@@ -52,7 +52,10 @@ func serveCmd() *cobra.Command {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 			defer cancel()
 
-			cfg := engine.DefaultConfig()
+			cfg, err := engine.DefaultConfig()
+			if err != nil {
+				return err
+			}
 			eng := engine.New(cfg)
 			defer eng.Close()
 
@@ -73,7 +76,10 @@ func fetchCmd() *cobra.Command {
 		Short: "Fetch a URL and print content to stdout",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := engine.DefaultConfig()
+			cfg, err := engine.DefaultConfig()
+			if err != nil {
+				return err
+			}
 			eng := engine.New(cfg)
 			defer eng.Close()
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Download prebuilt libcronet shared library from SagerNet releases.
-# macOS is not published — see scripts/build-libcronet-macos.sh instead.
+# macOS prebuilts are not currently published by SagerNet.
 
 set -euo pipefail
 
@@ -29,8 +29,10 @@ case "$OS" in
         echo "Error: SagerNet does not publish prebuilt macOS Cronet libraries."
         echo ""
         echo "Options:"
-        echo "  1. Run: scripts/build-libcronet-macos.sh (builds from Chromium source)"
-        echo "  2. Use Docker for Linux testing: docker run -v \$(pwd):/src -w /src golang:1.23 make build-linux"
+        echo "  1. Build from Chromium source using sagernet/cronet-go's build-naive tool:"
+        echo "     go run github.com/sagernet/cronet-go/cmd/build-naive@latest build"
+        echo "  2. Test on Linux via Docker:"
+        echo "     docker run --rm -v \$(pwd):/src -w /src golang:1.25 bash -c 'bash scripts/download-libcronet.sh . && make build'"
         exit 1
         ;;
     *)
@@ -40,9 +42,10 @@ case "$OS" in
 esac
 
 DEST="${1:-.}"
+mkdir -p "$DEST" || { echo "Error: cannot create directory $DEST"; exit 1; }
 
 echo "Downloading ${LIB}..."
-curl -L -o "${DEST}/${TARGET}" "${RELEASE_URL}/${LIB}"
+curl -fL -o "${DEST}/${TARGET}" "${RELEASE_URL}/${LIB}"
 echo "Saved to ${DEST}/${TARGET}"
 echo ""
 echo "To build wick: go build -tags with_purego -o wick ./cmd/wick"

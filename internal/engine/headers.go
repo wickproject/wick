@@ -2,9 +2,12 @@ package engine
 
 import "net/http"
 
+// Chrome version must match the Cronet/Chromium version used by
+// sagernet/cronet-go (currently 143). Mismatched UA + Client Hints
+// vs TLS fingerprint is a detection vector.
 const (
-	chromeMajor   = "134"
-	chromeFullVer = "134.0.6998.89"
+	chromeMajor   = "143"
+	chromeFullVer = "143.0.7499.109"
 )
 
 // ChromeUserAgent returns a current Chrome User-Agent string.

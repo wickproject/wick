@@ -19,14 +19,17 @@ type Config struct {
 }
 
 // DefaultConfig returns sensible defaults for local use.
-func DefaultConfig() Config {
-	home, _ := os.UserHomeDir()
+func DefaultConfig() (Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return Config{}, fmt.Errorf("cannot determine home directory: %w", err)
+	}
 	return Config{
 		StoragePath: filepath.Join(home, ".wick", "data"),
 		UserAgent:   ChromeUserAgent(),
 		EnableQUIC:  true,
 		CacheSize:   50 * 1024 * 1024, // 50 MB
-	}
+	}, nil
 }
 
 // Engine wraps a Cronet engine and exposes an *http.Client whose TLS,
@@ -36,6 +39,7 @@ type Engine struct {
 	once     sync.Once
 	initErr  error
 	mu       sync.Mutex
+	closed   bool
 	engine   cronet.Engine
 	executor cronet.Executor
 	client   *http.Client
@@ -116,14 +120,21 @@ func (e *Engine) StoragePath() string {
 }
 
 // Close shuts down the Cronet engine and frees native resources.
-// Safe to call even if the engine was never started.
+// Safe to call even if the engine was never started. Idempotent.
 func (e *Engine) Close() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.closed {
+		return nil
+	}
+	e.closed = true
 	if e.engine != (cronet.Engine{}) {
 		e.engine.Shutdown()
 		e.engine.Destroy()
 		e.executor.Destroy()
+		e.engine = cronet.Engine{}
+		e.executor = cronet.Executor{}
+		e.client = nil
 	}
 	return nil
 }

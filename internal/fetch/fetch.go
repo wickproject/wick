@@ -86,7 +86,7 @@ func (f *Fetcher) Fetch(req Request) (*Result, error) {
 	// Apply Chrome-equivalent headers
 	for key, vals := range engine.ChromeHeaders(req.URL) {
 		for _, v := range vals {
-			httpReq.Header.Set(key, v)
+			httpReq.Header.Add(key, v)
 		}
 	}
 

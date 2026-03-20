@@ -50,7 +50,10 @@ func setupClaudeCLI(wickPath string) error {
 }
 
 func setupClaudeJSON(wickPath string) error {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
 	configPath := filepath.Join(home, ".claude.json")
 
 	config := make(map[string]any)
@@ -77,7 +80,10 @@ func setupClaudeJSON(wickPath string) error {
 }
 
 func setupCursor(wickPath string) error {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
 	configDir := filepath.Join(home, ".cursor")
 
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
