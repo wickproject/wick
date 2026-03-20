@@ -5,10 +5,11 @@ LDFLAGS := -X github.com/myleshorton/wick/pkg/version.Version=$(VERSION) \
            -X github.com/myleshorton/wick/pkg/version.Commit=$(COMMIT) \
            -X github.com/myleshorton/wick/pkg/version.Date=$(DATE)
 
-.PHONY: build build-static clean test download-lib
+.PHONY: build build-purego clean test download-lib
 
-# Default: static build on macOS (CGO, links libcronet.a), purego elsewhere
-ifeq ($(shell uname -s),Darwin)
+# Default: static CGO build on macOS arm64, purego everywhere else.
+# macOS amd64 is not yet supported for static builds.
+ifeq ($(shell uname -s)-$(shell uname -m),Darwin-arm64)
 build:
 	CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -o wick ./cmd/wick
 else
@@ -16,7 +17,7 @@ build:
 	go build -tags with_purego -ldflags "$(LDFLAGS)" -o wick ./cmd/wick
 endif
 
-# Force purego build (requires libcronet.so/.dll at runtime)
+# Force purego build (requires libcronet.so/.dll/.dylib at runtime)
 build-purego:
 	go build -tags with_purego -ldflags "$(LDFLAGS)" -o wick ./cmd/wick
 
