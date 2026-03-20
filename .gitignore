@@ -2,5 +2,7 @@
 *.dylib
 *.so
 *.dll
+*.a
 .wick/
 .DS_Store
+lib/*/libcronet.*
