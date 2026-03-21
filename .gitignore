@@ -6,3 +6,4 @@
 .wick/
 .DS_Store
 lib/*/libcronet.*
+rust/target/
