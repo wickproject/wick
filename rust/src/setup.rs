@@ -2,6 +2,86 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::process::Command;
 
+const CEF_VERSION: &str = "0.1.0";
+const CEF_BUNDLE_SHA256: &str = "b2530de3015612797021b672712984aa1efff5d0e20ff2a3ef68fda801c87a38";
+
+/// Download and install the CEF renderer bundle for JavaScript rendering.
+pub fn install_cef() -> Result<()> {
+    let wick_bin = std::env::current_exe()?;
+    let install_dir = wick_bin.parent().ok_or_else(|| anyhow::anyhow!("no parent dir"))?;
+    let app_dir = install_dir.join("wick-renderer.app");
+
+    if app_dir.exists() {
+        println!("CEF renderer already installed at {}", app_dir.display());
+        return Ok(());
+    }
+
+    let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
+    let platform = match (os, arch) {
+        ("macos", "aarch64") => "darwin-arm64",
+        _ => anyhow::bail!("CEF bundle not available for {}-{}. Only macOS arm64 is currently supported.", os, arch),
+    };
+
+    let url = format!(
+        "https://github.com/myleshorton/wick/releases/download/v{}/wick-cef-{}.tar.gz",
+        CEF_VERSION, platform
+    );
+
+    let tmp_dir = install_dir.join(".wick-cef-download");
+    std::fs::create_dir_all(&tmp_dir)?;
+    let tarball = tmp_dir.join("wick-cef.tar.gz");
+
+    println!("Downloading CEF renderer (~121MB)...");
+    let status = Command::new("curl")
+        .args(["-fL", "--progress-bar", "-o"])
+        .arg(&tarball)
+        .arg(&url)
+        .status()?;
+
+    if !status.success() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        anyhow::bail!("Download failed. Check your internet connection and try again.");
+    }
+
+    // Verify checksum
+    println!("Verifying checksum...");
+    let output = Command::new("shasum")
+        .args(["-a", "256"])
+        .arg(&tarball)
+        .output()?;
+    let hash = String::from_utf8_lossy(&output.stdout);
+    let actual = hash.split_whitespace().next().unwrap_or("");
+    if actual != CEF_BUNDLE_SHA256 {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        anyhow::bail!(
+            "Checksum mismatch!\n  Expected: {}\n  Got:      {}\nThe download may be corrupted.",
+            CEF_BUNDLE_SHA256, actual
+        );
+    }
+    println!("Checksum OK.");
+
+    // Extract
+    println!("Extracting...");
+    let status = Command::new("tar")
+        .args(["xzf"])
+        .arg(&tarball)
+        .arg("-C")
+        .arg(install_dir)
+        .status()?;
+
+    if !status.success() {
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        anyhow::bail!("Extraction failed");
+    }
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+
+    println!("CEF renderer installed at {}", app_dir.display());
+    println!("JavaScript rendering is now available for wick_fetch.");
+    Ok(())
+}
+
 pub fn setup() -> Result<()> {
     let wick_path = std::env::current_exe()
         .map_err(|e| anyhow::anyhow!("find wick binary: {}", e))?;
