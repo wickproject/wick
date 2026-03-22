@@ -88,14 +88,19 @@ impl WickServer {
 
     #[tool(
         name = "wick_search",
-        description = "Search the web and optionally fetch top results. Note: basic implementation in v0.1."
+        description = "Search the web via DuckDuckGo. Returns titles, URLs, and snippets. Use wick_fetch to read the full content of any result."
     )]
     async fn wick_search(
         &self,
-        Parameters(_input): Parameters<SearchInput>,
-    ) -> String {
-        "Web search is not yet implemented in v0.1. Use wick_fetch with a specific URL instead."
-            .to_string()
+        Parameters(input): Parameters<SearchInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let num = input.num_results.unwrap_or(5).max(1).min(20) as usize;
+        let results = crate::search::search(&self.client, &input.query, num)
+            .await
+            .map_err(|e| McpError::internal_error(format!("search failed: {}", e), None))?;
+
+        let formatted = crate::search::format_results(&results);
+        Ok(CallToolResult::success(vec![Content::text(formatted)]))
     }
 
     #[tool(

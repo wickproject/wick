@@ -6,6 +6,7 @@ mod extract;
 mod fetch;
 mod mcp;
 mod robots;
+mod search;
 mod session;
 mod setup;
 
@@ -38,6 +39,14 @@ enum Command {
         /// Ignore robots.txt restrictions
         #[arg(long)]
         no_robots: bool,
+    },
+    /// Search the web and print results
+    Search {
+        /// Search query
+        query: String,
+        /// Number of results (default 5)
+        #[arg(short, long, default_value = "5")]
+        num: usize,
     },
     /// Auto-configure MCP clients (Claude Code, Cursor)
     Setup,
@@ -91,6 +100,12 @@ async fn main() -> Result<()> {
             }
             eprintln!("Status: {} | Time: {}ms\n", result.status_code, result.timing_ms);
             print!("{}", result.content);
+            Ok(())
+        }
+        Command::Search { query, num } => {
+            let client = engine::Client::new()?;
+            let results = search::search(&client, &query, num).await?;
+            println!("{}", search::format_results(&results));
             Ok(())
         }
         Command::Setup => setup::setup(),
