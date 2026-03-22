@@ -54,58 +54,84 @@ the No. 1 overall seed faces a tough test...
 
 Same page. Same URL. Different tool.
 
-## How it works
+## What you get
 
-Install takes 30 seconds:
+**`wick_fetch`** — Fetch any URL and get clean, LLM-friendly markdown. Strips boilerplate, navigation, and ads. Your agent gets the content, not the HTML soup.
 
+**`wick_search`** — Search the web directly from your agent. Returns titles, URLs, and snippets. Then use `wick_fetch` to read any result in full. Your agent can now research topics, not just read links you give it.
+
+**CAPTCHA handling** — When a site serves a CAPTCHA, Wick shows you a notification. You solve it (5 seconds), and your agent continues automatically. Because you're the human the CAPTCHA is looking for. No third-party solving service, no cloud, no cost.
+
+## Install in 30 seconds
+
+**macOS:**
 ```bash
 brew tap myleshorton/wick && brew install wick
 wick setup
 ```
 
-That's it. Your agent now has `wick_fetch` — a tool that fetches any URL and returns clean, LLM-friendly markdown. No configuration. No API keys. No cloud service.
+**Linux:**
+```bash
+curl -fsSL https://myleshorton.github.io/wick/apt/install.sh | bash
+wick setup
+```
 
-**What your agent sees:**
+**npm (any platform):**
+```bash
+npm install -g wick-mcp
+wick setup
+```
 
-| Without Wick | With Wick |
-|---|---|
-| 403 Forbidden | 200 OK |
-| "I can't access that page" | Clean markdown content |
-| Manual copy-paste required | Automatic, instant |
+That's it. Your agent now has `wick_fetch` and `wick_search`. No configuration. No API keys. No cloud service.
 
 ## What makes Wick different
 
-There are other tools in this space. Here's why Wick is different:
+There are other tools in this space — Firecrawl, Bright Data MCP, Browserbase, Playwright. Here's why Wick is different:
 
-**Local-first.** Wick runs on your machine. Your data never passes through a cloud service. Firecrawl, Browserbase, and Bright Data all route your traffic through their servers.
+**Local-first.** Wick runs on your machine. Your data never passes through a cloud service. Every alternative routes your traffic through their servers.
 
-**Your IP.** Requests come from your residential connection. No pooled proxy IPs with sketchy histories. No datacenter IPs that are pre-flagged.
+**Your IP.** Requests come from your residential connection. No pooled proxy IPs with sketchy histories. No datacenter IPs that are pre-flagged. To the website, it looks like you browsing normally — because it basically is.
 
-**Authentic, not mimicked.** Wick uses real browser networking technology, not a wrapper that tries to look like a browser. This is why it works where other tools fail.
+**Authentic, not mimicked.** Most tools try to *look* like a browser by faking headers. Anti-bot systems see through this in milliseconds. Wick uses the same networking technology that real browsers use. There's no difference to detect because there is no difference.
 
-**Free forever.** The core tool is open source and costs nothing. It runs entirely on your hardware.
+**Free forever.** The core tool is open source and costs nothing. It runs entirely on your hardware. No usage limits, no trial period, no credit card.
 
-**CAPTCHA handling.** When a site serves a CAPTCHA, Wick shows you a notification. You solve it (5 seconds), and your agent continues. Because you're the human the CAPTCHA is looking for.
+**Works everywhere.** macOS, Linux, any MCP client. Homebrew, apt, npm — install however you prefer.
 
-## Who it's for
+| | Wick | Firecrawl | Bright Data | Browserbase | Playwright MCP |
+|---|---|---|---|---|---|
+| Anti-bot bypass | Yes | No | Partial | No | No |
+| Runs locally | Yes | No | No | No | Yes |
+| Your residential IP | Yes | No | Pooled | No | Yes |
+| Clean markdown | Yes | Yes | Yes | No | No |
+| Web search | Yes | No | No | No | No |
+| Free tier | Forever | 500 pages | 5K req | Trial | Free |
 
-- **Developers using AI coding agents** who are tired of "I can't access that page"
-- **Teams building AI workflows** that need reliable web access
-- **Anyone who uses Claude Code, Cursor, Windsurf**, or any MCP-compatible client
+## For companies that need more
 
-## Try it
+The free version handles the majority of the web. But some companies need access to sites that go beyond what a Chrome fingerprint alone can handle — JavaScript-heavy single-page apps, sites with advanced bot detection, or pages that require rendering before content is available.
+
+**Wick Pro** is a bespoke service for companies accessing high-value data:
+
+- Full JavaScript rendering for dynamic pages
+- Advanced anti-detection that's continuously updated
+- Residential IP tunneling from cloud servers
+- Custom configuration per client
+- CAPTCHA handling (automated and human-in-the-loop)
+- Dedicated support with SLA
+
+We work with teams in financial data, competitive intelligence, compliance, market research, and other sectors where reliable web access is critical — not mass scraping.
+
+**Interested?** [Contact us](mailto:hello@getwick.dev). We'll set up a call to understand what you need.
+
+## Try it now
 
 ```bash
-brew tap myleshorton/wick && brew install wick
-wick setup
+brew tap myleshorton/wick && brew install wick && wick setup
 ```
 
-Then ask your agent to read a webpage. Any webpage. It just works.
+Then ask your agent to read a webpage. Any webpage.
 
 ---
 
-*Wick is built by the team behind [Lantern](https://getlantern.org) — a decade of experience in making the internet accessible. Check us out at [getwick.dev](https://getwick.dev) or on [GitHub](https://github.com/myleshorton/wick).*
-
----
-
-**For companies that need more** — JavaScript rendering, advanced anti-detection, custom fingerprinting, dedicated support — [contact us about Wick Pro](mailto:hello@getwick.dev).
+*Check us out at [getwick.dev](https://getwick.dev) or on [GitHub](https://github.com/myleshorton/wick).*
