@@ -957,6 +957,25 @@ footer {
         </div>
       </div>
     </div>
+
+    <!-- Search demo -->
+    <div style="max-width: 600px; margin: 2.5rem auto 0;">
+      <div class="demo-panel success reveal" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--smoke-light); background: var(--ash);">
+        <div class="demo-panel-header" style="padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--smoke-light); font-size: 0.85rem; font-weight: 500;">
+          <span class="panel-dot green" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;"></span>
+          wick_search
+        </div>
+        <div class="demo-panel-body" style="padding: 1.5rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.8; color: var(--warm-gray);">
+          <span style="color:var(--cool-gray);">&gt; wick search "rust programming language"</span><br><br>
+          <span style="color:var(--warm-white);">1. <a href="#" style="color:var(--flame);text-decoration:none;">Rust Programming Language</a></span><br>
+          <span style="color:var(--warm-gray);">&nbsp;&nbsp; rust-lang.org — Fast, reliable, productive.</span><br>
+          <span style="color:var(--warm-white);">2. <a href="#" style="color:var(--flame);text-decoration:none;">Rust (programming language) - Wikipedia</a></span><br>
+          <span style="color:var(--warm-gray);">&nbsp;&nbsp; General-purpose language emphasizing performance...</span><br>
+          <span style="color:var(--warm-white);">3. <a href="#" style="color:var(--flame);text-decoration:none;">wick-mcp on NPM</a></span><br>
+          <span style="color:var(--warm-gray);">&nbsp;&nbsp; Browser-grade web access for AI agents.</span>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -992,6 +1011,11 @@ footer {
       <span class="feature-icon">&#x1f916;</span>
       <h3>MCP Native</h3>
       <p>Designed for AI agents from day one. Works instantly with Claude Code, Cursor, Windsurf, and any MCP-compatible client. One command to install.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-5">
+      <span class="feature-icon">&#x1f50d;</span>
+      <h3>Web Search Built In</h3>
+      <p><code>wick_search</code> lets your agent search the web and get results with titles, URLs, and snippets. Then <code>wick_fetch</code> reads any result in full.</p>
     </div>
     <div class="feature-card reveal reveal-delay-5">
       <span class="feature-icon">&#x2764;</span>
@@ -1187,7 +1211,7 @@ footer {
       <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
         <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
         <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
         </div>
       </div>
     </div>
@@ -1212,7 +1236,7 @@ sudo apt update && sudo apt install wick</code>
       <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
         <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
         <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
         </div>
       </div>
     </div>
@@ -1234,7 +1258,7 @@ sudo apt update && sudo apt install wick</code>
       <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
         <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
         <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
         </div>
       </div>
     </div>
