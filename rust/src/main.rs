@@ -1,4 +1,4 @@
-mod cef;
+mod captcha;
 #[cfg(feature = "cronet")]
 mod cronet;
 mod engine;
@@ -40,11 +40,7 @@ enum Command {
         no_robots: bool,
     },
     /// Auto-configure MCP clients (Claude Code, Cursor)
-    Setup {
-        /// Download CEF for JavaScript rendering (~120MB)
-        #[arg(long)]
-        with_js: bool,
-    },
+    Setup,
     /// Print version information
     Version,
 }
@@ -97,12 +93,7 @@ async fn main() -> Result<()> {
             print!("{}", result.content);
             Ok(())
         }
-        Command::Setup { with_js } => {
-            if with_js {
-                setup::install_cef()?;
-            }
-            setup::setup()
-        }
+        Command::Setup => setup::setup(),
         Command::Version => {
             println!("wick {} (rust)", env!("CARGO_PKG_VERSION"));
             Ok(())

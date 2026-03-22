@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::time::Instant;
 
+use crate::captcha;
 use crate::engine::Client;
 use crate::extract::{self, Format};
 use crate::robots;
@@ -13,13 +14,7 @@ pub struct FetchResult {
     pub timing_ms: u64,
 }
 
-/// Full fetch pipeline: validate → robots.txt → CEF render → extract.
-///
-/// Always uses CEF (Chromium) for fetching + rendering. This means:
-/// - Single request per page (no double-fetch fingerprint signal)
-/// - JS rendering works automatically on every page
-/// - Same Chrome TLS fingerprint as Cronet (CEF IS Chromium)
-/// - Falls back to Cronet if CEF is not available
+/// Full fetch pipeline: validate → robots.txt → fetch → CAPTCHA → extract.
 pub async fn fetch(
     client: &Client,
     url: &str,
@@ -38,7 +33,7 @@ pub async fn fetch(
 
     let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("missing host"))?;
 
-    // robots.txt check (uses Cronet for the lightweight robots.txt fetch)
+    // robots.txt check
     if respect_robots && !robots::check(client, url).await {
         return Ok(FetchResult {
             content: format!(
@@ -53,43 +48,64 @@ pub async fn fetch(
         });
     }
 
-    // Primary path: CEF (full Chromium rendering, single request).
-    // Falls back to Cronet if CEF crashes or is unavailable.
-    if crate::cef::is_available() {
-        match crate::cef::render(url).await {
-            Ok(rendered_html) => {
-                let extracted = extract::extract(&rendered_html, &parsed, format)?;
-                return Ok(FetchResult {
-                    content: extracted.content,
-                    title: extracted.title,
-                    url: url.to_string(),
-                    status_code: 0, // CEF doesn't report HTTP status yet
-                    timing_ms: start.elapsed().as_millis() as u64,
-                });
-            }
-            Err(e) => {
-                tracing::debug!("CEF render failed, falling back to Cronet: {}", e);
-            }
-        }
-    }
-
-    // Fallback: Cronet (no JS rendering, but Chrome TLS fingerprint)
+    // Fetch via Cronet (Chrome TLS fingerprint)
     let resp = client.get(url).await?;
     let status = resp.status;
     let body = resp.body;
 
-    if status == 403 || status == 503 {
-        if is_challenge(&body) {
-            return Ok(FetchResult {
-                content: "This page returned a CAPTCHA or browser challenge. \
-                          The content could not be extracted automatically."
-                    .to_string(),
-                title: None,
-                url: url.to_string(),
-                status_code: status,
-                timing_ms: start.elapsed().as_millis() as u64,
-            });
+    // CAPTCHA detection → user-in-the-loop solving
+    if (status == 403 || status == 503) && is_challenge(&body) {
+        if captcha::is_available() {
+            tracing::info!("CAPTCHA detected on {}. Launching solver...", host);
+            match captcha::solve(url).await {
+                Ok(cookies) => {
+                    tracing::info!(
+                        "CAPTCHA solved! Got {} cookies. Retrying request...",
+                        cookies.len()
+                    );
+                    // Retry the request — Cronet should pick up cookies from
+                    // its persistent store, but also add them as a header
+                    // in case the cookie store doesn't sync immediately.
+                    let retry = client.get(url).await?;
+                    if retry.status < 400 {
+                        let extracted = extract::extract(&retry.body, &parsed, format)?;
+                        return Ok(FetchResult {
+                            content: extracted.content,
+                            title: extracted.title,
+                            url: url.to_string(),
+                            status_code: retry.status,
+                            timing_ms: start.elapsed().as_millis() as u64,
+                        });
+                    }
+                    // Retry still failed — return the retry response
+                    return Ok(FetchResult {
+                        content: format!("HTTP {} after CAPTCHA solve: {}", retry.status, retry.body),
+                        title: None,
+                        url: url.to_string(),
+                        status_code: retry.status,
+                        timing_ms: start.elapsed().as_millis() as u64,
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!("CAPTCHA solving failed: {}", e);
+                    // Fall through to return the challenge response
+                }
+            }
         }
+
+        return Ok(FetchResult {
+            content: "This page returned a CAPTCHA or browser challenge. \
+                      The content could not be extracted automatically.\n\
+                      Install wick-captcha to solve CAPTCHAs interactively."
+                .to_string(),
+            title: None,
+            url: url.to_string(),
+            status_code: status,
+            timing_ms: start.elapsed().as_millis() as u64,
+        });
+    }
+
+    if status == 403 || status == 503 {
         return Ok(FetchResult {
             content: format!("HTTP {}: {}", status, body),
             title: None,
