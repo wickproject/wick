@@ -1155,34 +1155,87 @@ footer {
   </div>
 </section>
 
-<!-- How it works -->
+<!-- Install -->
 <section class="how" id="install">
   <div class="how-header reveal">
     <div class="section-label">Get started</div>
-    <h2>Three commands. That's it.</h2>
+    <h2>Install in seconds. Any platform.</h2>
   </div>
-  <div class="steps">
-    <div class="step reveal">
-      <div class="step-num">01</div>
-      <div>
-        <h3>Install</h3>
-        <p>One line. Homebrew on macOS, or grab the binary from GitHub releases.</p>
-        <code>brew tap myleshorton/wick && brew install wick</code>
+
+  <!-- Platform tabs -->
+  <div style="max-width: 700px; margin: 0 auto;">
+    <div style="display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--smoke-light);" class="reveal">
+      <button onclick="showPlatform('macos')" id="tab-macos" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid var(--flame); margin-bottom: -2px; color: var(--flame); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">macOS</button>
+      <button onclick="showPlatform('linux')" id="tab-linux" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--warm-gray); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">Linux (apt)</button>
+      <button onclick="showPlatform('npm')" id="tab-npm" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--warm-gray); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">npm</button>
+    </div>
+
+    <div id="platform-macos" class="reveal reveal-delay-1" style="padding-top: 2rem;">
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install via Homebrew</h3>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">brew tap myleshorton/wick && brew install wick</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Auto-detects Claude Code, Cursor, and other MCP clients.</p>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);margin-top:0.5rem;">wick setup</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+        </div>
       </div>
     </div>
-    <div class="step reveal reveal-delay-1">
-      <div class="step-num">02</div>
-      <div>
-        <h3>Setup</h3>
-        <p>Wick auto-detects your MCP clients and configures them.</p>
-        <code>wick setup</code>
+
+    <div id="platform-linux" class="reveal reveal-delay-1" style="padding-top: 2rem; display: none;">
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">One-liner install</h3>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">curl -fsSL https://myleshorton.github.io/wick/apt/install.sh | bash</code>
+          <p style="color:var(--cool-gray);font-size:0.8rem;margin-top:0.75rem;">Or add the APT repository manually:</p>
+          <code style="display:block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.5rem 0.6rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--warm-gray);margin-top:0.25rem;line-height:1.6;white-space:pre-wrap;">echo "deb [trusted=yes] https://myleshorton.github.io/wick/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/wick.list
+sudo apt update && sudo apt install wick</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick setup</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+        </div>
       </div>
     </div>
-    <div class="step reveal reveal-delay-2">
-      <div class="step-num">03</div>
-      <div>
-        <h3>Use</h3>
-        <p>Your agent now has <code>wick_fetch</code>. Ask it to read any webpage. It just works.</p>
+
+    <div id="platform-npm" class="reveal reveal-delay-1" style="padding-top: 2rem; display: none;">
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install via npm</h3>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Works on any platform with Node.js.</p>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);margin-top:0.5rem;">npm install -g wick-mcp</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
+          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick setup</code>
+        </div>
+      </div>
+      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
+        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
+          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code>. Ask it to read any webpage.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1265,6 +1318,23 @@ function copyInstall(el) {
     setTimeout(() => copied.classList.remove('show'), 2000);
   });
 }
+
+// Platform tabs
+function showPlatform(platform) {
+  ['macos', 'linux', 'npm'].forEach(p => {
+    document.getElementById('platform-' + p).style.display = p === platform ? 'block' : 'none';
+    var tab = document.getElementById('tab-' + p);
+    tab.style.borderBottomColor = p === platform ? 'var(--flame)' : 'transparent';
+    tab.style.color = p === platform ? 'var(--flame)' : 'var(--warm-gray)';
+  });
+}
+
+// Auto-detect platform
+(function() {
+  var ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('linux') !== -1) showPlatform('linux');
+  else if (ua.indexOf('mac') !== -1) showPlatform('macos');
+})();
 
 // Smooth scroll for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(a => {
