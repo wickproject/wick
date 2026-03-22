@@ -58,16 +58,61 @@ jobs:
       - name: Strip binary
         run: strip rust/target/release/wick
 
-      - name: Package (binary + libcronet.so)
+      - name: Package tarball (binary + libcronet.so)
         run: |
           cp rust/lib/linux_amd64/libcronet.so rust/target/release/
           tar czf wick-linux-amd64.tar.gz -C rust/target/release wick libcronet.so
+
+      - name: Build .deb package
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          PKG="wick_${VERSION}_amd64"
+          mkdir -p "$PKG/DEBIAN"
+          mkdir -p "$PKG/usr/local/bin"
+          mkdir -p "$PKG/usr/local/lib"
+
+          # Install files
+          cp rust/target/release/wick "$PKG/usr/local/bin/"
+          cp rust/lib/linux_amd64/libcronet.so "$PKG/usr/local/lib/"
+
+          # Control file
+          cat > "$PKG/DEBIAN/control" << EOF
+          Package: wick
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Depends: libc6
+          Maintainer: Wick <hello@getwick.dev>
+          Homepage: https://getwick.dev
+          Description: Browser-grade web access for AI agents
+           Wick gives AI agents the same web access their human operators
+           have. Uses Chrome's network stack for authentic TLS fingerprinting.
+           Returns clean, LLM-friendly markdown from any webpage.
+          EOF
+          # Remove leading spaces from heredoc
+          sed -i 's/^          //' "$PKG/DEBIAN/control"
+
+          # Post-install: update library cache
+          cat > "$PKG/DEBIAN/postinst" << 'EOF'
+          #!/bin/sh
+          ldconfig
+          EOF
+          sed -i 's/^          //' "$PKG/DEBIAN/postinst"
+          chmod 755 "$PKG/DEBIAN/postinst"
+
+          dpkg-deb --build "$PKG"
+          mv "${PKG}.deb" "wick-linux-amd64.deb"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-amd64
-          path: wick-linux-amd64.tar.gz
+          path: |
+            wick-linux-amd64.tar.gz
+            wick-linux-amd64.deb
 
   release:
     needs: [build-macos-arm64, build-linux-amd64]
@@ -89,5 +134,6 @@ jobs:
             macos-arm64/wick-darwin-arm64.tar.gz \
             macos-arm64/wick-captcha-darwin-arm64.tar.gz \
             linux-amd64/wick-linux-amd64.tar.gz \
+            linux-amd64/wick-linux-amd64.deb \
             --title "$TAG_NAME" \
             --generate-notes
