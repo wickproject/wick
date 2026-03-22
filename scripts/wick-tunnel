@@ -1,0 +1,258 @@
+#!/bin/bash
+# wick-tunnel: One-command WireGuard tunnel for residential IP routing.
+#
+# On cloud server:  wick-tunnel init
+#                   → prints a join token
+#
+# On your laptop:   wick-tunnel join <token>
+#                   → connects, enables NAT, done
+#
+# Then on server:   wick fetch https://example.com
+#                   → exits from your residential IP
+
+set -euo pipefail
+
+WG_IFACE="wg-wick"
+WG_PORT=51820
+SERVER_IP="10.99.0.1"
+CLIENT_IP="10.99.0.2"
+CONF_DIR="/etc/wireguard"
+BINDWG="/usr/local/lib/bindwg.so"
+
+red() { echo -e "\033[0;31m$*\033[0m"; }
+green() { echo -e "\033[0;32m$*\033[0m"; }
+bold() { echo -e "\033[1m$*\033[0m"; }
+
+check_deps() {
+    if ! command -v wg &>/dev/null; then
+        echo "Installing WireGuard..."
+        if [[ "$(uname)" == "Darwin" ]]; then
+            brew install wireguard-tools 2>/dev/null || { red "Install wireguard-tools: brew install wireguard-tools"; exit 1; }
+        else
+            apt-get install -y wireguard-tools 2>/dev/null || \
+            yum install -y wireguard-tools 2>/dev/null || \
+            { red "Install wireguard-tools for your distro"; exit 1; }
+        fi
+    fi
+}
+
+ensure_root() {
+    if [[ $EUID -ne 0 ]]; then
+        red "This command requires root. Run with sudo."
+        exit 1
+    fi
+}
+
+# ── INIT (run on cloud server) ─────────────────────────────────
+
+cmd_init() {
+    ensure_root
+    check_deps
+
+    mkdir -p "$CONF_DIR"
+
+    # Generate server keys
+    if [[ ! -f "$CONF_DIR/server-private.key" ]]; then
+        wg genkey > "$CONF_DIR/server-private.key"
+        chmod 600 "$CONF_DIR/server-private.key"
+        wg pubkey < "$CONF_DIR/server-private.key" > "$CONF_DIR/server-public.key"
+    fi
+
+    local server_privkey
+    server_privkey=$(cat "$CONF_DIR/server-private.key")
+    local server_pubkey
+    server_pubkey=$(cat "$CONF_DIR/server-public.key")
+
+    # Detect public IP
+    local public_ip
+    public_ip=$(curl -s --connect-timeout 5 https://httpbin.org/ip 2>/dev/null | grep -o '"origin": "[^"]*"' | cut -d'"' -f4 || hostname -I | awk '{print $1}')
+
+    # Create server config (client peer added on join)
+    cat > "$CONF_DIR/${WG_IFACE}.conf" << EOF
+[Interface]
+PrivateKey = ${server_privkey}
+Address = ${SERVER_IP}/24
+ListenPort = ${WG_PORT}
+EOF
+
+    # Build bindwg.so for transparent routing
+    if [[ ! -f "$BINDWG" ]] && command -v gcc &>/dev/null; then
+        cat > /tmp/bindwg.c << 'CEOF'
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+int connect(int fd, const struct sockaddr *a, socklen_t l) {
+    static int (*real)(int, const struct sockaddr *, socklen_t) = 0;
+    if (!real) real = dlsym(RTLD_NEXT, "connect");
+    if (a->sa_family == AF_INET) {
+        struct sockaddr_in b = {.sin_family = AF_INET};
+        inet_pton(AF_INET, "10.99.0.1", &b.sin_addr);
+        bind(fd, (struct sockaddr *)&b, sizeof(b));
+    }
+    return real(fd, a, l);
+}
+CEOF
+        gcc -shared -fPIC -o "$BINDWG" /tmp/bindwg.c -ldl 2>/dev/null
+        rm -f /tmp/bindwg.c
+    fi
+
+    # Enable IP forwarding
+    sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1
+
+    # Create join token: base64(pubkey:endpoint)
+    local token
+    token=$(echo -n "${server_pubkey}:${public_ip}:${WG_PORT}" | base64 | tr -d '\n')
+
+    echo ""
+    green "=== Wick Tunnel Server Ready ==="
+    echo ""
+    bold "Run this on your laptop/desktop to connect:"
+    echo ""
+    echo "  sudo wick-tunnel join ${token}"
+    echo ""
+    echo "The token contains: server public key + endpoint."
+    echo "Your laptop's residential IP will be used for all Wick requests."
+    echo ""
+}
+
+# ── JOIN (run on client laptop) ────────────────────────────────
+
+cmd_join() {
+    local token="${1:?Usage: wick-tunnel join <token>}"
+    ensure_root
+    check_deps
+
+    # Decode token
+    local decoded
+    decoded=$(echo "$token" | base64 -d 2>/dev/null || echo "$token" | base64 -D 2>/dev/null)
+    local server_pubkey server_host server_port
+    server_pubkey=$(echo "$decoded" | cut -d: -f1)
+    server_host=$(echo "$decoded" | cut -d: -f2)
+    server_port=$(echo "$decoded" | cut -d: -f3)
+
+    if [[ -z "$server_pubkey" || -z "$server_host" ]]; then
+        red "Invalid token. Get a new one from: sudo wick-tunnel init"
+        exit 1
+    fi
+
+    mkdir -p "$CONF_DIR"
+
+    # Generate client keys
+    if [[ ! -f "$CONF_DIR/client-private.key" ]]; then
+        wg genkey > "$CONF_DIR/client-private.key"
+        chmod 600 "$CONF_DIR/client-private.key"
+        wg pubkey < "$CONF_DIR/client-private.key" > "$CONF_DIR/client-public.key"
+    fi
+
+    local client_privkey client_pubkey
+    client_privkey=$(cat "$CONF_DIR/client-private.key")
+    client_pubkey=$(cat "$CONF_DIR/client-public.key")
+
+    # Detect main interface
+    local main_iface
+    if [[ "$(uname)" == "Darwin" ]]; then
+        main_iface=$(route -n get default 2>/dev/null | grep interface | awk '{print $2}')
+    else
+        main_iface=$(ip route show default | awk '{print $5}' | head -1)
+    fi
+
+    # Create client config
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # macOS: use pfctl for NAT
+        cat > "$CONF_DIR/${WG_IFACE}.conf" << EOF
+[Interface]
+PrivateKey = ${client_privkey}
+Address = ${CLIENT_IP}/24
+PostUp = sysctl -w net.inet.ip.forwarding=1; echo "nat on ${main_iface} from 10.99.0.0/24 to any -> (${main_iface})" | pfctl -ef -
+PostDown = pfctl -d 2>/dev/null
+
+[Peer]
+PublicKey = ${server_pubkey}
+Endpoint = ${server_host}:${server_port}
+AllowedIPs = 10.99.0.0/24
+PersistentKeepalive = 25
+EOF
+    else
+        # Linux: use iptables for NAT
+        cat > "$CONF_DIR/${WG_IFACE}.conf" << EOF
+[Interface]
+PrivateKey = ${client_privkey}
+Address = ${CLIENT_IP}/24
+PostUp = iptables -t nat -A POSTROUTING -s 10.99.0.0/24 -o ${main_iface} -j MASQUERADE; sysctl -w net.ipv4.ip_forward=1
+PostDown = iptables -t nat -D POSTROUTING -s 10.99.0.0/24 -o ${main_iface} -j MASQUERADE
+
+[Peer]
+PublicKey = ${server_pubkey}
+Endpoint = ${server_host}:${server_port}
+AllowedIPs = 10.99.0.0/24
+PersistentKeepalive = 25
+EOF
+    fi
+
+    # Start tunnel
+    wg-quick down "$WG_IFACE" 2>/dev/null || true
+    wg-quick up "$WG_IFACE"
+
+    # Tell the server about this client
+    echo ""
+    green "=== Tunnel Connected ==="
+    echo ""
+    echo "Your residential IP is now available to the server."
+    echo ""
+    bold "Add this client to the server:"
+    echo ""
+    echo "  sudo wg set ${WG_IFACE} peer ${client_pubkey} allowed-ips 0.0.0.0/0"
+    echo ""
+    echo "Then test from the server:"
+    echo "  curl --interface 10.99.0.1 https://httpbin.org/ip"
+    echo "  # Should show your residential IP"
+    echo ""
+}
+
+# ── STATUS ─────────────────────────────────────────────────────
+
+cmd_status() {
+    if ! wg show "$WG_IFACE" &>/dev/null; then
+        red "Tunnel not active"
+        exit 1
+    fi
+
+    echo ""
+    bold "=== Wick Tunnel Status ==="
+    wg show "$WG_IFACE"
+    echo ""
+
+    # Check if residential routing works
+    if command -v curl &>/dev/null; then
+        local ip
+        ip=$(curl -s --interface "$SERVER_IP" --connect-timeout 3 https://httpbin.org/ip 2>/dev/null | grep -o '"origin": "[^"]*"' | cut -d'"' -f4)
+        if [[ -n "$ip" ]]; then
+            green "Residential IP: $ip"
+        fi
+    fi
+}
+
+# ── STOP ───────────────────────────────────────────────────────
+
+cmd_stop() {
+    wg-quick down "$WG_IFACE" 2>/dev/null && green "Tunnel stopped" || red "Tunnel was not running"
+}
+
+# ── MAIN ───────────────────────────────────────────────────────
+
+case "${1:-help}" in
+    init)   cmd_init ;;
+    join)   shift; cmd_join "$@" ;;
+    status) cmd_status ;;
+    stop)   cmd_stop ;;
+    *)
+        bold "wick-tunnel: Residential IP routing for Wick Pro"
+        echo ""
+        echo "  On cloud server:  sudo wick-tunnel init"
+        echo "  On your laptop:   sudo wick-tunnel join <token>"
+        echo "  Check status:     sudo wick-tunnel status"
+        echo "  Stop tunnel:      sudo wick-tunnel stop"
+        ;;
+esac

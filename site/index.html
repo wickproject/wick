@@ -1062,12 +1062,45 @@ footer {
         <li style="color: var(--flame);">&#x2713; Continuously updated evasions</li>
         <li style="color: var(--flame);">&#x2713; Custom browser fingerprint</li>
         <li style="color: var(--flame);">&#x2713; CAPTCHA handling</li>
-        <li style="color: var(--flame);">&#x2713; Dedicated support</li>
-        <li style="color: var(--flame);">&#x2713; SLA available</li>
-        <li>&nbsp;</li>
+        <li style="color: var(--flame);">&#x2713; Residential IP tunneling</li>
+        <li style="color: var(--flame);">&#x2713; Dedicated support + SLA</li>
       </ul>
       <div style="margin-top: 1.5rem;">
         <a href="mailto:hello@getwick.dev" class="btn-primary" style="width: 100%; justify-content: center;">Contact Us</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How Pro Works -->
+<section class="how" id="pro-setup">
+  <div class="how-header reveal">
+    <div class="section-label">Wick Pro</div>
+    <h2>Cloud server. Your residential&nbsp;IP.</h2>
+  </div>
+  <div style="max-width: 700px; margin: 0 auto;">
+    <p class="reveal" style="color: var(--warm-gray); text-align: center; margin-bottom: 2.5rem; font-size: 1.05rem; line-height: 1.7;">
+      Run Wick on a cloud server but exit from your residential IP. Two commands, zero configuration files.
+    </p>
+    <div class="step reveal" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
+      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Initialize on your server</h3>
+        <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.3rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">sudo wick-tunnel init</code>
+        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">Generates a join token. One line, installs WireGuard if needed.</p>
+      </div>
+    </div>
+    <div class="step reveal reveal-delay-1" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
+      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
+      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Connect from your laptop</h3>
+        <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.3rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">sudo wick-tunnel join &lt;token&gt;</code>
+        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">Your laptop's residential IP is now available to the server. Survives wifi changes.</p>
+      </div>
+    </div>
+    <div class="step reveal reveal-delay-2" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
+      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
+      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Fetch from the server</h3>
+        <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.3rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick fetch https://any-site.com</code>
+        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">Chrome fingerprint + your residential IP. Sites can't tell it's not your browser.</p>
       </div>
     </div>
   </div>
