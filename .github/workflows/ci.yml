@@ -7,37 +7,61 @@ on:
     branches: [main]
 
 jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Download libcronet.a (macOS arm64)
+        run: bash scripts/download-libcronet-macos.sh
+        working-directory: rust
+
+      - name: Build (Cronet)
+        run: cargo build --features cronet
+        working-directory: rust
+
+      - name: Build (reqwest fallback)
+        run: cargo build
+        working-directory: rust
+
+      - name: Verify
+        run: target/debug/wick version
+        working-directory: rust
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Download libcronet.so (Linux amd64)
+        run: bash scripts/download-cronet-linux.sh
+        working-directory: rust
+
+      - name: Build (Cronet)
+        run: cargo build --features cronet
+        working-directory: rust
+
+      - name: Build (reqwest fallback)
+        run: cargo build
+        working-directory: rust
+
+      - name: Verify
+        run: |
+          target/debug/wick version
+          target/debug/wick --help
+        working-directory: rust
+
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Download libcronet
-        run: bash scripts/download-libcronet.sh .
-
-      - name: Build
-        run: go build -tags with_purego -o wick ./cmd/wick
-
-      - name: Test
-        run: go test -tags with_purego -v ./...
-
-      - name: Verify binary
-        run: |
-          ./wick version
-          ./wick --help
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - name: Vet
-        run: go vet -tags with_purego ./...
+      - name: Test (without Cronet)
+        run: cargo test
+        working-directory: rust

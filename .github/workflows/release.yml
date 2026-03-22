@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Download libcronet.a
+        run: bash scripts/download-libcronet-macos.sh
+        working-directory: rust
+
+      - name: Build release
+        run: cargo build --release --features cronet
+        working-directory: rust
+
+      - name: Strip binary
+        run: strip rust/target/release/wick
+
+      - name: Build CAPTCHA solver
+        run: |
+          clang -o wick-captcha captcha/solver.m \
+            -framework Cocoa -framework WebKit -fobjc-arc
+        working-directory: rust
+
+      - name: Package
+        run: |
+          tar czf wick-darwin-arm64.tar.gz -C rust/target/release wick
+          tar czf wick-captcha-darwin-arm64.tar.gz -C rust wick-captcha
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: |
+            wick-darwin-arm64.tar.gz
+            wick-captcha-darwin-arm64.tar.gz
+
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Download libcronet.so
+        run: bash scripts/download-cronet-linux.sh
+        working-directory: rust
+
+      - name: Build release
+        run: cargo build --release --features cronet
+        working-directory: rust
+
+      - name: Strip binary
+        run: strip rust/target/release/wick
+
+      - name: Package (binary + libcronet.so)
+        run: |
+          cp rust/lib/linux_amd64/libcronet.so rust/target/release/
+          tar czf wick-linux-amd64.tar.gz -C rust/target/release wick libcronet.so
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: wick-linux-amd64.tar.gz
+
+  release:
+    needs: [build-macos-arm64, build-linux-amd64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            macos-arm64/wick-darwin-arm64.tar.gz \
+            macos-arm64/wick-captcha-darwin-arm64.tar.gz \
+            linux-amd64/wick-linux-amd64.tar.gz \
+            --title "$TAG_NAME" \
+            --generate-notes
