@@ -289,71 +289,9 @@ A critical component. Many sites work fine after the first visit sets cookies (C
 
 This means: solve a Cloudflare challenge once, and subsequent requests to that domain work without challenge for hours or days.
 
-### JavaScript Rendering (Local CEF)
+### JavaScript Rendering (Pro)
 
-For JavaScript-heavy sites (SPAs, Cloudflare JS challenges, dynamically loaded content), Wick uses the Chromium Embedded Framework (CEF) running locally on the user's machine.
-
-**Why local, not cloud:**
-
-| Concern | Cloud headless Chrome | Local CEF |
-|---------|----------------------|-----------|
-| **IP reputation** | Datacenter IPs are pre-flagged by Cloudflare/Akamai | User's residential IP — same as Cronet path |
-| **Automation detection** | CDP (Chrome DevTools Protocol) leaves fingerprints: `navigator.webdriver`, `__cdp_binding__`, injected execution contexts, timing anomalies | No CDP. DOM access via CEF's internal V8 + CefMessageRouter IPC — same path as Electron/Slack/Discord |
-| **Fingerprint consistency** | Stealth patches are cat-and-mouse | CEF IS Chromium — identical to any Electron app |
-| **Latency** | Network round-trip to cloud + render time | Local render only |
-| **Privacy** | Page content passes through cloud servers | Never leaves the user's machine |
-
-**Why not Playwright/Puppeteer?** Both use the Chrome DevTools Protocol (CDP) to control Chrome over a WebSocket connection. Modern anti-bot systems (Cloudflare, DataDome, Akamai) detect CDP through multiple vectors:
-- `navigator.webdriver` flag (set automatically when CDP is connected)
-- `__cdp_binding__` and other injected globals
-- Modified prototype chains and execution contexts
-- Timing anomalies from the WebSocket message round-trip
-- `Runtime.evaluate` side effects visible to page JS
-
-Even with stealth patches (`puppeteer-extra-plugin-stealth`), this is an arms race. CEF avoids it entirely by accessing the DOM through Chromium's internal APIs, not an external debugging protocol.
-
-**Architecture:**
-
-```
-wick binary (29MB)                     wick-renderer (CEF, ~120MB optional download)
-┌─────────────────────┐               ┌──────────────────────────────────────┐
-│ MCP Server          │               │ Offscreen CefBrowser                 │
-│ Cronet Engine       │  stdio IPC    │ Chromium rendering engine            │
-│ Content Extraction  │◄─────────────►│ V8 JavaScript execution              │
-│ CLI                 │               │ CefMessageRouter (DOM extraction)    │
-└─────────────────────┘               └──────────────────────────────────────┘
-```
-
-The CEF renderer is a separate binary, spawned on demand only when a page requires JavaScript. The main `wick` binary handles 90%+ of requests via Cronet alone.
-
-**DOM extraction flow (no CDP):**
-1. `wick` detects page needs JS (empty content, SPA bootstrap, explicit `wait_for_js`)
-2. Spawns `wick-renderer` (or reuses running instance)
-3. CEF loads URL in offscreen browser (no visible window)
-4. Chromium renders normally — full JS, DOM, CSS, network requests
-5. `CefMessageRouter` extracts `document.documentElement.outerHTML` via internal V8 IPC
-6. HTML returned to `wick` via stdio, piped through readability → markdown
-7. Result returned to agent
-
-**Distribution:** CEF is an optional ~120MB download, not bundled:
-```bash
-wick setup --with-js    # one-time CEF download
-```
-Stored in `~/.wick/cef/`. Users who only need static content never download it.
-
-**Language considerations:**
-
-CEF's native API is C/C++. The current Go implementation uses Cronet (also C) via cgo, but no mature Go CEF bindings exist for headless use. Options under evaluation:
-
-1. **Go + C shim** — Thin C wrapper (~1000 LOC) around CEF's C API, called from Go via cgo. Keeps the existing Go codebase. Risk: complex multi-process management from Go.
-
-2. **Hybrid: Go + C++ renderer** — Keep Go for MCP server/CLI/Cronet (the 29MB binary), write `wick-renderer` in C++ where CEF is native. Clean separation, each language used where it's strongest. Communicate via stdio.
-
-3. **Rewrite in Rust** — Native CEF C API access, good MCP SDK (rmcp), single binary possible. Risk: rewrite cost, smaller ecosystem.
-
-4. **Electron/TypeScript** — Electron IS Chromium. Network stack identical to Chrome. MCP SDK most mature in TypeScript. An Electron-based Wick has a perfect fingerprint because it is literally a Chromium application. Risk: ~150MB binary for all requests (not just JS), "just another Electron app" perception.
-
-The hybrid approach (option 2) is currently favored: lean Go binary for fast Cronet-only requests, C++ CEF renderer spawned only when needed.
+For JavaScript-heavy sites (SPAs, dynamically loaded content), Wick Pro offers local JavaScript rendering that runs entirely on the user's machine. Contact us for details.
 
 ---
 

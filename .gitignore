@@ -7,3 +7,13 @@
 .DS_Store
 lib/*/libcronet.*
 rust/target/
+
+# CEF binaries and frameworks (Pro only)
+rust/cef/
+rust/Frameworks/
+rust/captcha/
+
+# Build artifacts
+*.app/
+*.framework/
+*.tar.bz2

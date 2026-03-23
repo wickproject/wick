@@ -2,7 +2,7 @@
 
 Browser-grade web access for AI agents.
 
-<!-- mcp-name: io.github.myleshorton/wick -->
+<!-- mcp-name: io.github.wickproject/wick -->
 
 Your AI agent gets blocked on the web. Wick fixes that — giving agents the same web access their human operators have, running locally from your own IP.
 
@@ -16,7 +16,7 @@ wick setup
 Or via Homebrew:
 
 ```bash
-brew tap myleshorton/wick && brew install wick
+brew tap wickproject/wick && brew install wick
 wick setup
 ```
 
@@ -29,4 +29,4 @@ wick setup
 ## Links
 
 - [Website](https://getwick.dev)
-- [GitHub](https://github.com/myleshorton/wick)
+- [GitHub](https://github.com/wickproject/wick)

@@ -1,13 +1,13 @@
 {
   "name": "wick-mcp",
   "version": "0.1.0",
-  "mcpName": "io.github.myleshorton/wick",
+  "mcpName": "io.github.wickproject/wick",
   "description": "Browser-grade web access for AI agents. Gives MCP-compatible agents (Claude Code, Cursor, etc.) the same web access their human operators have.",
   "keywords": ["mcp", "ai-agent", "web-fetch", "browser", "claude", "cursor"],
   "homepage": "https://getwick.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/myleshorton/wick.git"
+    "url": "https://github.com/wickproject/wick.git"
   },
   "license": "MIT",
   "bin": {

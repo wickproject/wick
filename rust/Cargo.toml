@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 description = "Browser-grade web access for AI agents"
 license = "MIT"
-repository = "https://github.com/myleshorton/wick"
+repository = "https://github.com/wickproject/wick"
 
 [features]
 # Enable Cronet for Chrome-identical TLS/HTTP2/QUIC fingerprinting.

@@ -63,7 +63,7 @@ fi
 
 # Create the apt source list file
 cat > wick.list << 'EOF'
-deb [signed-by=/usr/share/keyrings/wick-archive-keyring.gpg] https://myleshorton.github.io/wick/apt stable main
+deb [signed-by=/usr/share/keyrings/wick-archive-keyring.gpg] https://wickproject.github.io/wick/apt stable main
 EOF
 
 # Create install script
@@ -75,11 +75,11 @@ set -e
 echo "Adding Wick APT repository..."
 
 # Add GPG key
-curl -fsSL https://myleshorton.github.io/wick/apt/key.gpg \
+curl -fsSL https://wickproject.github.io/wick/apt/key.gpg \
     | sudo gpg --dearmor -o /usr/share/keyrings/wick-archive-keyring.gpg
 
 # Add repository
-echo "deb [signed-by=/usr/share/keyrings/wick-archive-keyring.gpg] https://myleshorton.github.io/wick/apt stable main" \
+echo "deb [signed-by=/usr/share/keyrings/wick-archive-keyring.gpg] https://wickproject.github.io/wick/apt stable main" \
     | sudo tee /etc/apt/sources.list.d/wick.list > /dev/null
 
 # Install

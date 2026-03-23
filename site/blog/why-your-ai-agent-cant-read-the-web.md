@@ -66,13 +66,13 @@ Same page. Same URL. Different tool.
 
 **macOS:**
 ```bash
-brew tap myleshorton/wick && brew install wick
+brew tap wickproject/wick && brew install wick
 wick setup
 ```
 
 **Linux:**
 ```bash
-curl -fsSL https://myleshorton.github.io/wick/apt/install.sh | bash
+curl -fsSL https://wickproject.github.io/wick/apt/install.sh | bash
 wick setup
 ```
 
@@ -127,11 +127,11 @@ We work with teams in financial data, competitive intelligence, compliance, mark
 ## Try it now
 
 ```bash
-brew tap myleshorton/wick && brew install wick && wick setup
+brew tap wickproject/wick && brew install wick && wick setup
 ```
 
 Then ask your agent to read a webpage. Any webpage.
 
 ---
 
-*Check us out at [getwick.dev](https://getwick.dev) or on [GitHub](https://github.com/myleshorton/wick).*
+*Check us out at [getwick.dev](https://getwick.dev) or on [GitHub](https://github.com/wickproject/wick).*

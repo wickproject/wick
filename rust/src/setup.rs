@@ -23,7 +23,7 @@ pub fn install_cef() -> Result<()> {
     };
 
     let url = format!(
-        "https://github.com/myleshorton/wick/releases/download/v{}/wick-cef-{}.tar.gz",
+        "https://github.com/wickproject/wick/releases/download/v{}/wick-cef-{}.tar.gz",
         CEF_VERSION, platform
     );
 
