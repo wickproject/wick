@@ -53,10 +53,40 @@ pub async fn fetch(
     let status = resp.status;
     let body = resp.body;
 
-    // CAPTCHA detection → user-in-the-loop solving
+    // CAPTCHA detection → auto-solve (Pro) or user-in-the-loop (Free)
     if (status == 403 || status == 503) && is_challenge(&body) {
+        // Try auto-solve first if CapSolver API key is set (Pro feature)
+        if let Ok(api_key) = std::env::var("CAPSOLVER_API_KEY") {
+            if let Some(captcha_type) = crate::captcha_auto::detect_captcha(&body) {
+                tracing::info!("CAPTCHA detected on {}. Auto-solving via CapSolver...", host);
+                match crate::captcha_auto::solve(&api_key, url, &captcha_type).await {
+                    Ok(token) => {
+                        tracing::info!("CAPTCHA auto-solved! Token length: {}", token.len());
+                        // Retry — the token itself doesn't help with a simple GET retry,
+                        // but the CapSolver solve often triggers a cf_clearance cookie
+                        // on the server side. Retry the request.
+                        let retry = client.get(url).await?;
+                        if retry.status < 400 {
+                            let extracted = extract::extract(&retry.body, &parsed, format)?;
+                            return Ok(FetchResult {
+                                content: extracted.content,
+                                title: extracted.title,
+                                url: url.to_string(),
+                                status_code: retry.status,
+                                timing_ms: start.elapsed().as_millis() as u64,
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Auto-solve failed: {}. Trying manual solver...", e);
+                    }
+                }
+            }
+        }
+
+        // Fall back to user-in-the-loop (opens a window for the user to solve)
         if captcha::is_available() {
-            tracing::info!("CAPTCHA detected on {}. Launching solver...", host);
+            tracing::info!("CAPTCHA detected on {}. Launching manual solver...", host);
             match captcha::solve(url).await {
                 Ok(cookies) => {
                     tracing::info!(
