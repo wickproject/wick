@@ -48,7 +48,26 @@ pub async fn fetch(
         });
     }
 
-    // Fetch via Cronet (Chrome TLS fingerprint)
+    // If Pro renderer is installed, use it (JS rendering + stealth patches)
+    if crate::cef::is_available() {
+        match crate::cef::render(url).await {
+            Ok(html) => {
+                let extracted = extract::extract(&html, &parsed, format)?;
+                return Ok(FetchResult {
+                    content: extracted.content,
+                    title: extracted.title,
+                    url: url.to_string(),
+                    status_code: 200,
+                    timing_ms: start.elapsed().as_millis() as u64,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
+            }
+        }
+    }
+
+    // Free tier: fetch via Cronet (Chrome TLS fingerprint)
     let resp = client.get(url).await?;
     let status = resp.status;
     let body = resp.body;
