@@ -112,8 +112,11 @@ Wick also works as a standalone CLI:
 # Fetch a page
 wick fetch https://example.com
 
-# Fetch as HTML
+# Fetch as raw HTML (no extraction, full page source)
 wick fetch https://example.com --format html
+
+# Fetch as plain text (no markdown formatting)
+wick fetch https://example.com --format text
 
 # Search the web
 wick search "latest rust features" --num 10
