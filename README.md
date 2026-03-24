@@ -129,13 +129,14 @@ wick serve --mcp
 
 | | Wick | Firecrawl | Bright Data | Browserbase | Playwright MCP |
 |---|---|---|---|---|---|
-| Anti-bot bypass | Yes | No | Partial | No | No |
+| Anti-bot bypass | Yes | No | Partial | Paid | No |
 | Runs locally | Yes | No | No | No | Yes |
-| Your residential IP | Yes | No | Pooled | No | Yes |
+| Your residential IP | Yes | No | Pooled | Pooled | Yes |
 | Clean markdown | Yes | Yes | Yes | No | No |
 | Web search | Yes | No | No | No | No |
-| Free | Forever | 500 pages | 5K req | Trial | Free |
-| Geo-restriction bypass | Pro | No | No | No | No |
+| Your data stays local | Yes | No | No | No | Yes |
+| Free | Forever | 500 pages | 5K req | 1 hr | Free |
+| Geo-restriction bypass | Pro | No | Paid | Paid | No |
 
 ## Wick Pro
 
