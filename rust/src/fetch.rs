@@ -33,6 +33,14 @@ pub async fn fetch(
 
     let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("missing host"))?;
 
+    // Rewrite www.reddit.com → old.reddit.com for better content extraction.
+    if host == "www.reddit.com" || host == "reddit.com" {
+        let old_url = url
+            .replace("://www.reddit.com", "://old.reddit.com")
+            .replace("://reddit.com", "://old.reddit.com");
+        return Box::pin(fetch(client, &old_url, format, respect_robots)).await;
+    }
+
     // robots.txt check
     if respect_robots && !robots::check(client, url).await {
         return Ok(FetchResult {
