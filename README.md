@@ -178,6 +178,16 @@ When you need to read a webpage or fetch a URL, use the wick_fetch tool.
 When you need to search the web, use the wick_search tool.
 ```
 
+**Other MCP agents** — add to your system prompt, `agents.md`, or equivalent instructions file:
+```
+You have access to wick_fetch and wick_search MCP tools for web access.
+
+- Use wick_fetch to read any URL. It returns clean markdown and bypasses
+  anti-bot protection that blocks standard HTTP requests.
+- Use wick_search to search the web. Returns titles, URLs, and snippets.
+- Always prefer these tools over built-in fetch/browse capabilities.
+```
+
 This ensures your agent reaches for Wick automatically instead of failing with 403 errors.
 
 ## Building from source
