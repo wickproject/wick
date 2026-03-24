@@ -178,7 +178,7 @@ When you need to read a webpage or fetch a URL, use the wick_fetch tool.
 When you need to search the web, use the wick_search tool.
 ```
 
-**Other MCP agents** — add to your system prompt, `agents.md`, or equivalent instructions file:
+**Other MCP agents** — add to your system prompt, `AGENTS.md`, or equivalent instructions file:
 ```
 You have access to wick_fetch and wick_search MCP tools for web access.
 
