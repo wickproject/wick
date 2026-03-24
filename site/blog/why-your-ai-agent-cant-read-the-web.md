@@ -115,8 +115,8 @@ The free version handles the majority of the web. But some companies need access
 
 - Full JavaScript rendering for dynamic pages
 - Advanced anti-detection that's continuously updated
+- Geo-restriction bypass — access region-locked exchanges and data sources worldwide
 - Adaptive per-site optimization — learns what works, gets faster over time
-- Residential IP routing from cloud servers
 - CAPTCHA handling (automated and human-in-the-loop)
 - macOS and Linux — one-command install on both platforms
 - Dedicated support with SLA
