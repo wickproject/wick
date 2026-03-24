@@ -161,6 +161,25 @@ Manual configuration:
 }
 ```
 
+### Making agents always use Wick
+
+By default, agents use their built-in fetch (which gets blocked). To make them prefer Wick, add instructions to your project's config:
+
+**Claude Code** — add to your `CLAUDE.md`:
+```markdown
+When fetching web pages, always use the wick_fetch MCP tool instead of
+the built-in WebFetch tool. wick_fetch bypasses anti-bot protection and
+returns cleaner content. Use wick_search for web searches.
+```
+
+**Cursor** — add to `.cursorrules`:
+```
+When you need to read a webpage or fetch a URL, use the wick_fetch tool.
+When you need to search the web, use the wick_search tool.
+```
+
+This ensures your agent reaches for Wick automatically instead of failing with 403 errors.
+
 ## Building from source
 
 ```bash
