@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wick Docs — Browser-Grade Web Access for AI Agents</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --flame: #E8913A;
+  --flame-bright: #F5B74C;
+  --flame-hot: #FF6B2B;
+  --ember: #C45A1A;
+  --ash: #1A1714;
+  --smoke: #2A2520;
+  --smoke-light: #3D3630;
+  --warm-white: #F0E6D8;
+  --warm-gray: #9E958A;
+  --cool-gray: #6B635A;
+  --black: #0D0B09;
+  --font-display: 'Outfit', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --sidebar-w: 240px;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+body {
+  background: var(--black);
+  color: var(--warm-white);
+  font-family: var(--font-display);
+  font-weight: 300;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--flame); color: var(--black); }
+
+/* ── Top bar ───────────────────────────────── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 3.5rem;
+  background: rgba(13,11,9,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(232,145,58,0.06);
+  display: flex; align-items: center; padding: 0 2rem;
+}
+.topbar-logo {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 0.95rem; color: var(--warm-white);
+  text-decoration: none; letter-spacing: 0.06em;
+}
+.topbar-logo span { color: var(--flame); font-weight: 300; margin-left: 0.5rem; font-size: 0.8rem; }
+.topbar-links { margin-left: auto; display: flex; gap: 1.5rem; }
+.topbar-links a {
+  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
+  letter-spacing: 0.04em; transition: color 0.2s;
+}
+.topbar-links a:hover { color: var(--warm-white); }
+
+/* ── Layout ────────────────────────────────── */
+.layout { display: flex; margin-top: 3.5rem; min-height: calc(100vh - 3.5rem); }
+
+/* ── Sidebar ───────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  position: fixed; top: 3.5rem; bottom: 0; left: 0;
+  overflow-y: auto; padding: 2rem 1.5rem;
+  border-right: 1px solid var(--smoke-light);
+  background: var(--black);
+  scrollbar-width: thin;
+}
+.sidebar-section { margin-bottom: 1.5rem; }
+.sidebar-label {
+  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--cool-gray); margin-bottom: 0.5rem; font-weight: 500;
+}
+.sidebar a {
+  display: block; padding: 0.25rem 0.75rem; margin: 0.1rem 0;
+  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
+  border-radius: 4px; transition: all 0.15s; border-left: 2px solid transparent;
+}
+.sidebar a:hover { color: var(--warm-white); background: var(--smoke); }
+.sidebar a.active {
+  color: var(--flame); border-left-color: var(--flame);
+  background: rgba(232,145,58,0.06);
+}
+
+/* ── Content ───────────────────────────────── */
+.content {
+  margin-left: var(--sidebar-w); flex: 1;
+  max-width: 780px; padding: 3rem 3rem 6rem;
+}
+
+.content h1 {
+  font-family: var(--font-serif); font-size: 2.2rem;
+  font-weight: 400; margin-bottom: 0.5rem; color: var(--warm-white);
+}
+.content h1 + p { color: var(--warm-gray); font-size: 1rem; margin-bottom: 3rem; }
+
+.content h2 {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.35rem;
+  margin-top: 4rem; margin-bottom: 1rem; color: var(--warm-white);
+  padding-top: 1.5rem; border-top: 1px solid var(--smoke-light);
+}
+.content h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+.content h3 {
+  font-family: var(--font-mono); font-weight: 500; font-size: 0.95rem;
+  margin-top: 2.5rem; margin-bottom: 0.75rem; color: var(--flame);
+}
+
+.content p { margin-bottom: 1rem; font-size: 0.9rem; color: var(--warm-gray); }
+.content strong { color: var(--warm-white); font-weight: 500; }
+
+.content ul, .content ol {
+  margin-bottom: 1rem; padding-left: 1.5rem; font-size: 0.9rem; color: var(--warm-gray);
+}
+.content li { margin-bottom: 0.3rem; }
+
+/* Code */
+.content code {
+  font-family: var(--font-mono); font-size: 0.82rem;
+  background: var(--smoke); padding: 0.15rem 0.4rem;
+  border-radius: 3px; color: var(--flame-bright);
+}
+.content pre {
+  background: var(--ash); border: 1px solid var(--smoke-light);
+  border-radius: 6px; padding: 1.25rem 1.5rem;
+  overflow-x: auto; margin-bottom: 1.5rem; line-height: 1.8;
+}
+.content pre code {
+  background: none; padding: 0; font-size: 0.8rem;
+  color: var(--warm-white);
+}
+.content pre .comment { color: var(--cool-gray); }
+.content pre .cmd { color: var(--flame); }
+.content pre .str { color: var(--flame-bright); }
+.content pre .flag { color: var(--warm-gray); }
+
+/* Tables */
+.content table {
+  width: 100%; border-collapse: collapse; margin-bottom: 1.5rem;
+  font-size: 0.82rem;
+}
+.content th {
+  text-align: left; padding: 0.6rem 0.75rem;
+  background: var(--smoke); color: var(--warm-gray);
+  font-weight: 500; font-size: 0.72rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border-bottom: 1px solid var(--smoke-light);
+}
+.content td {
+  padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--smoke-light);
+  color: var(--warm-gray); vertical-align: top;
+}
+.content td code { font-size: 0.78rem; }
+
+/* Callouts */
+.callout {
+  background: rgba(232,145,58,0.06); border-left: 3px solid var(--flame);
+  padding: 1rem 1.25rem; margin-bottom: 1.5rem; border-radius: 0 6px 6px 0;
+  font-size: 0.85rem; color: var(--warm-gray);
+}
+.callout strong { color: var(--flame); }
+
+/* ── Mobile ────────────────────────────────── */
+.menu-toggle { display: none; }
+
+@media (max-width: 860px) {
+  .sidebar {
+    transform: translateX(-100%); transition: transform 0.3s;
+    z-index: 90; width: 260px;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 2rem 1.5rem 4rem; }
+  .menu-toggle {
+    display: block; background: none; border: none; color: var(--warm-white);
+    font-size: 1.2rem; cursor: pointer; margin-right: 1rem;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+  <a href="/" class="topbar-logo">Wick <span>Docs</span></a>
+  <div class="topbar-links">
+    <a href="/">Home</a>
+    <a href="https://github.com/wickproject/wick">GitHub</a>
+    <a href="mailto:hello@getwick.dev">Contact</a>
+  </div>
+</div>
+
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">Getting Started</div>
+    <a href="#quick-start">Quick Start</a>
+    <a href="#agent-config">Agent Configuration</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">MCP Tools</div>
+    <a href="#wick-fetch">wick_fetch</a>
+    <a href="#wick-search">wick_search</a>
+    <a href="#wick-session">wick_session</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">CLI</div>
+    <a href="#cli-fetch">wick fetch</a>
+    <a href="#cli-search">wick search</a>
+    <a href="#cli-other">setup / serve / version</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Reference</div>
+    <a href="#output-formats">Output Formats</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+  </div>
+</nav>
+
+<main class="content">
+
+<h1>Wick Documentation</h1>
+<p>Browser-grade web access for AI agents. Install in 30 seconds, fetch any page.</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="quick-start">Quick Start</h2>
+
+<p>Install Wick, configure your agent, and fetch your first page.</p>
+
+<h3>1. Install</h3>
+
+<p><strong>macOS</strong> (Homebrew):</p>
+<pre><code><span class="cmd">brew tap</span> wickproject/wick <span class="cmd">&&</span> <span class="cmd">brew install</span> wick</code></pre>
+
+<p><strong>Linux</strong> (apt):</p>
+<pre><code><span class="cmd">curl</span> <span class="flag">-fsSL</span> https://wickproject.github.io/wick/apt/install.sh <span class="cmd">|</span> bash</code></pre>
+
+<p><strong>Any platform</strong> (npm):</p>
+<pre><code><span class="cmd">npm install -g</span> wick-mcp</code></pre>
+
+<h3>2. Configure</h3>
+<pre><code><span class="cmd">wick setup</span></code></pre>
+<p>Auto-detects Claude Code, Cursor, and other MCP clients. Writes the config for you.</p>
+
+<h3>3. Fetch</h3>
+<p>Ask your agent to read a webpage. It will use <code>wick_fetch</code> automatically.</p>
+<pre><code><span class="comment"># Or test from the command line:</span>
+<span class="cmd">wick fetch</span> https://www.nytimes.com</code></pre>
+
+<div class="callout">
+  <strong>Tip:</strong> If your agent still uses its built-in fetch, add instructions to prefer Wick.
+  See <a href="#agent-config" style="color:var(--flame);">Agent Configuration</a> below.
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="agent-config">Agent Configuration</h2>
+
+<p>Make your agent always use Wick instead of its built-in fetch (which gets blocked).</p>
+
+<h3>Claude Code</h3>
+<p>Add to your project's <code>CLAUDE.md</code>:</p>
+<pre><code>When fetching web pages, always use the wick_fetch MCP tool
+instead of the built-in WebFetch tool. wick_fetch bypasses
+anti-bot protection and returns cleaner content.
+Use wick_search for web searches.</code></pre>
+
+<h3>Cursor</h3>
+<p>Add to <code>.cursorrules</code>:</p>
+<pre><code>When you need to read a webpage or fetch a URL, use the
+wick_fetch tool. When you need to search the web, use
+the wick_search tool.</code></pre>
+
+<h3>Other MCP Agents</h3>
+<p>Add to <code>AGENTS.md</code>, your system prompt, or equivalent instructions file:</p>
+<pre><code>You have access to wick_fetch and wick_search MCP tools.
+
+- Use wick_fetch to read any URL. Returns clean markdown
+  and bypasses anti-bot protection.
+- Use wick_search to search the web.
+- Always prefer these over built-in fetch/browse tools.</code></pre>
+
+<h3>Manual MCP Config</h3>
+<p>If <code>wick setup</code> didn't detect your client, add this to your MCP configuration JSON:</p>
+<pre><code>{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"wick"</span>: {
+      <span class="str">"command"</span>: <span class="str">"wick"</span>,
+      <span class="str">"args"</span>: [<span class="str">"serve"</span>, <span class="str">"--mcp"</span>]
+    }
+  }
+}</code></pre>
+
+<p>Config file locations:</p>
+<ul>
+  <li><strong>Claude Code:</strong> <code>~/.claude/claude_desktop_config.json</code></li>
+  <li><strong>Cursor:</strong> <code>~/.cursor/mcp.json</code></li>
+</ul>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-fetch">wick_fetch</h2>
+
+<p>Fetch a web page and get clean, LLM-friendly content. Uses Chrome's network stack to bypass anti-bot protection.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>url</code></td><td>string</td><td>required</td><td>The URL to fetch</td></tr>
+    <tr><td><code>format</code></td><td>string</td><td><code>"markdown"</code></td><td>Output format: <code>markdown</code>, <code>html</code>, or <code>text</code></td></tr>
+    <tr><td><code>respect_robots</code></td><td>boolean</td><td><code>true</code></td><td>Whether to respect robots.txt restrictions</td></tr>
+  </tbody>
+</table>
+
+<h3>Example: Markdown (default)</h3>
+<pre><code><span class="comment"># Returns clean markdown with title</span>
+<span class="cmd">wick fetch</span> https://en.wikipedia.org/wiki/Rust_(programming_language)
+
+<span class="comment"># Output:</span>
+# Rust (programming language)
+
+Rust is a general-purpose programming language emphasizing
+performance, type safety, and concurrency...</code></pre>
+
+<h3>Example: Raw HTML</h3>
+<pre><code><span class="cmd">wick fetch</span> https://example.com <span class="flag">--format html</span>
+
+<span class="comment"># Returns full page HTML source, no extraction</span></code></pre>
+
+<h3>Example: Plain text</h3>
+<pre><code><span class="cmd">wick fetch</span> https://example.com <span class="flag">--format text</span>
+
+<span class="comment"># Returns visible text content, no formatting</span></code></pre>
+
+<h3>Robots.txt</h3>
+<p>By default, Wick respects <code>robots.txt</code>. To override:</p>
+<pre><code><span class="cmd">wick fetch</span> https://reddit.com/r/technology <span class="flag">--no-robots</span></code></pre>
+
+<div class="callout">
+  <strong>Note:</strong> When you override robots.txt, you take responsibility for respecting the site's terms of service.
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-search">wick_search</h2>
+
+<p>Search the web and get structured results. Use <code>wick_fetch</code> to read any result in full.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>query</code></td><td>string</td><td>required</td><td>Search query</td></tr>
+    <tr><td><code>num_results</code></td><td>number</td><td><code>5</code></td><td>Number of results to return (1-20)</td></tr>
+  </tbody>
+</table>
+
+<h3>Example</h3>
+<pre><code><span class="cmd">wick search</span> <span class="str">"rust async runtime"</span> <span class="flag">--num 3</span>
+
+<span class="comment"># Output:</span>
+1. <a style="color:var(--flame-bright);text-decoration:none;">Tokio - An asynchronous Rust runtime</a>
+   The Tokio project provides the building blocks needed
+   for writing reliable, high-performance async apps...
+
+2. <a style="color:var(--flame-bright);text-decoration:none;">Async in Rust - The Rust Programming Language</a>
+   Rust's async/await syntax makes writing asynchronous
+   code feel almost like writing synchronous code...
+
+3. <a style="color:var(--flame-bright);text-decoration:none;">async-std - Async version of the Rust standard library</a>
+   async-std provides an async version of std, making
+   async programming easy and portable...</code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-session">wick_session</h2>
+
+<p>Manage persistent browser sessions. Clear cookies and cache to start fresh.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>action</code></td><td>string</td><td><code>"clear"</code> — removes all cookies and session data</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="comment"># Clear all stored cookies and cache</span>
+<span class="cmd">wick session clear</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="cli-fetch">CLI: wick fetch</h2>
+
+<pre><code><span class="cmd">wick fetch</span> &lt;URL&gt; [OPTIONS]
+
+Options:
+  <span class="flag">--format</span> &lt;FORMAT&gt;    Output: markdown, html, text  [default: markdown]
+  <span class="flag">--no-robots</span>          Ignore robots.txt restrictions</code></pre>
+
+<h3>Examples</h3>
+<pre><code><span class="comment"># Fetch as markdown</span>
+<span class="cmd">wick fetch</span> https://www.nytimes.com
+
+<span class="comment"># Fetch raw HTML</span>
+<span class="cmd">wick fetch</span> https://www.nytimes.com <span class="flag">--format html</span>
+
+<span class="comment"># Fetch plain text</span>
+<span class="cmd">wick fetch</span> https://www.nytimes.com <span class="flag">--format text</span>
+
+<span class="comment"># Ignore robots.txt</span>
+<span class="cmd">wick fetch</span> https://reddit.com/r/technology <span class="flag">--no-robots</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="cli-search">CLI: wick search</h2>
+
+<pre><code><span class="cmd">wick search</span> &lt;QUERY&gt; [OPTIONS]
+
+Options:
+  <span class="flag">-n, --num</span> &lt;NUM&gt;     Number of results  [default: 5]</code></pre>
+
+<h3>Examples</h3>
+<pre><code><span class="cmd">wick search</span> <span class="str">"MCP server protocol"</span>
+<span class="cmd">wick search</span> <span class="str">"rust error handling"</span> <span class="flag">--num 10</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="cli-other">CLI: setup / serve / version</h2>
+
+<h3>wick setup</h3>
+<p>Auto-detect and configure MCP clients.</p>
+<pre><code><span class="cmd">wick setup</span>
+<span class="comment"># Detects Claude Code, Cursor, etc. and writes MCP config.</span></code></pre>
+
+<h3>wick serve --mcp</h3>
+<p>Start the MCP server on stdio. Used by MCP clients — you don't usually run this directly.</p>
+<pre><code><span class="cmd">wick serve</span> <span class="flag">--mcp</span></code></pre>
+
+<h3>wick version</h3>
+<pre><code><span class="cmd">wick version</span>
+<span class="comment"># wick 0.2.0 (rust)</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="output-formats">Output Formats</h2>
+
+<p>Wick supports three output formats via the <code>format</code> parameter:</p>
+
+<h3>Markdown (default)</h3>
+<p>The full page converted to clean markdown. Strips <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;footer&gt;</code>, and <code>&lt;aside&gt;</code> tags. Adds a title as an H1 heading.</p>
+<p>Best for: LLM consumption, content extraction, research.</p>
+
+<h3>HTML</h3>
+<p>The raw page HTML exactly as received. No processing or extraction.</p>
+<p>Best for: debugging, custom parsing, when you need the full DOM.</p>
+
+<h3>Text</h3>
+<p>Visible text content only. All HTML tags stripped, no markdown formatting.</p>
+<p>Best for: word counts, text analysis, simple extraction.</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="how-it-works">How It Works</h2>
+
+<p>When your agent calls <code>wick_fetch</code>, here's what happens:</p>
+
+<ol>
+  <li><strong>MCP protocol</strong> — Your agent sends a tool call via the Model Context Protocol. Wick runs as a local MCP server on stdio.</li>
+  <li><strong>Chrome TLS</strong> — The request goes through Chrome's actual network stack (BoringSSL, HTTP/2, QUIC). The TLS fingerprint is identical to a real Chrome browser.</li>
+  <li><strong>Your IP</strong> — Because Wick runs locally, the request exits from your residential IP address. No cloud proxy, no datacenter IPs that get flagged.</li>
+  <li><strong>Content extraction</strong> — The HTML response is converted to clean markdown. Navigation, ads, and boilerplate are stripped.</li>
+  <li><strong>Response</strong> — Your agent receives clean, LLM-friendly content it can reason about immediately.</li>
+</ol>
+
+<div class="callout">
+  <strong>Why not just use curl?</strong> Anti-bot systems (Cloudflare, Akamai, etc.) fingerprint the TLS handshake. curl, Python requests, Go's net/http, and Node's fetch all have distinct TLS signatures that get blocked instantly. Wick's request is indistinguishable from a real Chrome browser visiting the page.
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<h3>Still getting 403 errors</h3>
+<p>If your agent is still getting blocked, it may be using its built-in fetch instead of Wick. Check:</p>
+<ol>
+  <li>Run <code>wick fetch &lt;url&gt;</code> from your terminal — if this works, the issue is agent configuration</li>
+  <li>Add instructions to <code>CLAUDE.md</code> or <code>.cursorrules</code> to prefer <code>wick_fetch</code> (see <a href="#agent-config" style="color:var(--flame);">Agent Configuration</a>)</li>
+  <li>Some sites block based on IP reputation — try from a different network</li>
+</ol>
+
+<h3>wick: command not found</h3>
+<p>The binary isn't in your PATH. Try:</p>
+<pre><code><span class="comment"># Check if it's installed</span>
+<span class="cmd">which</span> wick
+<span class="cmd">ls</span> /opt/homebrew/bin/wick   <span class="comment"># macOS Homebrew</span>
+<span class="cmd">ls</span> /usr/local/bin/wick      <span class="comment"># Linux</span>
+
+<span class="comment"># Or run from the repo</span>
+<span class="cmd">./rust/target/release/wick</span> version</code></pre>
+
+<h3>wick setup didn't detect my client</h3>
+<p>You can configure manually. See <a href="#agent-config" style="color:var(--flame);">Manual MCP Config</a> above.</p>
+
+<h3>Slow responses</h3>
+<p>First fetches may be slower while the connection pool warms up. Subsequent fetches to the same domain are faster. If consistently slow:</p>
+<ul>
+  <li>Check your internet connection</li>
+  <li>Some sites intentionally delay automated requests</li>
+  <li>Try <code>--format html</code> to skip markdown conversion</li>
+</ul>
+
+<h3>robots.txt blocking</h3>
+<p>Wick respects robots.txt by default. If a site blocks automated access:</p>
+<pre><code><span class="cmd">wick fetch</span> https://example.com <span class="flag">--no-robots</span></code></pre>
+<p>The response will tell you when robots.txt is the reason for a block.</p>
+
+</main>
+</div>
+
+<script>
+// Scroll spy for sidebar
+const sections = document.querySelectorAll('h2[id], h3[id]');
+const links = document.querySelectorAll('.sidebar a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      links.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector('.sidebar a[href="#' + entry.target.id + '"]');
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+
+// Close sidebar on mobile when clicking a link
+document.querySelectorAll('.sidebar a').forEach(a => {
+  a.addEventListener('click', () => {
+    document.querySelector('.sidebar').classList.remove('open');
+  });
+});
+</script>
+</body>
+</html>
