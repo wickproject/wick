@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::io::Cursor;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Format {
@@ -23,59 +22,58 @@ pub struct Extracted {
     pub title: Option<String>,
 }
 
-/// Full extraction pipeline: raw HTML → readability → format conversion.
-pub fn extract(html: &str, url: &url::Url, format: Format) -> Result<Extracted> {
+/// Convert raw HTML to the requested format.
+/// Converts the entire page — agents want all content, not article extraction.
+pub fn extract(html: &str, _url: &url::Url, format: Format) -> Result<Extracted> {
+    let title = extract_title(html);
+
     match format {
         Format::Html => Ok(Extracted {
             content: html.to_string(),
-            title: None,
+            title,
         }),
-        Format::Text => {
-            let readable = extract_readable(html, url)?;
-            Ok(Extracted {
-                content: readable.text,
-                title: readable.title,
-            })
-        }
+        Format::Text => Ok(Extracted {
+            content: strip_tags(html),
+            title,
+        }),
         Format::Markdown => {
-            let readable = extract_readable(html, url)?;
-            let md = to_markdown(&readable.html)?;
-            let content = match &readable.title {
+            let md = to_markdown(html)?;
+            let content = match &title {
                 Some(t) => format!("# {}\n\n{}", t, md.trim()),
                 None => md.trim().to_string(),
             };
-            Ok(Extracted {
-                content,
-                title: readable.title,
-            })
+            Ok(Extracted { content, title })
         }
     }
 }
 
-struct Readable {
-    title: Option<String>,
-    html: String,
-    text: String,
+/// Quick tag stripping for text output.
+fn strip_tags(html: &str) -> String {
+    let mut result = String::with_capacity(html.len() / 4);
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(c),
+            _ => {}
+        }
+    }
+    result
 }
 
-fn extract_readable(html: &str, url: &url::Url) -> Result<Readable> {
-    let mut cursor = Cursor::new(html.as_bytes());
-    let product = readability::extractor::extract(&mut cursor, url)
-        .map_err(|e| anyhow::anyhow!("readability extraction failed: {}", e))?;
-    Ok(Readable {
-        title: if product.title.is_empty() {
-            None
-        } else {
-            Some(product.title)
-        },
-        html: product.content,
-        text: product.text,
-    })
+/// Extract title from <title> tag.
+fn extract_title(html: &str) -> Option<String> {
+    let lower = html.to_lowercase();
+    let start = lower.find("<title")?.checked_add(lower[lower.find("<title")?..].find('>')? + 1)?;
+    let end = lower[start..].find("</title>").map(|i| i + start)?;
+    let title = html[start..end].trim().to_string();
+    if title.is_empty() { None } else { Some(title) }
 }
 
 fn to_markdown(html: &str) -> Result<String> {
     let converter = htmd::HtmlToMarkdown::builder()
-        .skip_tags(vec!["script", "style"])
+        .skip_tags(vec!["script", "style", "nav", "header", "footer", "aside"])
         .build();
     Ok(converter.convert(html)?)
 }
