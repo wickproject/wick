@@ -113,11 +113,12 @@ The free version handles the majority of the web. But some companies need access
 
 **Wick Pro** is a bespoke service for companies accessing high-value data:
 
-- Full JavaScript rendering for dynamic pages
-- Advanced anti-detection that's continuously updated
-- Residential IP tunneling from cloud servers
-- Custom configuration per client
-- CAPTCHA handling (automated and human-in-the-loop)
+- Full JavaScript rendering via Chromium (CEF) — renders SPAs, React apps, dynamic content
+- 22 anti-detection stealth patches — passes Cloudflare Turnstile, BotD, headless tests
+- Adaptive per-site strategy — learns what works for each domain, gets faster over time
+- Smart residential IP routing — only uses your tunnel when the site requires it
+- CAPTCHA handling — automated solving via proxy, plus human-in-the-loop fallback
+- macOS and Linux — one-command install on both platforms
 - Dedicated support with SLA
 
 We work with teams in financial data, competitive intelligence, compliance, market research, and other sectors where reliable web access is critical — not mass scraping.
