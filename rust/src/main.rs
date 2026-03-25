@@ -5,6 +5,7 @@ mod cef;
 mod cronet;
 mod download;
 mod engine;
+mod media;
 mod extract;
 mod fetch;
 mod mcp;

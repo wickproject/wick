@@ -62,8 +62,9 @@ pub async fn fetch(
         match crate::cef::render(url).await {
             Ok(html) => {
                 let extracted = extract::extract(&html, &parsed, format)?;
+                let content = append_media(&extracted.content, &html, &parsed);
                 return Ok(FetchResult {
-                    content: extracted.content,
+                    content,
                     title: extracted.title,
                     url: url.to_string(),
                     status_code: 200,
@@ -173,13 +174,29 @@ pub async fn fetch(
     }
 
     let extracted = extract::extract(&body, &parsed, format)?;
+    let content = append_media(&extracted.content, &body, &parsed);
     Ok(FetchResult {
-        content: extracted.content,
+        content,
         title: extracted.title,
         url: url.to_string(),
         status_code: status,
         timing_ms: start.elapsed().as_millis() as u64,
     })
+}
+
+/// Append detected media URLs to content so agents/crawlers can discover them.
+fn append_media(content: &str, html: &str, page_url: &url::Url) -> String {
+    let media = crate::media::extract_media(html, page_url);
+    if media.is_empty() {
+        return content.to_string();
+    }
+    let mut result = content.to_string();
+    result.push_str("\n\n---\n**Media found on this page:**\n");
+    for m in &media {
+        result.push_str(&format!("- [{}] {} ({})\n", m.media_type, m.url, m.source));
+        result.push_str(&format!("  Download: `wick download \"{}\"`\n", m.url));
+    }
+    result
 }
 
 fn is_challenge(body: &str) -> bool {
