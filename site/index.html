@@ -1102,7 +1102,7 @@ footer {
       <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
       <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install</h3>
         <code style="display:block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.5rem 0.6rem;font-family:var(--font-mono);font-size:0.8rem;color:var(--flame);line-height:1.6;white-space:pre-wrap;"># Linux server:
-WICK_KEY=your_key sudo -E bash &lt;(curl -fsSL https://releases.getwick.dev/install-pro.sh)
+curl -fsSL https://releases.getwick.dev/install-pro.sh -o /tmp/wp.sh &amp;&amp; WICK_KEY=your_key sudo -E bash /tmp/wp.sh
 # macOS:
 WICK_KEY=your_key curl -fsSL https://releases.getwick.dev/install-pro-mac.sh | bash</code>
         <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">We'll give you an API key when you sign up. One command, both platforms.</p>
