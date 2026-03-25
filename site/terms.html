@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wick — Terms of Service</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --flame: #E8913A;
+  --ash: #1A1714;
+  --smoke: #2A2520;
+  --smoke-light: #3D3630;
+  --warm-white: #F0E6D8;
+  --warm-gray: #9E958A;
+  --cool-gray: #6B635A;
+  --black: #0D0B09;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--black); color: var(--warm-gray); font-family: var(--font-display); font-weight: 300; line-height: 1.8; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--flame); color: var(--black); }
+.container { max-width: 700px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+.back { display: inline-block; font-size: 0.8rem; color: var(--flame); text-decoration: none; margin-bottom: 2rem; }
+.back:hover { text-decoration: underline; }
+h1 { font-size: 1.8rem; font-weight: 700; color: var(--warm-white); margin-bottom: 0.5rem; }
+.updated { font-size: 0.75rem; color: var(--cool-gray); margin-bottom: 3rem; }
+h2 { font-size: 1.1rem; font-weight: 600; color: var(--warm-white); margin-top: 2.5rem; margin-bottom: 0.75rem; }
+p, li { font-size: 0.88rem; margin-bottom: 0.75rem; }
+ul { padding-left: 1.5rem; }
+a { color: var(--flame); }
+code { font-family: var(--font-mono); font-size: 0.82rem; background: var(--smoke); padding: 0.1rem 0.3rem; border-radius: 3px; }
+.company { color: var(--warm-white); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>Terms of Service</h1>
+<p class="updated">Last updated: March 24, 2026</p>
+
+<h2>Company</h2>
+<p><span class="company">Pseudo Anonymous, Inc.</span> ("we", "us", "our") operates the Wick software and Wick Pro subscription service at <a href="https://getwick.dev">getwick.dev</a>.</p>
+
+<h2>Service Description</h2>
+<p>Wick is an MCP (Model Context Protocol) server that provides browser-grade web access for AI coding agents. It runs locally on your machine and returns clean markdown content from web pages.</p>
+<p><strong>Wick (Free)</strong> is open-source software distributed under the MIT License. It includes Chrome-grade TLS fingerprinting, web search, and content extraction.</p>
+<p><strong>Wick Pro</strong> is a paid subscription ($20/month) that adds JavaScript rendering, advanced anti-detection, geo-restriction bypass, automated CAPTCHA handling, and adaptive per-site optimization.</p>
+
+<h2>Contact</h2>
+<p>For support, billing questions, or any other inquiries:</p>
+<ul>
+  <li>Email: <a href="mailto:hello@getwick.dev">hello@getwick.dev</a></li>
+  <li>GitHub: <a href="https://github.com/wickproject/wick/issues">github.com/wickproject/wick/issues</a></li>
+</ul>
+
+<h2>Subscription &amp; Billing</h2>
+<p>Wick Pro is billed monthly at $20/month via Stripe. Your subscription begins when you complete checkout and receive your API key. Billing recurs on the same date each month until canceled.</p>
+<p>All prices are in USD. Applicable taxes may be added based on your location.</p>
+
+<h2>Cancellation Policy</h2>
+<p>You may cancel your Wick Pro subscription at any time. To cancel:</p>
+<ul>
+  <li>Run <code>wick pro deactivate</code> from your terminal, or</li>
+  <li>Email <a href="mailto:hello@getwick.dev">hello@getwick.dev</a> with your API key</li>
+</ul>
+<p>After cancellation, your Pro features remain active until the end of your current billing period. No further charges will be made.</p>
+
+<h2>Refund &amp; Dispute Policy</h2>
+<p>If you are unsatisfied with Wick Pro, we offer a full refund within 14 days of your initial purchase. To request a refund, email <a href="mailto:hello@getwick.dev">hello@getwick.dev</a> with your API key and the reason for your request.</p>
+<p>After 14 days, refunds are issued at our discretion on a case-by-case basis. Partial-month refunds are not provided for mid-cycle cancellations.</p>
+<p>If you believe a charge was made in error, please contact us at <a href="mailto:hello@getwick.dev">hello@getwick.dev</a> before filing a dispute with your bank. We will work with you to resolve the issue promptly.</p>
+
+<h2>Acceptable Use</h2>
+<p>You agree to use Wick and Wick Pro in compliance with all applicable laws. You may not use the service to:</p>
+<ul>
+  <li>Access systems without authorization</li>
+  <li>Scrape data in violation of a website's terms of service</li>
+  <li>Conduct denial-of-service attacks or abuse rate limits</li>
+  <li>Distribute malware or engage in fraud</li>
+  <li>Resell access to the Wick Pro service without permission</li>
+</ul>
+<p>We reserve the right to suspend or terminate accounts that violate these terms.</p>
+
+<h2>Privacy</h2>
+<p>Wick runs locally on your machine. We do not see, store, or transmit the content of pages you fetch.</p>
+<p>For Wick Pro, our server processes:</p>
+<ul>
+  <li>Your API key (for authentication)</li>
+  <li>URLs sent to the geo-proxy endpoint (for geo-restriction bypass)</li>
+  <li>CAPTCHA challenge data (sent to our solving proxy)</li>
+</ul>
+<p>We do not sell or share your data. We use Stripe for payment processing; Stripe's privacy policy applies to payment data.</p>
+
+<h2>Limitation of Liability</h2>
+<p>Wick is provided "as is" without warranty of any kind. We are not responsible for the content of third-party websites accessed through Wick, or for any consequences of using the service. Our total liability is limited to the amount you paid for the service in the 12 months preceding the claim.</p>
+
+<h2>Changes to Terms</h2>
+<p>We may update these terms from time to time. We will notify subscribers by email of material changes. Continued use after changes constitutes acceptance.</p>
+
+<p style="margin-top:3rem; font-size:0.75rem; color:var(--cool-gray);">&copy; 2026 Pseudo Anonymous, Inc. All rights reserved.</p>
+
+</div>
+</body>
+</html>
