@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 const PLATFORM = `${process.platform}-${process.arch}`;
 
 const ASSETS = {
