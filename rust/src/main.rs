@@ -6,6 +6,7 @@ mod engine;
 mod extract;
 mod fetch;
 mod mcp;
+mod pro;
 mod robots;
 mod search;
 mod session;
@@ -56,8 +57,25 @@ enum Command {
     },
     /// Auto-configure MCP clients (Claude Code, Cursor)
     Setup,
+    /// Manage Pro subscription
+    Pro {
+        #[command(subcommand)]
+        action: ProAction,
+    },
     /// Print version information
     Version,
+}
+
+#[derive(Subcommand)]
+enum ProAction {
+    /// Activate Pro (opens browser for $20/month subscription)
+    Activate {
+        /// Use an existing API key instead of creating a new subscription
+        #[arg(long)]
+        key: Option<String>,
+    },
+    /// Show Pro subscription status
+    Status,
 }
 
 #[tokio::main]
@@ -117,8 +135,13 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Command::Setup => setup::setup(),
+        Command::Pro { action } => match action {
+            ProAction::Activate { key } => pro::activate(key).await,
+            ProAction::Status => pro::status().await,
+        },
         Command::Version => {
-            println!("wick {} (rust)", env!("CARGO_PKG_VERSION"));
+            let pro = if cef::is_available() { " + Pro" } else { "" };
+            println!("wick {}{} (rust)", env!("CARGO_PKG_VERSION"), pro);
             Ok(())
         }
     }

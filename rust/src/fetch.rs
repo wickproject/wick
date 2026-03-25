@@ -133,6 +133,22 @@ pub async fn fetch(
     }
 
     if status == 403 || status == 503 {
+        // Smart upsell: suggest Pro when it would help
+        if !crate::cef::is_available() {
+            let hint = format!(
+                "HTTP {status}\n\n\
+                 This site blocked the request. Wick Pro ($20/mo) bypasses\n\
+                 anti-bot protection with JS rendering and advanced stealth.\n\n\
+                 Activate: wick pro activate"
+            );
+            return Ok(FetchResult {
+                content: hint,
+                title: None,
+                url: url.to_string(),
+                status_code: status,
+                timing_ms: start.elapsed().as_millis() as u64,
+            });
+        }
         return Ok(FetchResult {
             content: format!("HTTP {}: {}", status, body),
             title: None,
