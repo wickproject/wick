@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Fix 403 Forbidden in Claude Code — Wick</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="description" content="Claude Code gets 403 Forbidden when fetching web pages. Here's why (TLS fingerprinting) and how to fix it in 30 seconds with Wick.">
+<meta name="keywords" content="claude code 403, claude code forbidden, claude code can't fetch, ai agent blocked, cloudflare 403 ai, cursor fetch blocked, mcp server web access, wick_fetch, fix 403 claude">
+<meta property="og:title" content="How to Fix 403 Forbidden in Claude Code">
+<meta property="og:description" content="Your AI agent gets 403 errors because anti-bot systems fingerprint TLS handshakes. Fix it in 30 seconds.">
+<meta property="og:url" content="https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html">
+<meta property="og:type" content="article">
+<link rel="canonical" href="https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --flame: #E8913A; --ember: #C45A1A; --ash: #1A1714; --smoke: #2A2520;
+  --smoke-light: #3D3630; --warm-white: #F0E6D8; --warm-gray: #9E958A;
+  --cool-gray: #6B635A; --black: #0D0B09;
+  --font-display: 'Outfit', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--black); color: var(--warm-gray); font-family: var(--font-display); font-weight: 300; line-height: 1.8; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--flame); color: var(--black); }
+article { max-width: 680px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+.back { display: inline-block; font-size: 0.8rem; color: var(--flame); text-decoration: none; margin-bottom: 2rem; }
+.back:hover { text-decoration: underline; }
+h1 { font-size: 2rem; font-weight: 700; color: var(--warm-white); line-height: 1.3; margin-bottom: 1.5rem; }
+h2 { font-size: 1.2rem; font-weight: 600; color: var(--warm-white); margin-top: 2.5rem; margin-bottom: 0.75rem; }
+h3 { font-size: 1rem; font-weight: 500; color: var(--flame); margin-top: 2rem; margin-bottom: 0.5rem; }
+p { margin-bottom: 1rem; font-size: 0.92rem; }
+strong { color: var(--warm-white); font-weight: 500; }
+a { color: var(--flame); }
+ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; font-size: 0.92rem; }
+li { margin-bottom: 0.3rem; }
+code { font-family: var(--font-mono); font-size: 0.82rem; background: var(--smoke); padding: 0.15rem 0.4rem; border-radius: 3px; color: #F5B74C; }
+pre { background: var(--ash); border: 1px solid var(--smoke-light); border-radius: 6px; padding: 1.25rem 1.5rem; overflow-x: auto; margin-bottom: 1.5rem; line-height: 1.7; }
+pre code { background: none; padding: 0; font-size: 0.8rem; color: var(--warm-white); }
+table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.82rem; }
+th { text-align: left; padding: 0.5rem 0.75rem; background: var(--smoke); color: var(--warm-gray); font-weight: 500; border-bottom: 1px solid var(--smoke-light); }
+td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--smoke-light); }
+td code { font-size: 0.78rem; }
+hr { border: none; border-top: 1px solid var(--smoke-light); margin: 3rem 0 1.5rem; }
+.byline { font-size: 0.78rem; color: var(--cool-gray); font-style: italic; }
+</style>
+</head>
+<body>
+<article>
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>How to Fix 403 Forbidden in Claude Code</h1>
+
+<p>You're using Claude Code, and you ask it to read a webpage. API docs, a pricing page, a blog post, a news article. It tries:</p>
+
+<pre><code>Agent: I'll fetch that page for you.
+
+Result: 403 Forbidden
+
+Agent: I'm sorry, I wasn't able to access that page.
+       The site appears to be blocking automated requests.</code></pre>
+
+<p>This happens dozens of times a day. Claude Code can write code, debug systems, manage git repos — but it can't read a webpage. Here's why, and how to fix it in 30 seconds.</p>
+
+<h2>Why Claude Code gets 403 errors</h2>
+
+<p>It's not about robots.txt. It's about <strong>TLS fingerprinting</strong>.</p>
+
+<p>When Claude Code fetches a URL, it uses a standard HTTP client. Anti-bot systems like Cloudflare, Akamai, and Fastly inspect the TLS handshake — the very first message your connection sends — and compare it to known browser signatures.</p>
+
+<p>Chrome's TLS handshake looks different from Go's, Python's, or Node's. The cipher suites, extensions, and their ordering create a unique fingerprint. Anti-bot systems identify non-browser clients in milliseconds, before the HTTP request even reaches the server.</p>
+
+<p>That's your 403. The website never saw your request. The anti-bot layer killed it at the TLS level.</p>
+
+<p><strong>Sites that commonly block Claude Code:</strong></p>
+<ul>
+<li>The New York Times (Akamai)</li>
+<li>Reddit (custom anti-bot)</li>
+<li>Cloudflare-protected sites (~20% of the web)</li>
+<li>Most news sites, financial sites, and documentation behind CDNs</li>
+</ul>
+
+<h2>The fix: Wick</h2>
+
+<p><a href="https://getwick.dev">Wick</a> is a free, open-source MCP server that gives Claude Code browser-grade web access. It uses Chrome's actual network stack — the same BoringSSL, HTTP/2, and QUIC implementation that real Chrome uses. The TLS fingerprint is identical to a regular browser.</p>
+
+<h3>Install (30 seconds)</h3>
+
+<p><strong>macOS:</strong></p>
+<pre><code>brew tap wickproject/wick && brew install wick
+wick setup</code></pre>
+
+<p><strong>Linux:</strong></p>
+<pre><code>curl -fsSL https://wickproject.github.io/wick/apt/install.sh | bash
+wick setup</code></pre>
+
+<p><strong>npm (any platform):</strong></p>
+<pre><code>npm install -g wick-mcp
+wick setup</code></pre>
+
+<p><code>wick setup</code> auto-detects Claude Code and configures it. That's it.</p>
+
+<h3>Make Claude Code always use Wick</h3>
+
+<p>Add this to your project's <code>CLAUDE.md</code>:</p>
+
+<pre><code>When fetching web pages, always use the wick_fetch MCP tool instead of
+the built-in WebFetch tool. wick_fetch bypasses anti-bot protection and
+returns cleaner content. Use wick_search for web searches.</code></pre>
+
+<p>Now when Claude Code needs to read a webpage, it reaches for <code>wick_fetch</code> instead of its built-in fetch that gets blocked.</p>
+
+<h2>What Wick returns</h2>
+
+<p>Instead of a 403 error, your agent gets clean markdown:</p>
+
+<pre><code>Agent: I'll fetch that article using wick_fetch.
+
+# The New York Times - Breaking News
+
+Led by the freshman forward Cameron Boozer,
+the No. 1 overall seed faces a tough test in
+the NCAA tournament...</code></pre>
+
+<p>Clean, structured content your agent can actually reason about. Not raw HTML, not a wall of <code>&lt;div&gt;</code> tags — markdown with headings, links, and paragraphs.</p>
+
+<h2>How it works</h2>
+
+<p>Wick runs as a local MCP server on your machine. When Claude Code calls <code>wick_fetch</code>:</p>
+
+<ol>
+<li>The request goes through Chrome's actual network stack</li>
+<li>The TLS fingerprint matches a real Chrome browser</li>
+<li>The request exits from your residential IP (not a datacenter)</li>
+<li>Anti-bot systems see a normal browser visit</li>
+<li>The HTML response is extracted into clean markdown</li>
+<li>Claude Code gets the content</li>
+</ol>
+
+<p>No cloud service. No proxy. No API key. Everything runs locally.</p>
+
+<h2>What about sites that need JavaScript?</h2>
+
+<p>Some sites (Reddit, SPAs, financial exchanges) require JavaScript to render content. The free tier handles most of the web, but for JS-heavy sites, <a href="https://getwick.dev">Wick Pro</a> ($20/month) adds a full browser engine that renders JavaScript, handles CAPTCHAs automatically, and bypasses even aggressive anti-bot systems.</p>
+
+<p>Run <code>wick pro activate</code> to upgrade. The free tier automatically detects when Pro would help and suggests it.</p>
+
+<h2>Quick reference</h2>
+
+<table>
+<thead><tr><th>Problem</th><th>Solution</th></tr></thead>
+<tbody>
+<tr><td>403 Forbidden</td><td>Install Wick: <code>brew install wick && wick setup</code></td></tr>
+<tr><td>Claude uses built-in fetch</td><td>Add CLAUDE.md instructions (see above)</td></tr>
+<tr><td>JS-rendered pages blank</td><td><code>wick pro activate</code> for JS rendering</td></tr>
+<tr><td>robots.txt blocking</td><td><code>wick fetch URL --no-robots</code></td></tr>
+<tr><td>Need raw HTML</td><td><code>wick fetch URL --format html</code></td></tr>
+</tbody>
+</table>
+
+<h2>Links</h2>
+
+<ul>
+<li><strong>Install:</strong> <code>brew tap wickproject/wick && brew install wick</code></li>
+<li><strong>Docs:</strong> <a href="https://getwick.dev/docs.html">getwick.dev/docs.html</a></li>
+<li><strong>GitHub:</strong> <a href="https://github.com/wickproject/wick">github.com/wickproject/wick</a></li>
+<li><strong>Pro:</strong> <a href="https://getwick.dev">getwick.dev</a> ($20/month for JS rendering + advanced anti-detection)</li>
+</ul>
+
+<hr>
+
+<p class="byline">Wick is built by Adam Fisk, creator of <a href="https://lantern.io">Lantern</a> — a censorship circumvention tool used by 150 million people in Iran, China, and Russia. The same techniques that bypass government censors now bypass anti-bot walls.</p>
+
+</article>
+</body>
+</html>
