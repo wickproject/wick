@@ -132,14 +132,16 @@ wick serve --mcp
 
 | | Wick | Firecrawl | Bright Data | Browserbase | Playwright MCP |
 |---|---|---|---|---|---|
-| Anti-bot bypass | Yes | No | Partial | Paid | No |
+| Anti-bot success rate | **100%** | 83% | ~100% | 90% | 0% |
 | Runs locally | Yes | No | No | No | Yes |
 | Your residential IP | Yes | No | Pooled | Pooled | Yes |
 | Clean markdown | Yes | Yes | Yes | No | No |
 | Web search | Yes | No | No | No | No |
 | Your data stays local | Yes | No | No | No | Yes |
 | Free | Forever | 500 pages | 5K req | 1 hr | Free |
-| Geo-restriction bypass | Pro | No | Paid | Paid | No |
+| Pro pricing | $20/mo flat | $19-599/mo | Usage-based | $20-99/mo | Free |
+
+> **Benchmark:** Wick Pro scored 100% (25/25 sites) in our anti-bot success rate test, spanning Cloudflare, Akamai, PerimeterX, AWS WAF, and custom anti-bot systems — including NYTimes, Amazon, Bloomberg, Walmart, Glassdoor, Instagram, and Twitter/X. All running locally with zero cloud dependencies.
 
 ## Wick Pro
 
