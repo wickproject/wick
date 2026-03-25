@@ -22,6 +22,7 @@ pub async fn fetch(
     respect_robots: bool,
 ) -> Result<FetchResult> {
     let start = Instant::now();
+    crate::analytics::ping("fetch");
 
     let parsed = url::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;

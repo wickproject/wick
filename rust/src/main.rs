@@ -1,3 +1,4 @@
+mod analytics;
 mod captcha;
 mod cef;
 #[cfg(feature = "cronet")]
@@ -134,7 +135,10 @@ async fn main() -> Result<()> {
             println!("{}", search::format_results(&results));
             Ok(())
         }
-        Command::Setup => setup::setup(),
+        Command::Setup => {
+            analytics::ping("install");
+            setup::setup()
+        }
         Command::Pro { action } => match action {
             ProAction::Activate { key } => pro::activate(key).await,
             ProAction::Status => pro::status().await,
