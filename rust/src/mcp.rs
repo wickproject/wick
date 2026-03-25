@@ -36,6 +36,16 @@ pub struct SessionInput {
     pub action: String,
 }
 
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct DownloadInput {
+    #[schemars(description = "The URL of the page or video to download media from")]
+    pub url: String,
+    #[schemars(description = "Output directory path (default: current directory)")]
+    pub output_dir: Option<String>,
+    #[schemars(description = "If true, just return info about the media without downloading")]
+    pub info_only: Option<bool>,
+}
+
 // ── Server ────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -124,6 +134,36 @@ impl WickServer {
                 format!("Unknown action: {:?}. Supported: clear", other),
                 None,
             )),
+        }
+    }
+
+    #[tool(
+        name = "wick_download",
+        description = "Download video or audio from a URL (Reddit, YouTube, Twitter, and 1000+ sites). Returns the file path of the downloaded media. Requires yt-dlp installed."
+    )]
+    async fn wick_download(
+        &self,
+        Parameters(input): Parameters<DownloadInput>,
+    ) -> Result<CallToolResult, McpError> {
+        if input.info_only.unwrap_or(false) {
+            let vi = crate::download::info(&input.url).await.map_err(|e| {
+                McpError::internal_error(format!("info failed: {}", e), None)
+            })?;
+            let mut info = format!("Title: {}\nFormat: {}\nSize: {}", vi.title, vi.format, vi.size_approx);
+            if let Some(dur) = vi.duration_secs {
+                info.push_str(&format!("\nDuration: {}:{:02}", dur as u64 / 60, dur as u64 % 60));
+            }
+            Ok(CallToolResult::success(vec![Content::text(info)]))
+        } else {
+            let result = crate::download::download(&input.url, input.output_dir.as_deref())
+                .await
+                .map_err(|e| {
+                    McpError::internal_error(format!("download failed: {}", e), None)
+                })?;
+            Ok(CallToolResult::success(vec![Content::text(format!(
+                "Downloaded: {}\nSize: {:.1} MB",
+                result.path, result.size_mb
+            ))]))
         }
     }
 }

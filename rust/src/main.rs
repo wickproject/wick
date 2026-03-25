@@ -3,6 +3,7 @@ mod captcha;
 mod cef;
 #[cfg(feature = "cronet")]
 mod cronet;
+mod download;
 mod engine;
 mod extract;
 mod fetch;
@@ -55,6 +56,17 @@ enum Command {
         /// Number of results (default 5)
         #[arg(short, long, default_value = "5")]
         num: usize,
+    },
+    /// Download media (video/audio) from a URL
+    Download {
+        /// The URL containing media to download
+        url: String,
+        /// Output directory (default: current directory)
+        #[arg(short, long)]
+        output: Option<String>,
+        /// Just show info, don't download
+        #[arg(long)]
+        info: bool,
     },
     /// Auto-configure MCP clients (Claude Code, Cursor)
     Setup,
@@ -133,6 +145,24 @@ async fn main() -> Result<()> {
             let client = engine::Client::new(proxy)?;
             let results = search::search(&client, &query, num).await?;
             println!("{}", search::format_results(&results));
+            Ok(())
+        }
+        Command::Download { url, output, info } => {
+            if info {
+                let vi = download::info(&url).await?;
+                println!("Title: {}", vi.title);
+                if let Some(dur) = vi.duration_secs {
+                    let mins = dur as u64 / 60;
+                    let secs = dur as u64 % 60;
+                    println!("Duration: {}:{:02}", mins, secs);
+                }
+                println!("Format: {}", vi.format);
+                println!("Size: {}", vi.size_approx);
+            } else {
+                let result = download::download(&url, output.as_deref()).await?;
+                println!("Downloaded: {}", result.path);
+                println!("Size: {:.1} MB", result.size_mb);
+            }
             Ok(())
         }
         Command::Setup => {
