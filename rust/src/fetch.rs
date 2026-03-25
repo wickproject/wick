@@ -72,6 +72,7 @@ pub async fn fetch(
             }
             Err(e) => {
                 tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
+                crate::analytics::report_failure(host, 0, "cef_failed");
             }
         }
     }
@@ -134,6 +135,8 @@ pub async fn fetch(
     }
 
     if status == 403 || status == 503 {
+        crate::analytics::report_failure(host, status, "blocked");
+
         // Smart upsell: suggest Pro when it would help
         if !crate::cef::is_available() {
             let hint = format!(

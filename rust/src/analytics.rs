@@ -4,6 +4,33 @@
 
 const PING_URL: &str = "https://releases.getwick.dev/ping";
 
+/// Report a fetch failure — helps us diagnose and fix issues in new releases.
+/// Sends: domain, status code, error type. No page content or user data.
+pub fn report_failure(domain: &str, status: u16, error_type: &str) {
+    let domain = domain.to_string();
+    let error_type = error_type.to_string();
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    let os = std::env::consts::OS.to_string();
+    let has_pro = crate::cef::is_available();
+
+    std::thread::spawn(move || {
+        let body = format!(
+            r#"{{"event":"error","version":"{}","os":"{}","domain":"{}","status":{},"error":"{}","pro":{}}}"#,
+            version, os, domain, status, error_type, has_pro
+        );
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build()
+            .ok();
+        if let Some(c) = client {
+            let _ = c.post(PING_URL)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .send();
+        }
+    });
+}
+
 /// Send a usage ping (fire-and-forget, never fails the caller).
 pub fn ping(event: &str) {
     let event = event.to_string();
