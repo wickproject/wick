@@ -1,0 +1,101 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0D0B09"/>
+      <stop offset="100%" style="stop-color:#1A1714"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#E8913A"/>
+      <stop offset="100%" style="stop-color:#F5B74C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03" stroke="#F0E6D8" stroke-width="1">
+    <line x1="0" y1="0" x2="0" y2="630"/><line x1="60" y1="0" x2="60" y2="630"/>
+    <line x1="120" y1="0" x2="120" y2="630"/><line x1="180" y1="0" x2="180" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/><line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/><line x1="420" y1="0" x2="420" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/><line x1="540" y1="0" x2="540" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="660" y1="0" x2="660" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/><line x1="780" y1="0" x2="780" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/><line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/><line x1="1020" y1="0" x2="1020" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/><line x1="1140" y1="0" x2="1140" y2="630"/>
+    <line x1="0" y1="60" x2="1200" y2="60"/><line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/><line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/><line x1="0" y1="480" x2="1200" y2="480"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+  </g>
+
+  <!-- Flame accent bar at top -->
+  <rect x="0" y="0" width="1200" height="4" fill="url(#flame)"/>
+
+  <!-- Wick flame icon -->
+  <g transform="translate(80, 160)">
+    <path d="M24 0C24 0 14 18 14 28C14 33.5 18.5 38 24 38C29.5 38 34 33.5 34 28C34 18 24 0 24 0Z" fill="#E8913A" opacity="0.9"/>
+    <path d="M24 12C24 12 19 22 19 27C19 29.8 21.2 32 24 32C26.8 32 29 29.8 29 27C29 22 24 12 24 12Z" fill="#F5B74C"/>
+  </g>
+
+  <!-- Title -->
+  <text x="80" y="260" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="72" font-weight="700" fill="#F0E6D8" letter-spacing="-2">Wick</text>
+
+  <!-- Tagline -->
+  <text x="80" y="320" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="32" font-weight="300" fill="#9E958A">Browser-grade web access for AI agents</text>
+
+  <!-- Stats bar -->
+  <g transform="translate(80, 380)">
+    <!-- 100% badge -->
+    <rect x="0" y="0" width="200" height="56" rx="8" fill="#E8913A" opacity="0.15"/>
+    <text x="100" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#E8913A" text-anchor="middle">ANTI-BOT SUCCESS</text>
+    <text x="100" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#E8913A" text-anchor="middle">100%</text>
+
+    <!-- 25/25 -->
+    <rect x="220" y="0" width="160" height="56" rx="8" fill="#2A2520"/>
+    <text x="300" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#6B635A" text-anchor="middle">SITES TESTED</text>
+    <text x="300" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#F0E6D8" text-anchor="middle">25/25</text>
+
+    <!-- 6 tools -->
+    <rect x="400" y="0" width="160" height="56" rx="8" fill="#2A2520"/>
+    <text x="480" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#6B635A" text-anchor="middle">MCP TOOLS</text>
+    <text x="480" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#F0E6D8" text-anchor="middle">6</text>
+
+    <!-- Local -->
+    <rect x="580" y="0" width="160" height="56" rx="8" fill="#2A2520"/>
+    <text x="660" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#6B635A" text-anchor="middle">CLOUD DEPS</text>
+    <text x="660" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#F0E6D8" text-anchor="middle">Zero</text>
+  </g>
+
+  <!-- Code snippet on right -->
+  <g transform="translate(720, 140)">
+    <rect x="0" y="0" width="420" height="280" rx="12" fill="#1A1714" stroke="#3D3630" stroke-width="1"/>
+    <!-- Terminal dots -->
+    <circle cx="20" cy="20" r="5" fill="#E8913A" opacity="0.7"/>
+    <circle cx="36" cy="20" r="5" fill="#6B635A" opacity="0.5"/>
+    <circle cx="52" cy="20" r="5" fill="#6B635A" opacity="0.5"/>
+
+    <text x="20" y="60" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#6B635A">$ wick fetch nytimes.com</text>
+    <text x="20" y="90" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#4ADE80">200 OK</text>
+    <text x="75" y="90" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#6B635A">· 897ms</text>
+    <text x="20" y="125" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#F0E6D8"># The New York Times</text>
+    <text x="20" y="150" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#9E958A">Breaking news, live coverage...</text>
+
+    <line x1="20" y1="175" x2="400" y2="175" stroke="#3D3630" stroke-width="1"/>
+
+    <text x="20" y="200" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#6B635A">$ wick serve --api</text>
+    <text x="20" y="230" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#9E958A">API at</text>
+    <text x="60" y="230" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="13" fill="#E8913A"> localhost:8090</text>
+    <text x="20" y="260" font-family="'JetBrains Mono', 'SF Mono', 'Fira Code', monospace" font-size="12" fill="#6B635A">Python · LangChain · curl · anything</text>
+  </g>
+
+  <!-- URL -->
+  <text x="80" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="400" fill="#E8913A">getwick.dev</text>
+  <text x="260" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="300" fill="#6B635A">· Open source · MIT license</text>
+
+  <!-- By line -->
+  <text x="80" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="300" fill="#6B635A">By the creator of Lantern — censorship circumvention for 150M+ people</text>
+</svg>
