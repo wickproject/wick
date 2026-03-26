@@ -1,4 +1,5 @@
 mod analytics;
+mod api;
 mod captcha;
 mod cef;
 mod crawl;
@@ -39,6 +40,12 @@ enum Command {
         /// Run as MCP server on stdio
         #[arg(long)]
         mcp: bool,
+        /// Run as local HTTP API server
+        #[arg(long)]
+        api: bool,
+        /// Port for API server (default 8090)
+        #[arg(long, default_value = "8090")]
+        port: u16,
     },
     /// Fetch a URL and print content to stdout
     Fetch {
@@ -134,7 +141,7 @@ async fn main() -> Result<()> {
     let proxy = cli.proxy.as_deref();
 
     match cli.command {
-        Command::Serve { mcp: true } => {
+        Command::Serve { mcp: true, .. } => {
             tracing_subscriber::fmt()
                 .with_env_filter(
                     tracing_subscriber::EnvFilter::from_default_env()
@@ -153,8 +160,19 @@ async fn main() -> Result<()> {
             service.waiting().await?;
             Ok(())
         }
-        Command::Serve { mcp: false } => {
-            anyhow::bail!("currently only --mcp mode is supported");
+        Command::Serve { api: true, port, .. } => {
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::from_default_env()
+                        .add_directive(tracing::Level::INFO.into()),
+                )
+                .init();
+
+            analytics::ping("api");
+            api::serve(port, proxy).await
+        }
+        Command::Serve { .. } => {
+            anyhow::bail!("specify --mcp or --api mode. Example: wick serve --api");
         }
         Command::Fetch {
             url,
