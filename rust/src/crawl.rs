@@ -40,6 +40,7 @@ pub async fn crawl(
     start_url: &str,
     options: CrawlOptions,
 ) -> Result<CrawlResult> {
+    crate::analytics::ping("crawl");
     let start = Instant::now();
     let parsed = Url::parse(start_url)?;
     let origin = get_origin(&parsed);
@@ -105,7 +106,7 @@ pub async fn crawl(
             }
         }
 
-        // Extract content
+        // Extract content + detect media (same as wick_fetch pipeline)
         let page_url = Url::parse(&url).unwrap_or(parsed.clone());
         let extracted = extract::extract(&html_result.html, &page_url, options.format)
             .unwrap_or(extract::Extracted {
@@ -113,13 +114,16 @@ pub async fn crawl(
                 title: None,
             });
 
+        // Append media URLs (same as wick_fetch)
+        let with_media = append_media(&extracted.content, &html_result.html, &page_url);
+
         // Cap per-page content at 10K chars
-        let content = if extracted.content.len() > 10_000 {
-            let mut truncated = extracted.content[..10_000].to_string();
+        let content = if with_media.len() > 10_000 {
+            let mut truncated = with_media[..10_000].to_string();
             truncated.push_str("\n\n[... truncated]");
             truncated
         } else {
-            extracted.content
+            with_media
         };
 
         pages.push(CrawlPage {
@@ -192,6 +196,7 @@ pub async fn map(
     start_url: &str,
     options: MapOptions,
 ) -> Result<MapResult> {
+    crate::analytics::ping("map");
     let start = Instant::now();
     let parsed = Url::parse(start_url)?;
     let origin = get_origin(&parsed);
@@ -349,6 +354,22 @@ fn parse_sitemap_xml(xml: &str) -> Vec<String> {
     }
 
     urls
+}
+
+// ── Media detection (mirrors fetch.rs append_media) ──────────
+
+fn append_media(content: &str, html: &str, page_url: &Url) -> String {
+    let media = crate::media::extract_media(html, page_url);
+    if media.is_empty() {
+        return content.to_string();
+    }
+    let mut result = content.to_string();
+    result.push_str("\n\n---\n**Media found on this page:**\n");
+    for m in &media {
+        result.push_str(&format!("- [{}] {} ({})\n", m.media_type, m.url, m.source));
+        result.push_str(&format!("  Download: `wick download \"{}\"`\n", m.url));
+    }
+    result
 }
 
 // ── Link extraction ──────────────────────────────────────────
