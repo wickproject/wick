@@ -1,6 +1,6 @@
 [package]
 name = "wick"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "Browser-grade web access for AI agents"
 license = "MIT"

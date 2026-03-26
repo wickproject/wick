@@ -1,6 +1,6 @@
 {
   "name": "wick-mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "mcpName": "io.github.wickproject/wick",
   "description": "Browser-grade web access for AI agents. Gives MCP-compatible agents (Claude Code, Cursor, etc.) the same web access their human operators have.",
   "keywords": ["mcp", "ai-agent", "web-fetch", "browser", "claude", "cursor"],

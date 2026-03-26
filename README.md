@@ -112,6 +112,37 @@ Clear cookies and session data to start fresh.
 wick session clear
 ```
 
+## HTTP API
+
+Wick also runs as a local HTTP API server, making it accessible to any tool — Python, LangChain, n8n, curl, custom agents.
+
+```bash
+wick serve --api
+# Wick 0.7.0 + Pro API server running at http://127.0.0.1:8090
+```
+
+```bash
+# Fetch a page
+curl "http://localhost:8090/v1/fetch?url=https://nytimes.com"
+
+# Crawl a site
+curl "http://localhost:8090/v1/crawl?url=https://docs.example.com&max_pages=5"
+
+# Discover URLs
+curl "http://localhost:8090/v1/map?url=https://example.com"
+
+# Search
+curl "http://localhost:8090/v1/search?q=rust+async"
+```
+
+```python
+import requests
+r = requests.get("http://localhost:8090/v1/fetch", params={"url": "https://nytimes.com"})
+print(r.json()["content"])  # clean markdown
+```
+
+All endpoints return JSON. [Full API docs](https://getwick.dev/docs.html#api-server).
+
 ## 100% anti-bot success rate
 
 We tested Wick Pro against 25 sites spanning five tiers of protection:

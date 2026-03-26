@@ -210,12 +210,20 @@ body {
   <div class="sidebar-section">
     <div class="sidebar-label">MCP Tools</div>
     <a href="#wick-fetch">wick_fetch</a>
+    <a href="#wick-crawl">wick_crawl</a>
+    <a href="#wick-map">wick_map</a>
     <a href="#wick-search">wick_search</a>
+    <a href="#wick-download">wick_download</a>
     <a href="#wick-session">wick_session</a>
   </div>
   <div class="sidebar-section">
+    <div class="sidebar-label">HTTP API</div>
+    <a href="#api-server">API Server</a>
+    <a href="#api-endpoints">Endpoints</a>
+  </div>
+  <div class="sidebar-section">
     <div class="sidebar-label">CLI</div>
-    <a href="#cli-fetch">wick fetch</a>
+    <a href="#cli-fetch">wick fetch / crawl / map</a>
     <a href="#cli-search">wick search</a>
     <a href="#cli-other">setup / serve / version</a>
   </div>
@@ -349,6 +357,64 @@ performance, type safety, and concurrency...</code></pre>
 </div>
 
 <!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-crawl">wick_crawl</h2>
+
+<p>Crawl a website starting from a URL. Follows same-domain links, fetches each page through Chrome's TLS pipeline, and returns clean markdown for every page.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>url</code></td><td>string</td><td>required</td><td>Starting URL to crawl from</td></tr>
+    <tr><td><code>max_depth</code></td><td>number</td><td><code>2</code></td><td>How many links deep to follow (max 5)</td></tr>
+    <tr><td><code>max_pages</code></td><td>number</td><td><code>10</code></td><td>Max pages to fetch (max 50)</td></tr>
+    <tr><td><code>path_filter</code></td><td>string</td><td>none</td><td>Only crawl paths starting with this prefix</td></tr>
+    <tr><td><code>format</code></td><td>string</td><td><code>"markdown"</code></td><td>Output: markdown, html, or text</td></tr>
+    <tr><td><code>respect_robots</code></td><td>bool</td><td><code>true</code></td><td>Whether to respect robots.txt</td></tr>
+  </tbody>
+</table>
+
+<h3>Example</h3>
+<pre><code><span class="cmd">wick crawl</span> https://docs.example.com <span class="flag">--depth 2 --max-pages 10</span>
+
+<span class="comment"># Returns structured output:</span>
+# Crawl Results: docs.example.com
+# Crawled 8 pages in 4.2s
+#
+# --- Page 1: Introduction ---
+# [markdown content]
+#
+# --- Page 2: Getting Started ---
+# [markdown content]</code></pre>
+
+<p>Rate-limited at 500ms between requests. Media (video/audio) is automatically detected on crawled pages.</p>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-map">wick_map</h2>
+
+<p>Discover all URLs on a website. Checks <code>sitemap.xml</code> first, then follows links to build a complete URL map.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>url</code></td><td>string</td><td>required</td><td>Starting URL or domain</td></tr>
+    <tr><td><code>limit</code></td><td>number</td><td><code>100</code></td><td>Max URLs to discover (max 5000)</td></tr>
+    <tr><td><code>use_sitemap</code></td><td>bool</td><td><code>true</code></td><td>Check sitemap.xml first</td></tr>
+    <tr><td><code>path_filter</code></td><td>string</td><td>none</td><td>Only include paths with this prefix</td></tr>
+    <tr><td><code>respect_robots</code></td><td>bool</td><td><code>true</code></td><td>Whether to respect robots.txt</td></tr>
+  </tbody>
+</table>
+
+<h3>Example</h3>
+<pre><code><span class="cmd">wick map</span> https://example.com <span class="flag">--limit 50</span>
+
+<span class="comment"># Site Map: example.com</span>
+<span class="comment"># Found 47 URLs (12 from sitemap.xml)</span>
+<span class="comment">#</span>
+<span class="comment"># - https://example.com/</span>
+<span class="comment"># - https://example.com/about</span>
+<span class="comment"># - https://example.com/docs/intro</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
 <h2 id="wick-search">wick_search</h2>
 
 <p>Search the web and get structured results. Use <code>wick_fetch</code> to read any result in full.</p>
@@ -378,6 +444,24 @@ performance, type safety, and concurrency...</code></pre>
    async programming easy and portable...</code></pre>
 
 <!-- ═══════════════════════════════════════════ -->
+<h2 id="wick-download">wick_download</h2>
+
+<p>Download video and audio from Reddit, YouTube, Twitter, and 1000+ other sites. Powered by yt-dlp.</p>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>url</code></td><td>string</td><td>required</td><td>URL of the page or media to download</td></tr>
+    <tr><td><code>output_dir</code></td><td>string</td><td>current dir</td><td>Output directory path</td></tr>
+    <tr><td><code>info_only</code></td><td>bool</td><td><code>false</code></td><td>If true, return info without downloading</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="cmd">wick download</span> <span class="str">"https://v.redd.it/4uofpbxa97rg1"</span> <span class="flag">-o ./archive</span>
+<span class="comment"># Downloaded: video.mp4</span>
+<span class="comment"># Size: 33.7 MB</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
 <h2 id="wick-session">wick_session</h2>
 
 <p>Manage persistent browser sessions. Clear cookies and cache to start fresh.</p>
@@ -391,6 +475,49 @@ performance, type safety, and concurrency...</code></pre>
 
 <pre><code><span class="comment"># Clear all stored cookies and cache</span>
 <span class="cmd">wick session clear</span></code></pre>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="api-server">HTTP API Server</h2>
+
+<p>Wick can run as a local HTTP API server, making browser-grade web access available to <strong>any tool on your machine</strong> — Python scripts, LangChain, n8n, Jupyter notebooks, custom agents, anything that can make HTTP requests.</p>
+
+<pre><code><span class="cmd">wick serve</span> <span class="flag">--api</span>
+<span class="comment"># Wick 0.7.0 + Pro API server running at http://127.0.0.1:8090</span></code></pre>
+
+<p>Change the port with <code>--port</code>:</p>
+<pre><code><span class="cmd">wick serve</span> <span class="flag">--api --port 3000</span></code></pre>
+
+<h3 id="api-endpoints">Endpoints</h3>
+
+<table>
+  <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>GET /v1/fetch?url=...</code></td><td>Fetch a page, returns JSON with markdown content</td></tr>
+    <tr><td><code>GET /v1/crawl?url=...</code></td><td>Crawl a site, returns JSON array of pages</td></tr>
+    <tr><td><code>GET /v1/map?url=...</code></td><td>Discover URLs on a site</td></tr>
+    <tr><td><code>GET /v1/search?q=...</code></td><td>Web search, returns JSON results</td></tr>
+    <tr><td><code>GET /health</code></td><td>Status check (version, Pro status)</td></tr>
+  </tbody>
+</table>
+
+<h3>Example: Python</h3>
+<pre><code><span class="kw">import</span> requests
+
+r = requests.get(<span class="str">"http://localhost:8090/v1/fetch"</span>, params={<span class="str">"url"</span>: <span class="str">"https://nytimes.com"</span>})
+data = r.json()
+print(data[<span class="str">"content"</span>])  <span class="comment"># clean markdown</span></code></pre>
+
+<h3>Example: curl</h3>
+<pre><code><span class="cmd">curl</span> <span class="str">"http://localhost:8090/v1/fetch?url=https://nytimes.com"</span> | jq .content</code></pre>
+
+<h3>Example: JavaScript</h3>
+<pre><code><span class="kw">const</span> r = <span class="kw">await</span> fetch(<span class="str">"http://localhost:8090/v1/crawl?url=https://docs.example.com&max_pages=5"</span>);
+<span class="kw">const</span> { pages } = <span class="kw">await</span> r.json();
+pages.forEach(p => console.log(p.title, p.content.length));</code></pre>
+
+<div class="callout">
+  <strong>Why a local API?</strong> The MCP server only works with MCP clients (Claude Code, Cursor). The HTTP API makes Wick accessible to everything else — LangChain, n8n, Jupyter, shell scripts, custom agents, any programming language.
+</div>
 
 <!-- ═══════════════════════════════════════════ -->
 <h2 id="cli-fetch">CLI: wick fetch</h2>
@@ -438,9 +565,17 @@ Options:
 <p>Start the MCP server on stdio. Used by MCP clients — you don't usually run this directly.</p>
 <pre><code><span class="cmd">wick serve</span> <span class="flag">--mcp</span></code></pre>
 
+<h3>wick serve --api</h3>
+<p>Start the HTTP API server. Makes Wick accessible to any tool on your machine.</p>
+<pre><code><span class="cmd">wick serve</span> <span class="flag">--api</span>
+<span class="comment"># API running at http://127.0.0.1:8090</span>
+
+<span class="cmd">wick serve</span> <span class="flag">--api --port 3000</span>
+<span class="comment"># API running at http://127.0.0.1:3000</span></code></pre>
+
 <h3>wick version</h3>
 <pre><code><span class="cmd">wick version</span>
-<span class="comment"># wick 0.2.0 (rust)</span></code></pre>
+<span class="comment"># wick 0.7.0 (rust)</span></code></pre>
 
 <!-- ═══════════════════════════════════════════ -->
 <h2 id="output-formats">Output Formats</h2>
