@@ -14,6 +14,13 @@ pub struct FetchResult {
     pub timing_ms: u64,
 }
 
+/// Raw HTML fetch result (used by crawl engine for link extraction).
+pub struct FetchHtmlResult {
+    pub html: String,
+    pub url: String,
+    pub status_code: u16,
+}
+
 /// Full fetch pipeline: validate → robots.txt → fetch → CAPTCHA → extract.
 pub async fn fetch(
     client: &Client,
@@ -197,6 +204,57 @@ fn append_media(content: &str, html: &str, page_url: &url::Url) -> String {
         result.push_str(&format!("  Download: `wick download \"{}\"`\n", m.url));
     }
     result
+}
+
+/// Fetch raw HTML from a URL. Handles robots.txt, CEF/Cronet routing, and CAPTCHA.
+/// Used by the crawl engine to get HTML for link extraction.
+pub async fn fetch_html(
+    client: &Client,
+    url: &str,
+    respect_robots: bool,
+) -> Result<FetchHtmlResult> {
+    let parsed = url::Url::parse(url)
+        .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
+
+    let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("missing host"))?;
+
+    // robots.txt check
+    if respect_robots && !robots::check(client, url).await {
+        return Ok(FetchHtmlResult {
+            html: String::new(),
+            url: url.to_string(),
+            status_code: 0,
+        });
+    }
+
+    // If Pro renderer is installed, use it
+    if crate::cef::is_available() {
+        match crate::cef::render(url).await {
+            Ok(html) => {
+                return Ok(FetchHtmlResult {
+                    html,
+                    url: url.to_string(),
+                    status_code: 200,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
+            }
+        }
+    }
+
+    // Fetch via Cronet/reqwest
+    let resp = client.get(url).await?;
+
+    if resp.status >= 400 {
+        tracing::debug!("fetch_html {} returned HTTP {}", host, resp.status);
+    }
+
+    Ok(FetchHtmlResult {
+        html: resp.body,
+        url: url.to_string(),
+        status_code: resp.status,
+    })
 }
 
 fn is_challenge(body: &str) -> bool {

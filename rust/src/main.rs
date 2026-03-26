@@ -1,6 +1,7 @@
 mod analytics;
 mod captcha;
 mod cef;
+mod crawl;
 #[cfg(feature = "cronet")]
 mod cronet;
 mod download;
@@ -57,6 +58,40 @@ enum Command {
         /// Number of results (default 5)
         #[arg(short, long, default_value = "5")]
         num: usize,
+    },
+    /// Crawl a website and return content from multiple pages
+    Crawl {
+        /// Starting URL to crawl from
+        url: String,
+        /// Maximum link depth (default 2)
+        #[arg(short, long, default_value = "2")]
+        depth: u32,
+        /// Maximum number of pages (default 10)
+        #[arg(short = 'n', long, default_value = "10")]
+        max_pages: u32,
+        /// Only crawl paths starting with this prefix
+        #[arg(long)]
+        path_filter: Option<String>,
+        /// Ignore robots.txt restrictions
+        #[arg(long)]
+        no_robots: bool,
+    },
+    /// Discover all URLs on a website
+    Map {
+        /// Starting URL to map
+        url: String,
+        /// Maximum URLs to discover (default 100)
+        #[arg(short = 'n', long, default_value = "100")]
+        limit: u32,
+        /// Skip sitemap.xml check
+        #[arg(long)]
+        no_sitemap: bool,
+        /// Only include paths starting with this prefix
+        #[arg(long)]
+        path_filter: Option<String>,
+        /// Ignore robots.txt restrictions
+        #[arg(long)]
+        no_robots: bool,
     },
     /// Download media (video/audio) from a URL
     Download {
@@ -140,6 +175,53 @@ async fn main() -> Result<()> {
             }
             eprintln!("Status: {} | Time: {}ms\n", result.status_code, result.timing_ms);
             print!("{}", result.content);
+            Ok(())
+        }
+        Command::Crawl {
+            url,
+            depth,
+            max_pages,
+            path_filter,
+            no_robots,
+        } => {
+            let client = engine::Client::new(proxy)?;
+            let options = crawl::CrawlOptions {
+                max_depth: depth.min(5),
+                max_pages: max_pages.min(50),
+                format: extract::Format::Markdown,
+                respect_robots: !no_robots,
+                path_filter,
+            };
+            let result = crawl::crawl(&client, &url, options).await?;
+            let host = url::Url::parse(&url)
+                .ok()
+                .and_then(|u| u.host_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| url.clone());
+            eprintln!("Crawled {} pages in {:.1}s\n", result.pages.len(), result.timing_ms as f64 / 1000.0);
+            print!("{}", crawl::format_crawl_output(&result, &host));
+            Ok(())
+        }
+        Command::Map {
+            url,
+            limit,
+            no_sitemap,
+            path_filter,
+            no_robots,
+        } => {
+            let client = engine::Client::new(proxy)?;
+            let options = crawl::MapOptions {
+                limit: limit.min(5000),
+                use_sitemap: !no_sitemap,
+                respect_robots: !no_robots,
+                path_filter,
+            };
+            let result = crawl::map(&client, &url, options).await?;
+            let host = url::Url::parse(&url)
+                .ok()
+                .and_then(|u| u.host_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| url.clone());
+            eprintln!("Found {} URLs in {:.1}s\n", result.urls.len(), result.timing_ms as f64 / 1000.0);
+            print!("{}", crawl::format_map_output(&result, &host));
             Ok(())
         }
         Command::Search { query, num } => {

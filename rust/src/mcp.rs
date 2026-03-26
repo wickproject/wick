@@ -37,6 +37,36 @@ pub struct SessionInput {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct CrawlInput {
+    #[schemars(description = "Starting URL to crawl from")]
+    pub url: String,
+    #[schemars(description = "Maximum link depth to follow (default 2, max 5)")]
+    pub max_depth: Option<u32>,
+    #[schemars(description = "Maximum number of pages to fetch (default 10, max 50)")]
+    pub max_pages: Option<u32>,
+    #[schemars(description = "Output format: markdown (default), html, or text")]
+    pub format: Option<String>,
+    #[schemars(description = "Whether to respect robots.txt (default true)")]
+    pub respect_robots: Option<bool>,
+    #[schemars(description = "Only crawl pages whose path starts with this prefix (e.g., /docs/)")]
+    pub path_filter: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct MapInput {
+    #[schemars(description = "Starting URL or domain to map")]
+    pub url: String,
+    #[schemars(description = "Maximum number of URLs to discover (default 100, max 5000)")]
+    pub limit: Option<u32>,
+    #[schemars(description = "Whether to check sitemap.xml first (default true)")]
+    pub use_sitemap: Option<bool>,
+    #[schemars(description = "Whether to respect robots.txt (default true)")]
+    pub respect_robots: Option<bool>,
+    #[schemars(description = "Only include URLs whose path starts with this prefix")]
+    pub path_filter: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct DownloadInput {
     #[schemars(description = "The URL of the page or video to download media from")]
     pub url: String,
@@ -165,6 +195,76 @@ impl WickServer {
                 result.path, result.size_mb
             ))]))
         }
+    }
+
+    #[tool(
+        name = "wick_crawl",
+        description = "Crawl a website starting from a URL. Follows same-domain links, fetches multiple pages, and returns their content as clean markdown. Useful for reading documentation sites, blogs, or multi-page content."
+    )]
+    async fn wick_crawl(
+        &self,
+        Parameters(input): Parameters<CrawlInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let format = input
+            .format
+            .as_deref()
+            .map(Format::from_str)
+            .unwrap_or(Format::Markdown);
+        let max_depth = input.max_depth.unwrap_or(2).min(5);
+        let max_pages = input.max_pages.unwrap_or(10).min(50);
+        let respect_robots = input.respect_robots.unwrap_or(true);
+
+        let options = crate::crawl::CrawlOptions {
+            max_depth,
+            max_pages,
+            format,
+            respect_robots,
+            path_filter: input.path_filter,
+        };
+
+        let result = crate::crawl::crawl(&self.client, &input.url, options)
+            .await
+            .map_err(|e| McpError::internal_error(format!("crawl failed: {}", e), None))?;
+
+        let host = url::Url::parse(&input.url)
+            .ok()
+            .and_then(|u| u.host_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| input.url.clone());
+
+        let output = crate::crawl::format_crawl_output(&result, &host);
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(
+        name = "wick_map",
+        description = "Discover all URLs on a website. Checks sitemap.xml first, then follows links to build a URL map. Returns a sorted list of discovered URLs. Useful for understanding site structure before targeted fetching."
+    )]
+    async fn wick_map(
+        &self,
+        Parameters(input): Parameters<MapInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let limit = input.limit.unwrap_or(100).min(5000);
+        let use_sitemap = input.use_sitemap.unwrap_or(true);
+        let respect_robots = input.respect_robots.unwrap_or(true);
+
+        let options = crate::crawl::MapOptions {
+            limit,
+            use_sitemap,
+            respect_robots,
+            path_filter: input.path_filter,
+        };
+
+        let result = crate::crawl::map(&self.client, &input.url, options)
+            .await
+            .map_err(|e| McpError::internal_error(format!("map failed: {}", e), None))?;
+
+        let host = url::Url::parse(&input.url)
+            .ok()
+            .and_then(|u| u.host_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| input.url.clone());
+
+        let output = crate::crawl::format_map_output(&result, &host);
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 }
 
