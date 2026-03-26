@@ -11,7 +11,51 @@
 <meta property="og:description" content="Your AI agent gets 403 errors because anti-bot systems fingerprint TLS handshakes. Fix it in 30 seconds.">
 <meta property="og:url" content="https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html">
 <meta property="og:type" content="article">
+<meta property="og:image" content="https://getwick.dev/og-image.png">
+<meta property="article:published_time" content="2026-03-24T00:00:00Z">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How to Fix 403 Forbidden in Claude Code">
+<meta name="twitter:description" content="Your AI agent gets 403 errors because anti-bot systems fingerprint TLS handshakes. Fix it in 30 seconds.">
+<meta name="twitter:image" content="https://getwick.dev/og-image.png">
 <link rel="canonical" href="https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "How to Fix 403 Forbidden in Claude Code",
+  "description": "Claude Code gets 403 Forbidden when fetching web pages. Here's why (TLS fingerprinting) and how to fix it in 30 seconds with Wick.",
+  "author": {"@type": "Person", "name": "Adam Fisk", "url": "https://getwick.dev"},
+  "publisher": {"@type": "Organization", "name": "Wick", "url": "https://getwick.dev"},
+  "datePublished": "2026-03-24",
+  "dateModified": "2026-03-24",
+  "mainEntityOfPage": {"@type": "WebPage", "@id": "https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html"},
+  "url": "https://getwick.dev/blog/how-to-fix-403-forbidden-in-claude-code.html"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Why does Claude Code get 403 Forbidden?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Claude Code uses a standard HTTP client whose TLS fingerprint is identified as non-browser by anti-bot systems like Cloudflare and Akamai. The request is blocked before any content is served."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I fix 403 Forbidden in Claude Code?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Install Wick: brew tap wickproject/wick && brew install wick && wick setup. Wick uses Chrome's actual network stack so anti-bot systems see a real browser fingerprint."
+      }
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -167,6 +211,13 @@ the NCAA tournament...</code></pre>
 <li><strong>Docs:</strong> <a href="https://getwick.dev/docs.html">getwick.dev/docs.html</a></li>
 <li><strong>GitHub:</strong> <a href="https://github.com/wickproject/wick">github.com/wickproject/wick</a></li>
 <li><strong>Pro:</strong> <a href="https://getwick.dev">getwick.dev</a> ($20/month for JS rendering + advanced anti-detection)</li>
+</ul>
+
+<h2>Related</h2>
+<ul>
+<li><a href="why-your-ai-agent-cant-read-the-web.html">Why Your AI Agent Can't Read the Web</a> — deep dive on TLS fingerprinting</li>
+<li><a href="wick-0-6-crawl-and-100-percent.html">100% Anti-Bot Success Rate</a> — benchmark across 25 sites</li>
+<li><a href="wick-0-7-http-api.html">Wick 0.7: Local HTTP API</a> — use Wick from Python or any HTTP client</li>
 </ul>
 
 <hr>
