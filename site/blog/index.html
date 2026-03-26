@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog — Wick</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="description" content="Updates, guides, and technical deep dives from the Wick team. Browser-grade web access for AI agents.">
+<meta property="og:title" content="Blog — Wick">
+<meta property="og:description" content="Updates, guides, and technical deep dives from the Wick team.">
+<link rel="canonical" href="https://getwick.dev/blog/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--flame:#E8913A;--ash:#1A1714;--smoke:#2A2520;--smoke-light:#3D3630;--warm-white:#F0E6D8;--warm-gray:#9E958A;--cool-gray:#6B635A;--black:#0D0B09;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--warm-gray);font-family:var(--font-display);font-weight:300;line-height:1.8;-webkit-font-smoothing:antialiased}
+::selection{background:var(--flame);color:var(--black)}
+.container{max-width:680px;margin:0 auto;padding:3rem 2rem 6rem}
+.back{display:inline-block;font-size:0.8rem;color:var(--flame);text-decoration:none;margin-bottom:2rem}
+.back:hover{text-decoration:underline}
+h1{font-size:2rem;font-weight:700;color:var(--warm-white);margin-bottom:0.5rem}
+.subtitle{color:var(--cool-gray);font-size:0.9rem;margin-bottom:3rem}
+a{color:var(--flame);text-decoration:none}
+a:hover{text-decoration:underline}
+.post{display:block;padding:1.5rem 0;border-bottom:1px solid var(--smoke-light);text-decoration:none}
+.post:hover{text-decoration:none}
+.post:hover .post-title{color:var(--flame)}
+.post-date{font-size:0.75rem;color:var(--cool-gray);font-family:var(--font-mono)}
+.post-title{font-size:1.1rem;font-weight:600;color:var(--warm-white);margin:0.3rem 0;transition:color 0.15s}
+.post-summary{font-size:0.88rem;color:var(--warm-gray);line-height:1.6}
+.post-tag{display:inline-block;font-size:0.7rem;font-family:var(--font-mono);color:var(--cool-gray);background:var(--smoke);padding:0.15rem 0.5rem;border-radius:3px;margin-top:0.5rem}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>Blog</h1>
+<p class="subtitle">Updates, guides, and deep dives from the team behind Wick.</p>
+
+<a href="wick-0-7-http-api.html" class="post">
+  <div class="post-date">March 26, 2026</div>
+  <div class="post-title">Wick 0.7: Local HTTP API</div>
+  <div class="post-summary">One command gives every tool on your machine browser-grade web access. Python, LangChain, n8n, Jupyter, curl — anything that can make an HTTP request.</div>
+  <span class="post-tag">release</span>
+</a>
+
+<a href="wick-0-6-crawl-and-100-percent.html" class="post">
+  <div class="post-date">March 26, 2026</div>
+  <div class="post-title">Wick 0.6: Site Crawling, 100% Anti-Bot Success, and How We Compare</div>
+  <div class="post-summary">New wick_crawl and wick_map tools. We tested against 25 protected sites and scored 100% — matching Bright Data without any cloud infrastructure. Full comparison to nine competing MCP servers.</div>
+  <span class="post-tag">release</span>
+</a>
+
+<a href="wick-0-5-media-downloads.html" class="post">
+  <div class="post-date">March 25, 2026</div>
+  <div class="post-title">Wick 0.5: Media Downloads, Analytics, and Self-Serve Pro</div>
+  <div class="post-summary">Download video from Reddit, YouTube, Twitter. Auto-detect media in fetched pages. Self-serve Pro at $20/month via Stripe.</div>
+  <span class="post-tag">release</span>
+</a>
+
+<a href="how-to-fix-403-forbidden-in-claude-code.html" class="post">
+  <div class="post-date">March 24, 2026</div>
+  <div class="post-title">How to Fix 403 Forbidden in Claude Code</div>
+  <div class="post-summary">Claude Code gets 403 Forbidden when fetching web pages. Here's why it happens (TLS fingerprinting) and how to fix it in 30 seconds with Wick.</div>
+  <span class="post-tag">guide</span>
+</a>
+
+<a href="why-your-ai-agent-cant-read-the-web.html" class="post">
+  <div class="post-date">March 24, 2026</div>
+  <div class="post-title">Why Your AI Agent Can't Read the Web</div>
+  <div class="post-summary">Anti-bot systems fingerprint TLS handshakes, not just headers. That's why your agent gets blocked and how browser-grade networking fixes it.</div>
+  <span class="post-tag">deep dive</span>
+</a>
+
+</div>
+</body>
+</html>
