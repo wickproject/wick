@@ -991,6 +991,23 @@ footer {
         </div>
       </div>
     </div>
+
+    <!-- API demo -->
+    <div style="max-width: 600px; margin: 2.5rem auto 0;">
+      <div class="demo-panel success reveal" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--smoke-light); background: var(--ash);">
+        <div class="demo-panel-header" style="padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--smoke-light); font-size: 0.85rem; font-weight: 500;">
+          <span class="panel-dot green" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;"></span>
+          HTTP API &mdash; works with any tool
+        </div>
+        <div class="demo-panel-body" style="padding: 1.5rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.8; color: var(--warm-gray);">
+          <span style="color:var(--cool-gray);">$ wick serve --api</span><br>
+          <span style="color:var(--warm-gray);">API running at http://127.0.0.1:8090</span><br><br>
+          <span style="color:var(--cool-gray);">$ curl "localhost:8090/v1/fetch?url=https://nytimes.com"</span><br>
+          <span style="color:var(--warm-white);">{"status": 200, "content": "# The New York Times..."}</span><br><br>
+          <span style="color:#F5B74C;">Python, LangChain, n8n, Jupyter, curl &mdash; anything.</span>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1023,19 +1040,24 @@ footer {
       <p>No pooled residential IPs. No sketchy proxy networks. Requests go out from your own connection &mdash; because you're the one making them, through your agent.</p>
     </div>
     <div class="feature-card reveal reveal-delay-5">
+      <span class="feature-icon">&#x1f577;</span>
+      <h3>Crawl &amp; Map</h3>
+      <p><code>wick_crawl</code> follows links and returns markdown from multiple pages. <code>wick_map</code> discovers all URLs on a site. Build RAG pipelines, scrape docs, index entire sites.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-5">
       <span class="feature-icon">&#x1f916;</span>
-      <h3>MCP Native</h3>
-      <p>Designed for AI agents from day one. Works instantly with Claude Code, Cursor, Windsurf, and any MCP-compatible client. One command to install.</p>
+      <h3>MCP + HTTP API</h3>
+      <p>Works with Claude Code, Cursor, and any MCP client. Also runs as a <a href="/docs.html#api-server" style="color:var(--flame);">local HTTP API</a> &mdash; <code>wick serve --api</code> gives Python, LangChain, n8n, and anything else browser-grade access.</p>
     </div>
     <div class="feature-card reveal reveal-delay-5">
       <span class="feature-icon">&#x1f50d;</span>
-      <h3>Web Search Built In</h3>
-      <p><code>wick_search</code> lets your agent search the web and get results with titles, URLs, and snippets. Then <code>wick_fetch</code> reads any result in full.</p>
+      <h3>Search &amp; Download</h3>
+      <p><code>wick_search</code> for web search. <code>wick_download</code> for video/audio from Reddit, YouTube, Twitter, and 1000+ sites. Six tools, one server.</p>
     </div>
     <div class="feature-card reveal reveal-delay-5">
       <span class="feature-icon">&#x2764;</span>
       <h3>Free &amp; Open Source</h3>
-      <p>Wick is MIT-licensed and costs nothing to run. Built by a team with over a decade of experience in internet access technology.</p>
+      <p>Wick is MIT-licensed and costs nothing to run. Built by the creator of <a href="https://lantern.io" style="color:var(--flame);">Lantern</a>, with over a decade of experience in internet access technology.</p>
     </div>
   </div>
 </section>
