@@ -3,17 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const VERSION = "0.5.0";
+const VERSION = "0.7.0";
 const PLATFORM = `${process.platform}-${process.arch}`;
 
 const ASSETS = {
   "darwin-arm64": {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-${VERSION}-darwin-arm64.tar.gz`,
-    sha256: "8f4585f478c4bb734098dddd4660cb60ccce47ac10f7f48e7b382a02110554cc",
-  },
-  "linux-x64": {
-    url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-${VERSION}-linux-x86_64.tar.gz`,
-    sha256: "d87cf78ef30b79e5455e0030fe8cbc4d696c570a569fe39b0b12774e6e0050c1",
+    sha256: "766f48f0eb1cfb220352f9fb266fb97504fe456cea9670a1d1f3516b3ae8f725",
   },
 };
 
@@ -31,7 +27,8 @@ const binDir = path.join(__dirname, "..", "bin");
 const binPath = path.join(binDir, "wick");
 const tarPath = path.join(binDir, "wick.tar.gz");
 
-if (fs.existsSync(binPath)) {
+// Check if real binary exists (not the stub — stub is <500 bytes)
+if (fs.existsSync(binPath) && fs.statSync(binPath).size > 1000) {
   process.exit(0);
 }
 
