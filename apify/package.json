@@ -1,0 +1,8 @@
+{
+    "name": "wick-web-fetcher",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "apify": "^3.2.0"
+    }
+}

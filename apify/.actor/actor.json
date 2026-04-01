@@ -1,0 +1,15 @@
+{
+    "actorSpecification": 1,
+    "name": "wick-web-fetcher",
+    "title": "Wick Web Fetcher — Browser-Grade Content Extraction",
+    "version": "1.0",
+    "buildTag": "latest",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 1024,
+    "dockerfile": "../Dockerfile",
+    "readme": "./ACTOR.md",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    }
+}
