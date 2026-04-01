@@ -30,7 +30,8 @@
   "operatingSystem": "macOS, Linux",
   "offers": [
     {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier"},
-    {"@type": "Offer", "price": "20", "priceCurrency": "USD", "description": "Pro — $20/month"}
+    {"@type": "Offer", "price": "20", "priceCurrency": "USD", "description": "Pro — $20/month"},
+    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Enterprise — custom pricing"}
   ],
   "author": {"@type": "Person", "name": "Adam Fisk"}
 }
@@ -1085,9 +1086,9 @@ footer {
 <section class="features" id="pricing">
   <div class="features-header reveal">
     <div class="section-label">Plans</div>
-    <h2>Free to start. Pro when you need&nbsp;more.</h2>
+    <h2>Free to start. Scale when you&nbsp;need&nbsp;more.</h2>
   </div>
-  <div class="features-grid" style="grid-template-columns: 1fr 1fr; max-width: 800px; margin: 0 auto;">
+  <div class="features-grid" style="grid-template-columns: 1fr 1fr 1fr; max-width: 1100px; margin: 0 auto;">
     <div class="feature-card reveal reveal-delay-1" style="border-color: var(--smoke-light);">
       <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 1rem;">Free</div>
       <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">$0</div>
@@ -1098,10 +1099,10 @@ footer {
         <li style="color: var(--warm-white);">&#x2713; MCP server (Claude, Cursor, etc.)</li>
         <li style="color: var(--warm-white);">&#x2713; Persistent cookies</li>
         <li style="color: var(--warm-white);">&#x2713; robots.txt respect</li>
+        <li style="color: var(--warm-white);">&#x2713; Residential IP routing</li>
+        <li style="color: var(--warm-white);">&#x2713; IP tunneling to local machine</li>
+        <li style="color: var(--warm-white);">&#x2713; macOS + Linux, one-command install</li>
         <li style="color: var(--warm-white);">&#x2713; Open source, runs locally</li>
-        <li>&#x2717; JavaScript rendering</li>
-        <li>&#x2717; Advanced anti-detection</li>
-        <li>&#x2717; Dedicated support</li>
       </ul>
       <div style="margin-top: 1.5rem;">
         <a href="#install" class="btn-secondary" style="width: 100%; justify-content: center;">Get Started Free</a>
@@ -1109,18 +1110,27 @@ footer {
     </div>
     <div class="feature-card reveal reveal-delay-2" style="border-color: var(--flame);">
       <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--flame); margin-bottom: 1rem;">Pro</div>
-      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">Custom</div>
-      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For companies accessing high-value data</p>
+      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">$20<span style="font-size: 1rem; font-weight: 400; color: var(--warm-gray);">/mo</span></div>
+      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For power users and teams</p>
       <ul style="list-style: none; font-size: 0.9rem; line-height: 2.2; color: var(--warm-gray);">
         <li style="color: var(--warm-white);">&#x2713; Everything in Free</li>
         <li style="color: var(--flame);">&#x2713; Full JavaScript rendering</li>
         <li style="color: var(--flame);">&#x2713; Advanced anti-detection</li>
-        <li style="color: var(--flame);">&#x2713; Geo-restriction bypass</li>
-        <li style="color: var(--flame);">&#x2713; Residential IP routing</li>
         <li style="color: var(--flame);">&#x2713; Adaptive per-site optimization</li>
-        <li style="color: var(--flame);">&#x2713; CAPTCHA handling</li>
-        <li style="color: var(--flame);">&#x2713; macOS + Linux, one-command install</li>
-        <li style="color: var(--flame);">&#x2713; Dedicated support + SLA</li>
+      </ul>
+      <div style="margin-top: 1.5rem;">
+        <a href="#install" class="btn-primary" style="width: 100%; justify-content: center;">Upgrade in CLI</a>
+      </div>
+    </div>
+    <div class="feature-card reveal reveal-delay-3" style="border-color: var(--ember);">
+      <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ember); margin-bottom: 1rem;">Enterprise</div>
+      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">Custom</div>
+      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For companies accessing high-value data</p>
+      <ul style="list-style: none; font-size: 0.9rem; line-height: 2.2; color: var(--warm-gray);">
+        <li style="color: var(--warm-white);">&#x2713; Everything in Pro</li>
+        <li style="color: var(--ember);">&#x2713; Automated CAPTCHA handling</li>
+        <li style="color: var(--ember);">&#x2713; Geo-restriction bypass</li>
+        <li style="color: var(--ember);">&#x2713; Dedicated support + SLA</li>
       </ul>
       <div style="margin-top: 1.5rem;">
         <a href="mailto:hello@getwick.dev" class="btn-primary" style="width: 100%; justify-content: center;">Contact Us</a>
