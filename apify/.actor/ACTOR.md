@@ -57,6 +57,17 @@ For additional anti-detection, you can connect this Actor to your own Wick insta
 - **No JavaScript rendering** in the bundled engine. For JS-heavy SPAs, pair this Actor with a browser-based Actor like [Website Content Crawler](https://apify.com/apify/website-content-crawler) or use Wick's tunnel mode with a Pro instance that includes JS rendering.
 - **Best for content pages.** Wick excels at articles, documentation, blogs, and product pages. For structured data extraction (e.g., specific fields from a listing), consider combining Wick's output with an LLM or a purpose-built scraper.
 
+## Integrations
+
+Wick's output works with Apify's built-in integrations. Some ideas:
+
+- **Pinecone / Qdrant / PGVector** -- Crawl a docs site, then push the markdown straight into a vector database for RAG.
+- **OpenAI Vector Store** -- Feed crawled content to an OpenAI Assistant.
+- **Google Sheets** -- Export fetched pages to a spreadsheet for review.
+- **Zapier / Make / n8n** -- Trigger downstream workflows when a crawl finishes.
+
+Set these up from the **Integrations** tab on your Actor run page.
+
 ## Pricing
 
 This Actor is **free** -- you only pay for Apify compute units. The Wick engine is open source ([MIT license](https://github.com/wickproject/wick)).
