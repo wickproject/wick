@@ -1,51 +1,86 @@
 {
     "actorSpecification": 1,
     "fields": {
-        "url": {
-            "type": "string",
-            "description": "The URL that was fetched"
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "title": "URL",
+                "description": "The URL that was fetched",
+                "example": "https://www.nytimes.com"
+            },
+            "title": {
+                "type": "string",
+                "title": "Page Title",
+                "description": "Page title extracted from HTML",
+                "example": "The New York Times"
+            },
+            "content": {
+                "type": "string",
+                "title": "Content",
+                "description": "Page content in the requested format (markdown, html, or text)"
+            },
+            "statusCode": {
+                "type": "integer",
+                "title": "Status Code",
+                "description": "HTTP response status code",
+                "example": 200
+            },
+            "timingMs": {
+                "type": "integer",
+                "title": "Timing (ms)",
+                "description": "Time to fetch in milliseconds",
+                "example": 1500
+            },
+            "format": {
+                "type": "string",
+                "title": "Format",
+                "description": "Output format used for content extraction",
+                "example": "markdown"
+            },
+            "engine": {
+                "type": "string",
+                "title": "Engine",
+                "description": "wick-local (bundled engine) or wick-tunnel (residential IP)",
+                "example": "wick-local"
+            },
+            "error": {
+                "type": "string",
+                "title": "Error",
+                "description": "Error message if the fetch failed"
+            },
+            "fetchedAt": {
+                "type": "string",
+                "title": "Fetched At",
+                "description": "ISO 8601 timestamp of when the page was fetched",
+                "example": "2026-04-01T12:00:00.000Z"
+            }
         },
-        "title": {
-            "type": "string",
-            "description": "Page title extracted from HTML",
-            "nullable": true
-        },
-        "content": {
-            "type": "string",
-            "description": "Page content in the requested format (markdown, html, or text)",
-            "nullable": true
-        },
-        "urls": {
-            "type": "array",
-            "description": "Discovered URLs (map mode only)",
-            "nullable": true
-        },
-        "format": {
-            "type": "string",
-            "description": "Output format used"
-        },
-        "statusCode": {
-            "type": "integer",
-            "description": "HTTP status code from the fetch",
-            "nullable": true
-        },
-        "timingMs": {
-            "type": "integer",
-            "description": "Time to fetch in milliseconds",
-            "nullable": true
-        },
-        "engine": {
-            "type": "string",
-            "description": "wick-local (bundled engine) or wick-tunnel (residential IP)"
-        },
-        "error": {
-            "type": "string",
-            "description": "Error message if the fetch failed",
-            "nullable": true
-        },
-        "fetchedAt": {
-            "type": "string",
-            "description": "ISO 8601 timestamp of when the page was fetched"
+        "required": ["url", "fetchedAt"]
+    },
+    "views": {
+        "overview": {
+            "title": "Results",
+            "transformation": {
+                "fields": ["url", "title", "statusCode", "timingMs", "format", "engine", "fetchedAt"]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "url": {
+                        "label": "URL",
+                        "format": "link"
+                    },
+                    "statusCode": {
+                        "label": "Status",
+                        "format": "number"
+                    },
+                    "timingMs": {
+                        "label": "Time (ms)",
+                        "format": "number"
+                    }
+                }
+            }
         }
     }
 }

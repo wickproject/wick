@@ -20,12 +20,14 @@
         "format": {
             "title": "Output Format",
             "type": "string",
+            "description": "Content format: markdown (default, best for LLMs), html (raw), or text (plain)",
             "enum": ["markdown", "html", "text"],
             "default": "markdown"
         },
         "maxPages": {
             "title": "Max Pages (crawl mode)",
             "type": "integer",
+            "description": "Maximum number of pages to fetch when crawling",
             "default": 10,
             "minimum": 1,
             "maximum": 50
@@ -33,6 +35,7 @@
         "maxDepth": {
             "title": "Max Depth (crawl mode)",
             "type": "integer",
+            "description": "How many links deep to follow from the starting URL",
             "default": 2,
             "minimum": 1,
             "maximum": 5
