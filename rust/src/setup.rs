@@ -90,6 +90,9 @@ pub fn setup() -> Result<()> {
     // Try claude CLI first
     if setup_claude_cli(&wick_str).is_ok() {
         println!("Configured Wick for Claude Code (via claude mcp add)");
+        println!();
+        println!("Wick is ready. If it saves you time, a star helps:");
+        println!("  https://github.com/wickproject/wick");
         return Ok(());
     }
 
@@ -110,6 +113,11 @@ pub fn setup() -> Result<()> {
             "no MCP clients found — install Claude Code or Cursor, then run 'wick setup' again"
         );
     }
+
+    println!();
+    println!("Wick is ready. If it saves you time, a star helps:");
+    println!("  https://github.com/wickproject/wick");
+
     Ok(())
 }
 
