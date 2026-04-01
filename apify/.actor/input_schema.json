@@ -37,6 +37,14 @@
             "minimum": 1,
             "maximum": 5
         },
+        "mapLimit": {
+            "title": "Max URLs (map mode)",
+            "type": "integer",
+            "description": "Maximum number of URLs to discover in map mode",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 5000
+        },
         "wickTunnelUrl": {
             "title": "Wick Tunnel URL (optional)",
             "type": "string",

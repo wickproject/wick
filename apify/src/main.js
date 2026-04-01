@@ -6,16 +6,22 @@ const WICK_BASE = `http://127.0.0.1:${WICK_PORT}`;
 
 await Actor.init();
 
-const input = await Actor.getInput();
+const input = (await Actor.getInput()) ?? {};
 const {
     urls,
     mode = 'fetch',
     format = 'markdown',
     maxPages = 10,
     maxDepth = 2,
+    mapLimit = 100,
     wickTunnelUrl,
     wickApiKey,
 } = input;
+
+if (!Array.isArray(urls) || urls.length === 0) {
+    Actor.log.error('Input must include a non-empty "urls" array.');
+    await Actor.exit({ exitCode: 1 });
+}
 
 const dataset = await Actor.openDataset();
 const useTunnel = !!wickTunnelUrl;
@@ -31,6 +37,20 @@ if (!useTunnel) {
         stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    wickProcess.on('error', (err) => {
+        Actor.log.error(`Failed to start Wick: ${err.message}`);
+        Actor.exit({ exitCode: 1 });
+    });
+
+    wickProcess.stdout.on('data', (chunk) => {
+        const msg = chunk.toString().trimEnd();
+        if (msg) Actor.log.info(`[wick] ${msg}`);
+    });
+    wickProcess.stderr.on('data', (chunk) => {
+        const msg = chunk.toString().trimEnd();
+        if (msg) Actor.log.warning(`[wick] ${msg}`);
+    });
+
     // Wait for server to be ready
     let ready = false;
     for (let i = 0; i < 30; i++) {
@@ -42,7 +62,7 @@ if (!useTunnel) {
     }
 
     if (!ready) {
-        Actor.log.error('Wick API server failed to start');
+        Actor.log.error('Wick API server failed to start within 15s');
         await Actor.exit({ exitCode: 1 });
     }
     Actor.log.info('Wick API server ready');
@@ -67,7 +87,7 @@ async function wickCrawl(url) {
 }
 
 async function wickMap(url) {
-    const params = new URLSearchParams({ url, limit: '100' });
+    const params = new URLSearchParams({ url, limit: String(mapLimit) });
     const resp = await fetch(`${baseUrl}/v1/map?${params}`, { headers });
     if (!resp.ok) throw new Error(`Wick returned ${resp.status}: ${await resp.text()}`);
     return resp.json();

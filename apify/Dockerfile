@@ -2,8 +2,16 @@ FROM node:20-slim
 
 # Install Wick binary + libcronet.so from GitHub release
 ARG WICK_VERSION=0.7.0
-ADD https://github.com/wickproject/wick/releases/download/v${WICK_VERSION}/wick-linux-amd64.tar.gz /tmp/wick.tar.gz
-RUN cd /tmp && tar xzf wick.tar.gz \
+ARG WICK_SHA256=110d074072ff5fb334ca3d0123def3f9463d5298f9c6a48fa727a03d21f08ea9
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cd /tmp \
+    && curl -fsSL "https://github.com/wickproject/wick/releases/download/v${WICK_VERSION}/wick-linux-amd64.tar.gz" -o wick.tar.gz \
+    && echo "${WICK_SHA256}  wick.tar.gz" | sha256sum -c - \
+    && tar xzf wick.tar.gz \
     && mv wick /usr/local/bin/wick \
     && mv libcronet.so /usr/local/lib/libcronet.so \
     && chmod +x /usr/local/bin/wick \
