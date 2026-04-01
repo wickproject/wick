@@ -125,15 +125,25 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
-      - name: Create release
+      - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG_NAME" \
-            macos-arm64/wick-darwin-arm64.tar.gz \
-            macos-arm64/wick-captcha-darwin-arm64.tar.gz \
-            linux-amd64/wick-linux-amd64.tar.gz \
-            linux-amd64/wick-linux-amd64.deb \
-            --title "$TAG_NAME" \
-            --generate-notes
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Release $TAG_NAME exists, uploading assets..."
+            gh release upload "$TAG_NAME" --clobber \
+              macos-arm64/wick-darwin-arm64.tar.gz \
+              macos-arm64/wick-captcha-darwin-arm64.tar.gz \
+              linux-amd64/wick-linux-amd64.tar.gz \
+              linux-amd64/wick-linux-amd64.deb
+          else
+            echo "Creating release $TAG_NAME..."
+            gh release create "$TAG_NAME" \
+              macos-arm64/wick-darwin-arm64.tar.gz \
+              macos-arm64/wick-captcha-darwin-arm64.tar.gz \
+              linux-amd64/wick-linux-amd64.tar.gz \
+              linux-amd64/wick-linux-amd64.deb \
+              --title "$TAG_NAME" \
+              --generate-notes
+          fi
