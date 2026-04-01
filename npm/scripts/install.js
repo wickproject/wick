@@ -11,6 +11,11 @@ const ASSETS = {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-${VERSION}-darwin-arm64.tar.gz`,
     sha256: "766f48f0eb1cfb220352f9fb266fb97504fe456cea9670a1d1f3516b3ae8f725",
   },
+  "linux-x64": {
+    url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-linux-amd64.tar.gz`,
+    sha256: "110d074072ff5fb334ca3d0123def3f9463d5298f9c6a48fa727a03d21f08ea9",
+    hasLib: true,
+  },
 };
 
 const asset = ASSETS[PLATFORM];
@@ -61,6 +66,20 @@ async function main() {
   execFileSync("tar", ["xzf", tarPath, "-C", binDir]);
   fs.unlinkSync(tarPath);
   fs.chmodSync(binPath, 0o755);
+
+  // On Linux, the tarball includes libcronet.so — create a wrapper script
+  // so LD_LIBRARY_PATH is set automatically
+  const libPath = path.join(binDir, "libcronet.so");
+  if (asset.hasLib && fs.existsSync(libPath)) {
+    const realBin = path.join(binDir, "wick-bin");
+    fs.renameSync(binPath, realBin);
+    fs.writeFileSync(
+      binPath,
+      `#!/bin/sh\nLD_LIBRARY_PATH="${binDir}:$LD_LIBRARY_PATH" exec "${realBin}" "$@"\n`
+    );
+    fs.chmodSync(binPath, 0o755);
+  }
+
   console.log("Wick installed successfully.");
 }
 

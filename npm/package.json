@@ -16,8 +16,8 @@
   "scripts": {
     "postinstall": "node scripts/install.js"
   },
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": ["darwin", "linux"],
+  "cpu": ["arm64", "x64"],
   "files": [
     "bin/",
     "scripts/",
