@@ -1,32 +1,25 @@
 # Wick Web Fetcher
 
-Getting 403 Forbidden? Your scraper's TLS fingerprint is giving it away.
+A lightweight content extraction Actor powered by [Wick](https://getwick.dev), an open-source tool that uses Chrome's real network stack (Cronet) to fetch web pages. Because requests go through the same TLS implementation as a real Chrome browser (BoringSSL, HTTP/2, QUIC), Wick reaches sites that block raw HTTP clients.
 
-**Wick uses Chrome's real network stack** (BoringSSL, HTTP/2, QUIC) to fetch web pages. The TLS handshake is identical to a real Chrome browser -- not headless Chromium, not Playwright, not Puppeteer. Sites that block every other scraper return 200 OK to Wick.
+## When to use this Actor
 
-## What it does
+- **Quick single-page fetches** where spinning up a full browser is overkill
+- **LLM and RAG pipelines** that need clean markdown from web pages
+- **Lightweight content extraction** at low memory cost (256 MB)
+- **Complement to browser-based Actors** -- use Wick for the pages that don't need JS rendering, save browser compute for the pages that do
 
-- **Fetch** any URL and get clean markdown, HTML, or plain text
-- **Crawl** a site following links, up to 50 pages deep
-- **Map** a site to discover all URLs via sitemap.xml + link following
-- Returns LLM-ready markdown -- perfect for RAG pipelines, AI training, and content analysis
+## How it works
 
-## Why not Website Content Crawler?
+Under the hood, this Actor runs the Wick binary as a local HTTP API server inside the container. Wick makes requests using [Cronet](https://chromium.googlesource.com/chromium/src/+/master/components/cronet/) -- Chrome's network stack extracted as a standalone library. The response HTML is converted to clean markdown, stripping navigation, ads, and boilerplate.
 
-| | Wick | Website Content Crawler |
-|---|---|---|
-| TLS fingerprint | Real Chrome (Cronet) | Headless Chromium |
-| Anti-bot bypass | High -- real browser signature | Medium -- detectable fingerprint |
-| Output | Clean markdown | Clean markdown |
-| Speed | Fast (no browser startup) | Slower (full browser launch) |
-| Memory | 256 MB | 1-4 GB |
-| Compute cost | ~4x cheaper per run | Standard |
+No headless browser is launched. This makes it fast (~1-3s per page) and lightweight (256 MB vs typical 1-4 GB for browser-based Actors).
 
 ## Modes
 
 ### Fetch (default)
 
-Fetches one or more URLs and returns clean content. Each URL becomes one row in the output dataset.
+Fetches one or more URLs and returns clean content. Each URL becomes one row in the output dataset with title, content, status code, and timing.
 
 ### Crawl
 
@@ -34,27 +27,44 @@ Starts from a URL and follows same-domain links. Returns content for every page 
 
 ### Map
 
-Discovers all URLs on a site by checking sitemap.xml and following links. Returns a list of URLs without fetching their content -- useful for planning a targeted crawl.
+Discovers all URLs on a site by checking sitemap.xml and following links. Returns a URL list without fetching content -- useful for planning a targeted crawl or building a sitemap.
+
+## Output
+
+Each dataset row contains:
+
+| Field | Description |
+|-------|-------------|
+| `url` | The URL that was fetched |
+| `title` | Page title |
+| `content` | Page content in markdown, HTML, or plain text |
+| `statusCode` | HTTP response status |
+| `timingMs` | Fetch duration in milliseconds |
+| `format` | Output format used |
+| `fetchedAt` | ISO 8601 timestamp |
 
 ## Residential IP mode (optional)
 
-For maximum anti-detection, connect this Actor to your own **Wick Pro** instance running on your machine. Requests route through your residential IP -- no datacenter fingerprint, no proxy costs.
+For additional anti-detection, you can connect this Actor to your own Wick instance running on your machine. Requests then route through your residential IP, combining Apify's scheduling and monitoring with your own network.
 
-1. Install Wick Pro: `wick install pro` (see [getwick.dev](https://getwick.dev))
+1. Install [Wick Pro](https://getwick.dev) on your machine
 2. Start the API server: `wick serve --api`
-3. Expose via tunnel (Cloudflare Tunnel, ngrok, etc.)
-4. Paste the tunnel URL in the **Wick Tunnel URL** input field
+3. Expose it via a tunnel (Cloudflare Tunnel, ngrok, etc.)
+4. Enter the tunnel URL in the **Wick Tunnel URL** input field
 
-This gives you Apify's scheduling and monitoring with Wick's anti-detection and your residential IP.
+## Limitations
+
+- **No JavaScript rendering** in the bundled engine. For JS-heavy SPAs, pair this Actor with a browser-based Actor like [Website Content Crawler](https://apify.com/apify/website-content-crawler) or use Wick's tunnel mode with a Pro instance that includes JS rendering.
+- **Best for content pages.** Wick excels at articles, documentation, blogs, and product pages. For structured data extraction (e.g., specific fields from a listing), consider combining Wick's output with an LLM or a purpose-built scraper.
 
 ## Pricing
 
-This Actor is **free to use** -- you only pay for Apify compute units. The bundled Wick engine is open source (MIT license).
+This Actor is **free** -- you only pay for Apify compute units. The Wick engine is open source ([MIT license](https://github.com/wickproject/wick)).
 
-For residential IP routing, you need [Wick Pro](https://getwick.dev) ($20/month).
+Residential IP mode requires [Wick Pro](https://getwick.dev) ($20/month).
 
-## Links
+## Resources
 
-- [Wick website](https://getwick.dev)
-- [GitHub](https://github.com/wickproject/wick)
-- [Documentation](https://getwick.dev/docs.html)
+- [Wick documentation](https://getwick.dev/docs.html)
+- [GitHub repository](https://github.com/wickproject/wick)
+- [How Wick's TLS fingerprinting works](https://getwick.dev/blog/why-your-ai-agent-cant-read-the-web.html)
