@@ -1,0 +1,57 @@
+{
+    "title": "Wick Web Fetcher Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "urls": {
+            "title": "URLs",
+            "type": "array",
+            "description": "List of URLs to fetch",
+            "editor": "stringList",
+            "prefill": ["https://www.nytimes.com"]
+        },
+        "mode": {
+            "title": "Mode",
+            "type": "string",
+            "description": "fetch = single pages, crawl = follow links, map = discover URLs",
+            "enum": ["fetch", "crawl", "map"],
+            "default": "fetch"
+        },
+        "format": {
+            "title": "Output Format",
+            "type": "string",
+            "enum": ["markdown", "html", "text"],
+            "default": "markdown"
+        },
+        "maxPages": {
+            "title": "Max Pages (crawl mode)",
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+        },
+        "maxDepth": {
+            "title": "Max Depth (crawl mode)",
+            "type": "integer",
+            "default": 2,
+            "minimum": 1,
+            "maximum": 5
+        },
+        "wickTunnelUrl": {
+            "title": "Wick Tunnel URL (optional)",
+            "type": "string",
+            "description": "URL of your local Wick instance for residential IP routing. Leave blank to use Wick's built-in engine on Apify's infrastructure.",
+            "editor": "textfield",
+            "sectionCaption": "Advanced — Residential IP",
+            "sectionDescription": "Connect to your own Wick Pro instance to route requests through your residential IP instead of Apify's datacenter."
+        },
+        "wickApiKey": {
+            "title": "Wick API Key (optional)",
+            "type": "string",
+            "description": "API key for your Wick tunnel endpoint",
+            "editor": "textfield",
+            "isSecret": true
+        }
+    },
+    "required": ["urls"]
+}
