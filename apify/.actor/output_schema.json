@@ -1,0 +1,13 @@
+{
+    "actorOutputSchemaVersion": 1,
+    "title": "Wick Web Fetcher Output",
+    "description": "Fetched pages with clean markdown content, status codes, and timing data.",
+    "properties": {
+        "results": {
+            "type": "string",
+            "title": "Results",
+            "description": "Fetched pages with URL, title, content, status code, and timing.",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        }
+    }
+}
