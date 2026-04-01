@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wick is Now on Apify — Run It in the Cloud — Wick</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="description" content="Wick is now available on the Apify marketplace. Fetch, crawl, and map websites using Chrome's real TLS fingerprint — running in Apify's cloud, no local install needed.">
+<meta name="keywords" content="wick apify, web scraping actor, content extraction, chrome tls fingerprint, apify store, wick web fetcher, anti-bot, markdown extraction">
+<meta property="og:title" content="Wick is Now on Apify — Browser-Grade Web Access in the Cloud">
+<meta property="og:description" content="Wick's Chrome TLS fingerprinting is now available as an Apify Actor. Fetch any page, crawl any site, get clean markdown — from Apify's cloud.">
+<meta property="og:url" content="https://getwick.dev/blog/wick-on-apify.html">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://getwick.dev/og-image.png">
+<meta property="article:published_time" content="2026-04-01T00:00:00Z">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wick is Now on Apify — Browser-Grade Web Access in the Cloud">
+<meta name="twitter:description" content="Wick's Chrome TLS fingerprinting is now available as an Apify Actor. Fetch any page, crawl any site, get clean markdown — from Apify's cloud.">
+<meta name="twitter:image" content="https://getwick.dev/og-image.png">
+<link rel="canonical" href="https://getwick.dev/blog/wick-on-apify.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Wick is Now on Apify",
+  "description": "Wick is now available on the Apify marketplace. Fetch, crawl, and map websites using Chrome's real TLS fingerprint — running in Apify's cloud.",
+  "author": {"@type": "Person", "name": "Adam Fisk", "url": "https://getwick.dev"},
+  "publisher": {"@type": "Organization", "name": "Wick", "url": "https://getwick.dev"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "mainEntityOfPage": {"@type": "WebPage", "@id": "https://getwick.dev/blog/wick-on-apify.html"},
+  "url": "https://getwick.dev/blog/wick-on-apify.html"
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--flame:#E8913A;--ash:#1A1714;--smoke:#2A2520;--smoke-light:#3D3630;--warm-white:#F0E6D8;--warm-gray:#9E958A;--cool-gray:#6B635A;--black:#0D0B09;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--warm-gray);font-family:var(--font-display);font-weight:300;line-height:1.8;-webkit-font-smoothing:antialiased}
+::selection{background:var(--flame);color:var(--black)}
+article{max-width:680px;margin:0 auto;padding:3rem 2rem 6rem}
+.back{display:inline-block;font-size:0.8rem;color:var(--flame);text-decoration:none;margin-bottom:2rem}
+.back:hover{text-decoration:underline}
+h1{font-size:1.8rem;font-weight:700;color:var(--warm-white);line-height:1.3;margin-bottom:0.5rem}
+.date{font-size:0.75rem;color:var(--cool-gray);margin-bottom:2rem}
+h2{font-size:1.15rem;font-weight:600;color:var(--warm-white);margin-top:2.5rem;margin-bottom:0.75rem}
+p{margin-bottom:1rem;font-size:0.92rem}
+strong{color:var(--warm-white);font-weight:500}
+a{color:var(--flame)}
+ul{padding-left:1.5rem;margin-bottom:1rem;font-size:0.92rem}
+li{margin-bottom:0.4rem}
+code{font-family:var(--font-mono);font-size:0.82rem;background:var(--smoke);padding:0.15rem 0.4rem;border-radius:3px;color:#F5B74C}
+pre{background:var(--ash);border:1px solid var(--smoke-light);border-radius:6px;padding:1.25rem 1.5rem;overflow-x:auto;margin-bottom:1.5rem;line-height:1.7}
+pre code{background:none;padding:0;font-size:0.8rem;color:var(--warm-white)}
+hr{border:none;border-top:1px solid var(--smoke-light);margin:3rem 0 1.5rem}
+table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;font-size:0.85rem}
+th{text-align:left;color:var(--warm-white);font-weight:500;padding:0.5rem 0.75rem;border-bottom:1px solid var(--smoke-light)}
+td{padding:0.5rem 0.75rem;border-bottom:1px solid var(--smoke);color:var(--warm-gray)}
+</style>
+</head>
+<body>
+<article>
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>Wick is Now on Apify</h1>
+<p class="date">April 1, 2026</p>
+
+<p>Wick's browser-grade web fetching is now available on the <a href="https://apify.com/eventful_notoriety/wick-web-fetcher">Apify Store</a> — the marketplace with 22,000+ web scraping and automation tools. You can run it in Apify's cloud without installing anything locally.</p>
+
+<h2>Why Apify?</h2>
+
+<p>Wick was built to run locally. That's still its strength — your residential IP, your machine, no cloud dependency. But people kept asking for two things Wick doesn't do on its own: <strong>scheduled crawls</strong> and <strong>pipeline integrations</strong>.</p>
+
+<p>Apify does both of those well. Their platform handles scheduling, retries, monitoring, and has built-in integrations with Pinecone, Google Sheets, Zapier, LangChain, and dozens of other tools. By putting Wick on their marketplace, you get the best of both worlds: Wick's Chrome TLS fingerprinting with Apify's orchestration.</p>
+
+<h2>How it works</h2>
+
+<p>The Actor bundles the Wick binary inside a Docker container on Apify's infrastructure. When you start a run, it boots up Wick's HTTP API server and routes your requests through it. Same Cronet engine, same Chrome TLS handshake, same clean markdown output — just running in their cloud instead of your laptop.</p>
+
+<pre><code>{
+    "urls": ["https://www.nytimes.com", "https://www.bloomberg.com"],
+    "mode": "fetch",
+    "format": "markdown"
+}</code></pre>
+
+<p>Three modes, same as the local version:</p>
+
+<ul>
+<li><strong>Fetch</strong> — grab one or more pages, get clean markdown back</li>
+<li><strong>Crawl</strong> — follow links from a starting URL, configurable depth and page limit</li>
+<li><strong>Map</strong> — discover all URLs on a site via sitemap + link following</li>
+</ul>
+
+<h2>Performance on Apify's datacenter IPs</h2>
+
+<p>The question we had to answer: does Wick's anti-detection work from datacenter IPs, or does it only work because of residential IPs? Here's what we measured:</p>
+
+<table>
+<tr><th>Site</th><th>Status</th><th>Time</th><th>Content</th></tr>
+<tr><td>nytimes.com</td><td>200</td><td>146ms</td><td>Live headlines, real articles</td></tr>
+<tr><td>cloudflare.com</td><td>200</td><td>450ms</td><td>Full marketing page</td></tr>
+<tr><td>bloomberg.com</td><td>200</td><td>290ms</td><td>Market data, financial news</td></tr>
+<tr><td>news.ycombinator.com</td><td>200</td><td>255ms</td><td>Full front page</td></tr>
+<tr><td>wikipedia.org</td><td>200</td><td>45ms</td><td>Complete article (561K chars)</td></tr>
+</table>
+
+<p>All real content, no challenge pages, no CAPTCHAs. The TLS fingerprint is doing the heavy lifting — Cronet's handshake is indistinguishable from a real Chrome browser, regardless of the IP it's coming from.</p>
+
+<h2>The backstory</h2>
+
+<p>Wick's anti-detection technology didn't start with web scraping. It grew out of a decade of building censorship circumvention tools — specifically <a href="https://lantern.io">Lantern</a>, a peer-to-peer system used by millions of people in China, Iran, and Russia to access the open internet.</p>
+
+<p>When you're building tools to bypass national firewalls, you learn what real traffic analysis looks like. State-level censors do deep packet inspection, TLS fingerprinting, and active probing. The techniques Wick uses to look like a real browser to anti-bot systems are the same ones that help people reach blocked websites in the most restrictive countries on earth.</p>
+
+<p>That's why Wick uses Chrome's actual network stack (Cronet) rather than trying to fake it. Faking TLS fingerprints is a cat-and-mouse game. Using the real implementation isn't.</p>
+
+<h2>Residential IP mode</h2>
+
+<p>The Actor also supports a tunnel mode: connect it to a Wick Pro instance running on your machine, and requests route through your residential IP while Apify handles the scheduling. You get anti-detection + residential IP + cloud orchestration.</p>
+
+<h2>Try it</h2>
+
+<p><a href="https://apify.com/eventful_notoriety/wick-web-fetcher">Wick Web Fetcher on Apify Store</a> — free to use, you only pay for Apify compute units.</p>
+
+<p>Or install locally if you prefer:</p>
+
+<pre><code>brew tap wickproject/wick && brew install wick && wick setup</code></pre>
+
+<h2>Previous releases</h2>
+<ul>
+<li><a href="wick-0-7-http-api.html">Wick 0.7: Local HTTP API</a></li>
+<li><a href="wick-0-6-crawl-and-100-percent.html">Wick 0.6: Crawl, Map, 100% Success Rate</a></li>
+<li><a href="wick-0-5-media-downloads.html">Wick 0.5: Media Downloads</a></li>
+</ul>
+
+<hr>
+
+<p><a href="https://github.com/wickproject/wick">GitHub</a> | <a href="https://getwick.dev/docs.html">Docs</a> | <a href="mailto:hello@getwick.dev">Contact</a></p>
+
+</article>
+</body>
+</html>
