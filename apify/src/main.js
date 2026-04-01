@@ -1,4 +1,4 @@
-import { Actor } from 'apify';
+import { Actor, log } from 'apify';
 import { spawn } from 'child_process';
 
 const WICK_PORT = 18090;
@@ -19,7 +19,7 @@ const {
 } = input;
 
 if (!Array.isArray(urls) || urls.length === 0) {
-    Actor.log.error('Input must include a non-empty "urls" array.');
+    log.error('Input must include a non-empty "urls" array.');
     await Actor.exit({ exitCode: 1 });
 }
 
@@ -31,24 +31,24 @@ const headers = wickApiKey ? { Authorization: `Bearer ${wickApiKey}` } : {};
 // Start the bundled Wick API server if not using a tunnel
 let wickProcess;
 if (!useTunnel) {
-    Actor.log.info('Starting Wick API server...');
+    log.info('Starting Wick API server...');
     wickProcess = spawn('/usr/local/bin/wick', ['serve', '--api', '--port', String(WICK_PORT)], {
         env: { ...process.env, LD_LIBRARY_PATH: '/usr/local/lib' },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     wickProcess.on('error', (err) => {
-        Actor.log.error(`Failed to start Wick: ${err.message}`);
+        log.error(`Failed to start Wick: ${err.message}`);
         Actor.exit({ exitCode: 1 });
     });
 
     wickProcess.stdout.on('data', (chunk) => {
         const msg = chunk.toString().trimEnd();
-        if (msg) Actor.log.info(`[wick] ${msg}`);
+        if (msg) log.info(`[wick] ${msg}`);
     });
     wickProcess.stderr.on('data', (chunk) => {
         const msg = chunk.toString().trimEnd();
-        if (msg) Actor.log.warning(`[wick] ${msg}`);
+        if (msg) log.warning(`[wick] ${msg}`);
     });
 
     // Wait for server to be ready
@@ -62,12 +62,12 @@ if (!useTunnel) {
     }
 
     if (!ready) {
-        Actor.log.error('Wick API server failed to start within 15s');
+        log.error('Wick API server failed to start within 15s');
         await Actor.exit({ exitCode: 1 });
     }
-    Actor.log.info('Wick API server ready');
+    log.info('Wick API server ready');
 } else {
-    Actor.log.info(`Using Wick tunnel at ${wickTunnelUrl}`);
+    log.info(`Using Wick tunnel at ${wickTunnelUrl}`);
 }
 
 async function wickFetch(url) {
@@ -97,7 +97,7 @@ const engine = useTunnel ? 'wick-tunnel' : 'wick-local';
 
 for (const url of urls) {
     try {
-        Actor.log.info(`${mode}: ${url}`);
+        log.info(`${mode}: ${url}`);
 
         if (mode === 'crawl') {
             const result = await wickCrawl(url);
@@ -111,7 +111,7 @@ for (const url of urls) {
                     engine,
                 });
             }
-            Actor.log.info(`Crawled ${result.pages?.length || 0} pages from ${url}`);
+            log.info(`Crawled ${result.pages?.length || 0} pages from ${url}`);
         } else if (mode === 'map') {
             const result = await wickMap(url);
             await dataset.pushData({
@@ -122,7 +122,7 @@ for (const url of urls) {
                 fetchedAt: new Date().toISOString(),
                 engine,
             });
-            Actor.log.info(`Mapped ${result.count} URLs from ${url}`);
+            log.info(`Mapped ${result.count} URLs from ${url}`);
         } else {
             const result = await wickFetch(url);
             await dataset.pushData({
@@ -137,7 +137,7 @@ for (const url of urls) {
             });
         }
     } catch (err) {
-        Actor.log.error(`Failed: ${url}: ${err.message}`);
+        log.error(`Failed: ${url}: ${err.message}`);
         await dataset.pushData({
             url,
             error: err.message,
