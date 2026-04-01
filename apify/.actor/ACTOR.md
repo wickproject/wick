@@ -15,6 +15,31 @@ Under the hood, this Actor runs the Wick binary as a local HTTP API server insid
 
 No headless browser is launched. This makes it fast (~1-3s per page) and lightweight (256 MB vs typical 1-4 GB for browser-based Actors).
 
+## Getting started
+
+Run the Actor with a list of URLs:
+
+```json
+{
+    "urls": ["https://www.nytimes.com", "https://docs.example.com"],
+    "mode": "fetch",
+    "format": "markdown"
+}
+```
+
+Or crawl a whole site:
+
+```json
+{
+    "urls": ["https://docs.example.com"],
+    "mode": "crawl",
+    "maxDepth": 2,
+    "maxPages": 20
+}
+```
+
+Results appear in the **Output** tab as a table. Each row is one page with its URL, title, content, status code, and timing.
+
 ## Modes
 
 ### Fetch (default)
@@ -68,9 +93,17 @@ Wick's output works with Apify's built-in integrations. Some ideas:
 
 Set these up from the **Integrations** tab on your Actor run page.
 
-## Pricing
+## Cost estimate
 
-This Actor is **free** -- you only pay for Apify compute units. The Wick engine is open source ([MIT license](https://github.com/wickproject/wick)).
+This Actor uses 256 MB of memory and runs fast, so compute costs are low:
+
+| Task | Approximate cost |
+|------|-----------------|
+| Fetch 10 URLs | ~$0.001 |
+| Crawl 50 pages | ~$0.005 |
+| Map a site (100 URLs) | ~$0.001 |
+
+You only pay for Apify compute units. The Wick engine is open source ([MIT license](https://github.com/wickproject/wick)).
 
 Residential IP mode requires [Wick Pro](https://getwick.dev) ($20/month).
 
