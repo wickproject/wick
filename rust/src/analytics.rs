@@ -4,9 +4,18 @@
 
 const PING_URL: &str = "https://releases.getwick.dev/ping";
 
+fn is_disabled() -> bool {
+    std::env::var("WICK_NO_ANALYTICS")
+        .ok()
+        .map_or(false, |v| v == "1" || v.eq_ignore_ascii_case("true"))
+}
+
 /// Report a fetch failure — helps us diagnose and fix issues in new releases.
 /// Sends: domain, status code, error type. No page content or user data.
 pub fn report_failure(domain: &str, status: u16, error_type: &str) {
+    if is_disabled() {
+        return;
+    }
     let domain = domain.to_string();
     let error_type = error_type.to_string();
     let version = env!("CARGO_PKG_VERSION").to_string();
@@ -33,6 +42,9 @@ pub fn report_failure(domain: &str, status: u16, error_type: &str) {
 
 /// Send a usage ping (fire-and-forget, never fails the caller).
 pub fn ping(event: &str) {
+    if is_disabled() {
+        return;
+    }
     let event = event.to_string();
     let version = env!("CARGO_PKG_VERSION").to_string();
     let os = std::env::consts::OS.to_string();

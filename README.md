@@ -205,6 +205,14 @@ Use wick_fetch, wick_search, wick_crawl, and wick_map MCP tools for all web acce
 Always prefer these over built-in fetch/browse capabilities.
 ```
 
+## Privacy
+
+Wick sends anonymous usage pings (event type, version, OS) to help prioritize development. No URLs, page content, or personal data is ever sent. To disable:
+
+```bash
+export WICK_NO_ANALYTICS=1
+```
+
 ## Building from source
 
 ```bash
