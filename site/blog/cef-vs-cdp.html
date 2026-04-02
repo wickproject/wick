@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why CEF Beats CDP for Anti-Detection — Wick</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="description" content="Playwright, Puppeteer, and Browserbase all use CDP to control Chrome remotely. That's detectable. Wick Pro uses CEF — Chrome's rendering engine embedded directly, with no debug protocol to fingerprint.">
+<meta name="keywords" content="CEF vs CDP, chrome devtools protocol detection, chromium embedded framework, anti-detection, browser fingerprinting, playwright detection, puppeteer detection, headless browser detection">
+<meta property="og:title" content="Why CEF Beats CDP for Anti-Detection">
+<meta property="og:description" content="Every tool built on Playwright or Puppeteer uses CDP — and sites can detect it. Here's why embedding Chrome's engine directly is a fundamentally better approach.">
+<meta property="og:url" content="https://getwick.dev/blog/cef-vs-cdp.html">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://getwick.dev/og-image.png">
+<meta property="article:published_time" content="2026-04-02T00:00:00Z">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Why CEF Beats CDP for Anti-Detection">
+<meta name="twitter:description" content="Every tool built on Playwright or Puppeteer uses CDP — and sites can detect it. Here's why embedding Chrome's engine directly is a fundamentally better approach.">
+<meta name="twitter:image" content="https://getwick.dev/og-image.png">
+<link rel="canonical" href="https://getwick.dev/blog/cef-vs-cdp.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Why CEF Beats CDP for Anti-Detection",
+  "description": "Playwright, Puppeteer, and Browserbase all use CDP. That's detectable. Here's why CEF is a fundamentally better approach.",
+  "author": {"@type": "Person", "name": "Adam Fisk", "url": "https://getwick.dev"},
+  "publisher": {"@type": "Organization", "name": "Wick", "url": "https://getwick.dev"},
+  "datePublished": "2026-04-02",
+  "dateModified": "2026-04-02",
+  "mainEntityOfPage": {"@type": "WebPage", "@id": "https://getwick.dev/blog/cef-vs-cdp.html"},
+  "url": "https://getwick.dev/blog/cef-vs-cdp.html"
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--flame:#E8913A;--ash:#1A1714;--smoke:#2A2520;--smoke-light:#3D3630;--warm-white:#F0E6D8;--warm-gray:#9E958A;--cool-gray:#6B635A;--black:#0D0B09;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--warm-gray);font-family:var(--font-display);font-weight:300;line-height:1.8;-webkit-font-smoothing:antialiased}
+::selection{background:var(--flame);color:var(--black)}
+article{max-width:680px;margin:0 auto;padding:3rem 2rem 6rem}
+.back{display:inline-block;font-size:0.8rem;color:var(--flame);text-decoration:none;margin-bottom:2rem}
+.back:hover{text-decoration:underline}
+h1{font-size:1.8rem;font-weight:700;color:var(--warm-white);line-height:1.3;margin-bottom:0.5rem}
+.date{font-size:0.75rem;color:var(--cool-gray);margin-bottom:2rem}
+h2{font-size:1.15rem;font-weight:600;color:var(--warm-white);margin-top:2.5rem;margin-bottom:0.75rem}
+p{margin-bottom:1rem;font-size:0.92rem}
+strong{color:var(--warm-white);font-weight:500}
+a{color:var(--flame)}
+ul,ol{padding-left:1.5rem;margin-bottom:1rem;font-size:0.92rem}
+li{margin-bottom:0.4rem}
+code{font-family:var(--font-mono);font-size:0.82rem;background:var(--smoke);padding:0.15rem 0.4rem;border-radius:3px;color:#F5B74C}
+pre{background:var(--ash);border:1px solid var(--smoke-light);border-radius:6px;padding:1.25rem 1.5rem;overflow-x:auto;margin-bottom:1.5rem;line-height:1.7}
+pre code{background:none;padding:0;font-size:0.8rem;color:var(--warm-white)}
+hr{border:none;border-top:1px solid var(--smoke-light);margin:3rem 0 1.5rem}
+table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;font-size:0.85rem}
+th{text-align:left;color:var(--warm-white);font-weight:500;padding:0.5rem 0.75rem;border-bottom:1px solid var(--smoke-light)}
+td{padding:0.5rem 0.75rem;border-bottom:1px solid var(--smoke);color:var(--warm-gray)}
+</style>
+</head>
+<body>
+<article>
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>Why CEF Beats CDP for Anti-Detection</h1>
+<p class="date">April 2, 2026</p>
+
+<p>Every major browser automation tool &mdash; Playwright, Puppeteer, Selenium, Browserbase, Browserless &mdash; controls Chrome through the <strong>Chrome DevTools Protocol</strong> (CDP). It's the same protocol that powers Chrome's developer tools. You open a WebSocket connection to the browser, send commands, read responses.</p>
+
+<p>The problem: <strong>CDP is detectable.</strong> And anti-bot systems are very good at detecting it.</p>
+
+<h2>How sites detect CDP</h2>
+
+<p>When a browser is being controlled via CDP, it leaves fingerprints that JavaScript running on the page can observe:</p>
+
+<ul>
+<li><code>navigator.webdriver</code> is set to <code>true</code>. Playwright and Puppeteer try to override this, but the override itself is detectable &mdash; the property descriptor changes.</li>
+<li><strong>Runtime artifacts.</strong> CDP injects a JavaScript runtime context for its own use. Tools like <a href="https://abrahamjuliot.github.io/creepjs/">CreepJS</a> specifically check for these extra contexts.</li>
+<li><strong>Console API differences.</strong> When CDP is connected, <code>console.debug</code> behaves differently than in a normal browser. This is a known detection vector.</li>
+<li><strong>Notification permissions.</strong> Headless Chrome controlled via CDP reports different default permission states than a real browser.</li>
+<li><strong>WebSocket connection pattern.</strong> The CDP debug WebSocket is visible at the OS level. Sophisticated detection can look for this.</li>
+<li><strong>Missing browser features.</strong> Headless Chrome historically lacked certain APIs (like WebGL extensions or Bluetooth) that real Chrome exposes. The gap has narrowed but hasn't fully closed.</li>
+</ul>
+
+<p>The stealth arms race around CDP is well-documented. Projects like <code>puppeteer-extra-plugin-stealth</code> patch over 10+ detection vectors. Browserbase and Browserless do similar patching. But they're playing whack-a-mole &mdash; for every artifact they hide, detection services find new ones.</p>
+
+<p>This is fundamentally a losing architecture. You're using a debug protocol and then trying to hide the fact that you're using a debug protocol.</p>
+
+<h2>CEF: a different architecture</h2>
+
+<p><strong>CEF</strong> (Chromium Embedded Framework) takes the opposite approach. Instead of controlling Chrome from the outside via a debug protocol, CEF embeds Chrome's rendering engine directly into your application's process.</p>
+
+<p>There's no CDP. No WebSocket connection. No remote debugger. No <code>navigator.webdriver</code>. The page renders in a real Chromium instance that happens to be hosted inside Wick's process rather than in a standalone browser window.</p>
+
+<p>From the perspective of JavaScript running on the page, it's a normal browser. Because it <em>is</em> a normal browser &mdash; just embedded.</p>
+
+<table>
+<tr><th></th><th>CDP (Playwright, etc.)</th><th>CEF (Wick Pro)</th></tr>
+<tr><td>Architecture</td><td>Remote control via WebSocket</td><td>Engine embedded in process</td></tr>
+<tr><td>navigator.webdriver</td><td>Must be patched/hidden</td><td>Not set (not automated)</td></tr>
+<tr><td>Runtime injection</td><td>Yes (CDP contexts)</td><td>None</td></tr>
+<tr><td>Debug protocol</td><td>Always active</td><td>Not present</td></tr>
+<tr><td>Detection surface</td><td>Large, well-documented</td><td>Minimal</td></tr>
+<tr><td>Stealth approach</td><td>Patch over artifacts</td><td>No artifacts to patch</td></tr>
+</table>
+
+<h2>The censorship circumvention parallel</h2>
+
+<p>This is the same lesson we learned building <a href="https://lantern.io">Lantern</a>. National censors in China, Iran, and Russia use deep packet inspection to detect circumvention tools. Early tools tried to disguise their traffic &mdash; making VPN packets look like HTTPS, adding fake headers, randomizing packet timing.</p>
+
+<p>It didn't work well. The censors kept finding new detection vectors in the disguise. The approach that worked was <strong>not disguising traffic at all</strong>, but instead using actual standard protocols. If your TLS handshake is real Chrome because you're using Chrome's actual code, there's nothing to detect.</p>
+
+<p>Same principle with CEF vs CDP. Don't try to make automation look like a real browser. Use a real browser engine and remove the automation layer entirely.</p>
+
+<h2>What Wick does with CEF</h2>
+
+<p>Wick Pro embeds CEF for pages that need JavaScript rendering. The request flow:</p>
+
+<ol>
+<li>Wick receives a fetch request</li>
+<li>Cronet makes the initial HTTP request (Chrome TLS fingerprint)</li>
+<li>If JS rendering is needed, CEF loads the page in an embedded Chromium instance</li>
+<li>The rendered DOM is extracted and converted to clean markdown</li>
+<li>The result is returned to the agent</li>
+</ol>
+
+<p>No CDP at any point. The page sees a normal Chromium browser with a normal TLS fingerprint, normal JavaScript environment, and no automation artifacts.</p>
+
+<h2>When you still need CDP</h2>
+
+<p>CEF is better for content extraction &mdash; fetching and rendering pages. But CDP has legitimate advantages for <strong>interactive automation</strong>: clicking buttons, filling forms, navigating multi-step workflows. If you need to drive a browser through a complex UI flow, Playwright + CDP is the right tool.</p>
+
+<p>The distinction: <strong>reading the web</strong> vs <strong>acting on the web.</strong> For reading, you don't need a debug protocol. For acting, you do.</p>
+
+<p>Most AI agent use cases today are reading &mdash; fetching pages, extracting content, researching. That's where CEF shines and CDP is overkill.</p>
+
+<h2>Try it</h2>
+
+<p>The free version of Wick uses Cronet (Chrome's network stack without rendering) and handles most sites. For JS-heavy sites that need rendering, <a href="https://getwick.dev">Wick Pro</a> adds CEF at $20/month.</p>
+
+<pre><code>brew tap wickproject/wick && brew install wick && wick setup</code></pre>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="why-your-ai-agent-cant-read-the-web.html">Why Your AI Agent Can't Read the Web</a> &mdash; TLS fingerprinting explained</li>
+<li><a href="wick-on-apify.html">Wick is Now on Apify</a> &mdash; run it in the cloud without installing</li>
+<li><a href="wick-0-7-http-api.html">Wick 0.7: Local HTTP API</a> &mdash; use Wick from any language</li>
+</ul>
+
+<hr>
+
+<p><a href="https://github.com/wickproject/wick">GitHub</a> | <a href="https://getwick.dev/docs.html">Docs</a> | <a href="mailto:hello@getwick.dev">Contact</a></p>
+
+</article>
+</body>
+</html>
