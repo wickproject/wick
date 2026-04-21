@@ -1,12 +1,19 @@
-//! Auto CAPTCHA solving via CapSolver API (Wick Pro).
-//! Detects CAPTCHA type from HTML, extracts site key, submits to CapSolver,
-//! returns the solution token for injection into the page.
+//! Automated CAPTCHA solving via CapSolver.
+//!
+//! Users bring their own CapSolver API key (set `CAPSOLVER_API_KEY` env var
+//! or `~/.wick/capsolver-key`). Wick never proxies or subsidizes solves —
+//! the user's key goes directly to CapSolver and they pay CapSolver directly.
+//!
+//! If no key is configured, Wick falls back to the user-in-the-loop
+//! `captcha::solve` flow where the user clicks through the CAPTCHA manually.
+//!
+//! Supported: Cloudflare Turnstile, reCAPTCHA v2, hCaptcha, DataDome.
 
 use anyhow::{bail, Result};
 use serde::Deserialize;
 use std::time::Duration;
 
-const SOLVE_PROXY: &str = "https://releases.getwick.dev/solve";
+const CAPSOLVER_API: &str = "https://api.capsolver.com";
 const POLL_INTERVAL: Duration = Duration::from_secs(3);
 const MAX_POLLS: usize = 40; // 40 × 3s = 2 minutes max
 
@@ -70,15 +77,34 @@ pub fn detect_captcha(html: &str) -> Option<CaptchaType> {
     None
 }
 
+/// Load the user's CapSolver API key from env var or config file.
+/// Returns None if the user hasn't configured one.
+pub fn load_capsolver_key() -> Option<String> {
+    if let Ok(key) = std::env::var("CAPSOLVER_API_KEY") {
+        if !key.is_empty() {
+            return Some(key);
+        }
+    }
+    let home = std::env::var_os("HOME")?;
+    let path = std::path::PathBuf::from(home).join(".wick").join("capsolver-key");
+    std::fs::read_to_string(&path)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Whether auto-CAPTCHA is configured (user has a CapSolver key).
+pub fn is_available() -> bool {
+    load_capsolver_key().is_some()
+}
+
 /// Extract data-sitekey from a CAPTCHA widget div.
 fn extract_site_key(html: &str, class_hint: &str) -> Option<String> {
-    // Look for data-sitekey="..."
-    // Find it near the class hint
     let hint_pos = html.to_lowercase().find(&class_hint.to_lowercase())?;
     let region = &html[hint_pos.saturating_sub(500)..html.len().min(hint_pos + 2000)];
 
     if let Some(pos) = region.find("data-sitekey=\"") {
-        let start = pos + 14; // len of 'data-sitekey="'
+        let start = pos + 14;
         if let Some(end) = region[start..].find('"') {
             let key = &region[start..start + end];
             if !key.is_empty() {
@@ -87,7 +113,7 @@ fn extract_site_key(html: &str, class_hint: &str) -> Option<String> {
         }
     }
 
-    // Also try turnstile.render({sitekey: '...'})
+    // turnstile.render({sitekey: '...'})
     if let Some(pos) = region.find("sitekey:") {
         let after = &region[pos + 8..];
         let after = after.trim_start();
@@ -102,16 +128,14 @@ fn extract_site_key(html: &str, class_hint: &str) -> Option<String> {
     None
 }
 
-/// Solve a CAPTCHA via the Wick Pro proxy (which forwards to CapSolver).
-/// The `wick_key` is the customer's API key for authentication.
-/// The CapSolver API key is stored server-side in the Worker, never exposed.
+/// Solve a CAPTCHA via CapSolver using the user's own API key.
+/// The user pays CapSolver directly — Wick never sees or proxies the key.
 pub async fn solve(
-    wick_key: &str,
+    capsolver_key: &str,
     page_url: &str,
     captcha: &CaptchaType,
 ) -> Result<String> {
     let client = reqwest::Client::new();
-    let proxy_url = format!("{}/{}", SOLVE_PROXY, wick_key);
 
     let task = match captcha {
         CaptchaType::Turnstile { site_key } => serde_json::json!({
@@ -130,13 +154,10 @@ pub async fn solve(
             "websiteKey": site_key
         }),
         CaptchaType::DataDome { captcha_url } => {
-            // DataDome requires: Windows Chrome UA, proxy, and t=fe in captchaUrl
-            // Check if IP is banned (t=bv means banned, solving will fail)
             if captcha_url.contains("t=bv") {
                 bail!("DataDome: IP is banned (t=bv). Residential IP required.");
             }
-            let proxy = std::env::var("WICK_PROXY")
-                .unwrap_or_default();
+            let proxy = std::env::var("WICK_PROXY").unwrap_or_default();
             let mut task = serde_json::json!({
                 "type": "DatadomeSliderTask",
                 "websiteURL": page_url,
@@ -144,7 +165,6 @@ pub async fn solve(
                 "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
             });
             if !proxy.is_empty() {
-                // Convert socks5://host:port to host:port format
                 let proxy_clean = proxy
                     .trim_start_matches("socks5://")
                     .trim_start_matches("socks5h://")
@@ -156,11 +176,11 @@ pub async fn solve(
         },
     };
 
-    // Create task via proxy
+    // Create task
     let resp: TaskResponse = client
-        .post(&proxy_url)
+        .post(format!("{}/createTask", CAPSOLVER_API))
         .json(&serde_json::json!({
-            "action": "createTask",
+            "clientKey": capsolver_key,
             "task": task
         }))
         .send()
@@ -170,12 +190,11 @@ pub async fn solve(
 
     if resp.error_id != 0 {
         bail!(
-            "CAPTCHA createTask error: {}",
+            "CapSolver createTask error: {}",
             resp.error_code.unwrap_or_else(|| "unknown".to_string())
         );
     }
 
-    // Sometimes solution comes back immediately
     if resp.status.as_deref() == Some("ready") {
         if let Some(token) = extract_token(&resp.solution, captcha) {
             return Ok(token);
@@ -186,14 +205,13 @@ pub async fn solve(
         .task_id
         .ok_or_else(|| anyhow::anyhow!("no task_id in response"))?;
 
-    // Poll for result via proxy
     for _ in 0..MAX_POLLS {
         tokio::time::sleep(POLL_INTERVAL).await;
 
         let result: TaskResponse = client
-            .post(&proxy_url)
+            .post(format!("{}/getTaskResult", CAPSOLVER_API))
             .json(&serde_json::json!({
-                "action": "getTaskResult",
+                "clientKey": capsolver_key,
                 "taskId": task_id
             }))
             .send()
@@ -203,7 +221,7 @@ pub async fn solve(
 
         if result.error_id != 0 {
             bail!(
-                "CAPTCHA solve error: {}",
+                "CapSolver solve error: {}",
                 result.error_code.unwrap_or_else(|| "unknown".to_string())
             );
         }
@@ -213,28 +231,24 @@ pub async fn solve(
                 if let Some(token) = extract_token(&result.solution, captcha) {
                     return Ok(token);
                 }
-                bail!("CAPTCHA returned ready but no token");
+                bail!("CapSolver returned ready but no token");
             }
             Some("processing") => continue,
             other => bail!("unexpected status: {:?}", other),
         }
     }
 
-    bail!("CAPTCHA solve timed out after {} polls", MAX_POLLS)
+    bail!("CapSolver solve timed out after {} polls", MAX_POLLS)
 }
 
-/// Extract the DataDome captcha iframe URL from HTML.
 fn extract_datadome_url(html: &str) -> Option<String> {
-    // Look for iframe src containing captcha-delivery.com
     let marker = "captcha-delivery.com";
     let pos = html.find(marker)?;
-    // Walk backwards to find src="
     let before = &html[..pos];
     let src_start = before.rfind("src=\"")? + 5;
     let after = &html[src_start..];
     let src_end = after.find('"')?;
     let url = &after[..src_end];
-    // Decode HTML entities
     Some(url.replace("&amp;", "&"))
 }
 
@@ -248,7 +262,6 @@ fn extract_token(solution: &Option<serde_json::Value>, captcha: &CaptchaType) ->
             sol.get("token")?.as_str().map(|s| s.to_string())
         }
         CaptchaType::DataDome { .. } => {
-            // DataDome returns a cookie value, not a token
             sol.get("cookie")?.as_str().map(|s| s.to_string())
         }
     }

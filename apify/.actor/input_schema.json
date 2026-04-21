@@ -54,7 +54,7 @@
             "description": "URL of your local Wick instance for residential IP routing. Leave blank to use Wick's built-in engine on Apify's infrastructure.",
             "editor": "textfield",
             "sectionCaption": "Advanced — Residential IP",
-            "sectionDescription": "Connect to your own Wick Pro instance to route requests through your residential IP instead of Apify's datacenter."
+            "sectionDescription": "Connect to your own Wick instance to route requests through your residential IP instead of Apify's datacenter."
         },
         "wickApiKey": {
             "title": "Wick API Key (optional)",
@@ -62,6 +62,15 @@
             "description": "API key for your Wick tunnel endpoint",
             "editor": "textfield",
             "isSecret": true
+        },
+        "capsolverApiKey": {
+            "title": "CapSolver API Key (optional)",
+            "type": "string",
+            "description": "Your own CapSolver API key for automated CAPTCHA solving. Get one at capsolver.com. You pay CapSolver directly per solve (~$0.10-$0.40). Leave blank to skip auto-solving.",
+            "editor": "textfield",
+            "isSecret": true,
+            "sectionCaption": "Advanced — Auto-CAPTCHA (BYO key)",
+            "sectionDescription": "Bring your own CapSolver API key to automatically solve CAPTCHAs. Wick sends the task directly to CapSolver — your key never touches Wick's servers."
         }
     },
     "required": ["urls"]

@@ -66,7 +66,7 @@ hr{border:none;border-top:1px solid var(--smoke-light);margin:3rem 0 1.5rem}
 <li><strong>Cronet</strong> — Chrome's network stack for real TLS fingerprints on every HTTP request</li>
 <li><strong>CEF renderer</strong> — embedded Chromium for pages that need JavaScript execution</li>
 <li><strong>20+ stealth patches</strong> — injected before page scripts run, removing automation fingerprints</li>
-<li><strong>Auto-CAPTCHA handling</strong> — detects Turnstile, reCAPTCHA, hCaptcha, DataDome and routes through solvers</li>
+<li><strong>CAPTCHA handling</strong> — detects Turnstile, reCAPTCHA, hCaptcha, DataDome. Manual user-in-the-loop by default; bring your own CapSolver API key for automated solving (you pay CapSolver directly, we don't touch the key)</li>
 <li><strong>Residential IP tunneling</strong> — WireGuard-based routing for when datacenter IPs get flagged</li>
 <li><strong>Adaptive fallback</strong> — starts with fast Cronet, escalates to full CEF only when needed</li>
 </ul>
