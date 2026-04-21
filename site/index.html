@@ -3,22 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wick — Browser-Grade Web Access for AI Agents</title>
+<title>WICK — Browser-grade access for AI agents</title>
+<meta name="description" content="Your AI agent gets blocked on the web. Wick unredacts it. Browser-grade access, running locally, from your own IP.">
+<meta name="keywords" content="mcp server, ai agent, web access, web scraping, anti-bot, TLS fingerprint, chrome network stack, claude code, cursor, browser-grade">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<meta name="description" content="Your AI agent gets blocked on the web. Wick fixes that. MCP server with Chrome's TLS fingerprint. Bypasses Cloudflare, Akamai anti-bot. Returns clean markdown. Free, open source.">
-<meta name="keywords" content="wick, mcp server, ai agent web access, claude code 403, cursor fetch blocked, cloudflare bypass, akamai bypass, anti-bot, web scraping, browser fingerprint, TLS fingerprint, ai coding agent, mcp tool, wick_fetch, web search ai, 403 forbidden ai agent, claude code can't fetch, agent blocked website">
+<link rel="canonical" href="https://getwick.dev">
+
 <!-- Open Graph -->
-<meta property="og:title" content="Wick — Browser-Grade Web Access for AI Agents">
-<meta property="og:description" content="Your AI agent gets 403 Forbidden on the web. Wick fixes that. MCP server with Chrome's actual TLS fingerprint. Free and open source.">
+<meta property="og:title" content="WICK — Browser-grade access for AI agents">
+<meta property="og:description" content="Your AI agent gets blocked on the web. Wick unredacts it. Browser-grade access, running locally, from your own IP.">
 <meta property="og:url" content="https://getwick.dev">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Wick">
-<!-- Twitter Card -->
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Wick — Browser-Grade Web Access for AI Agents">
-<meta name="twitter:description" content="Your AI agent gets 403 Forbidden. Wick fixes it. Chrome TLS fingerprint, clean markdown, runs locally. Free MCP server.">
 <meta property="og:image" content="https://getwick.dev/og-image.png">
+<meta property="og:site_name" content="Wick">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WICK — Browser-grade access for AI agents">
+<meta name="twitter:description" content="Your AI agent gets blocked on the web. Wick unredacts it. Browser-grade access, running locally, from your own IP.">
 <meta name="twitter:image" content="https://getwick.dev/og-image.png">
+
+<!-- Structured data -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -30,1488 +35,1533 @@
   "operatingSystem": "macOS, Linux",
   "offers": [
     {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier"},
-    {"@type": "Offer", "price": "20", "priceCurrency": "USD", "description": "Pro — $20/month"},
-    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Enterprise — custom pricing"}
+    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Pro — custom pricing"}
   ],
   "author": {"@type": "Person", "name": "Adam Fisk"}
 }
 </script>
-<!-- Canonical -->
-<link rel="canonical" href="https://getwick.dev">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --flame: #E8913A;
-  --flame-bright: #F5B74C;
-  --flame-hot: #FF6B2B;
-  --ember: #C45A1A;
-  --ash: #1A1714;
-  --smoke: #2A2520;
-  --smoke-light: #3D3630;
-  --warm-white: #F0E6D8;
-  --warm-gray: #9E958A;
-  --cool-gray: #6B635A;
-  --black: #0D0B09;
-  --font-display: 'Outfit', sans-serif;
-  --font-serif: 'Instrument Serif', serif;
-  --font-mono: 'JetBrains Mono', monospace;
-}
-
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-html {
-  scroll-behavior: smooth;
-  scrollbar-color: var(--smoke-light) var(--black);
-}
-
-body {
-  background: var(--black);
-  color: var(--warm-white);
-  font-family: var(--font-display);
-  font-weight: 300;
-  line-height: 1.6;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-
-::selection {
-  background: var(--flame);
-  color: var(--black);
-}
-
-/* ── Grain overlay ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-}
-
-/* ── Navigation ── */
-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  padding: 1.5rem 3rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  backdrop-filter: blur(20px);
-  background: rgba(13, 11, 9, 0.7);
-  border-bottom: 1px solid rgba(232, 145, 58, 0.06);
-  transition: all 0.4s ease;
-}
-
-nav.scrolled {
-  padding: 1rem 3rem;
-  background: rgba(13, 11, 9, 0.92);
-}
-
-.nav-logo {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.3rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--flame);
-  text-decoration: none;
-}
-
-.nav-logo span {
-  color: var(--warm-gray);
-  font-weight: 400;
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  display: block;
-  margin-top: -2px;
-}
-
-.nav-links {
-  display: flex;
-  gap: 2.5rem;
-  align-items: center;
-  list-style: none;
-}
-
-.nav-links a {
-  color: var(--warm-gray);
-  text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: 400;
-  letter-spacing: 0.05em;
-  transition: color 0.3s ease;
-}
-
-.nav-links a:hover { color: var(--warm-white); }
-
-.nav-cta {
-  background: var(--flame) !important;
-  color: var(--black) !important;
-  padding: 0.6rem 1.5rem;
-  border-radius: 6px;
-  font-weight: 600 !important;
-  transition: all 0.3s ease !important;
-}
-
-.nav-cta:hover {
-  background: var(--flame-bright) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(232, 145, 58, 0.3);
-}
-
-/* ── Hero ── */
-.hero {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  padding: 8rem 2rem 4rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 800px;
-  background: radial-gradient(ellipse at center,
-    rgba(232, 145, 58, 0.12) 0%,
-    rgba(196, 90, 26, 0.06) 30%,
-    rgba(255, 107, 43, 0.02) 50%,
-    transparent 70%
-  );
-  pointer-events: none;
-  animation: glow-pulse 8s ease-in-out infinite;
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
-  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.2rem;
-  border: 1px solid rgba(232, 145, 58, 0.2);
-  border-radius: 100px;
-  font-size: 0.8rem;
-  color: var(--flame);
-  letter-spacing: 0.08em;
-  margin-bottom: 3rem;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 0.2s;
-}
-
-.hero-badge::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: var(--flame);
-  border-radius: 50%;
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.hero h1 {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: clamp(3rem, 7vw, 6rem);
-  line-height: 1.05;
-  max-width: 900px;
-  letter-spacing: -0.02em;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 0.4s;
-}
-
-.hero h1 em {
-  font-style: italic;
-  color: var(--flame);
-}
-
-.hero-sub {
-  font-size: clamp(1.1rem, 2vw, 1.35rem);
-  color: var(--warm-gray);
-  max-width: 580px;
-  margin-top: 2rem;
-  font-weight: 300;
-  line-height: 1.7;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 0.6s;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 3rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 0.8s;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--flame);
-  color: var(--black);
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 1rem;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  background: var(--flame-bright);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(232, 145, 58, 0.3);
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: transparent;
-  color: var(--warm-white);
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 1rem;
-  text-decoration: none;
-  border: 1px solid var(--smoke-light);
-  transition: all 0.3s ease;
-}
-
-.btn-secondary:hover {
-  border-color: var(--warm-gray);
-  background: rgba(255,255,255,0.03);
-}
-
-.hero-install {
-  margin-top: 2.5rem;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 1s;
-}
-
-.install-code {
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--smoke);
-  border: 1px solid var(--smoke-light);
-  border-radius: 10px;
-  padding: 1rem 1.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--warm-gray);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.install-code:hover {
-  border-color: var(--flame);
-  background: rgba(232, 145, 58, 0.05);
-}
-
-.install-code code {
-  color: var(--warm-white);
-}
-
-.install-code code span { color: var(--flame); }
-
-.install-code .copy-btn {
-  background: none;
-  border: none;
-  color: var(--cool-gray);
-  cursor: pointer;
-  padding: 0.25rem;
-  transition: color 0.2s;
-  font-size: 1rem;
-}
-
-.install-code .copy-btn:hover { color: var(--flame); }
-
-.install-code .copied {
-  position: absolute;
-  right: -60px;
-  font-size: 0.75rem;
-  color: var(--flame);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.install-code .copied.show { opacity: 1; }
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ── Scroll line ── */
-.scroll-hint {
-  position: absolute;
-  bottom: 3rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  opacity: 0;
-  animation: fade-up 0.8s ease forwards 1.2s;
-}
-
-.scroll-hint span {
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cool-gray);
-}
-
-.scroll-line {
-  width: 1px;
-  height: 40px;
-  background: linear-gradient(to bottom, var(--flame), transparent);
-  animation: scroll-line-move 2s ease-in-out infinite;
-}
-
-@keyframes scroll-line-move {
-  0% { opacity: 1; transform: scaleY(1); transform-origin: top; }
-  50% { opacity: 0.3; transform: scaleY(0.3); transform-origin: top; }
-  100% { opacity: 1; transform: scaleY(1); transform-origin: top; }
-}
-
-/* ── Problem / Solution ── */
-.problem {
-  padding: 8rem 2rem;
-  position: relative;
-}
-
-.problem::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--smoke-light), transparent);
-}
-
-.section-grid {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6rem;
-  align-items: start;
-}
-
-.section-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--flame);
-  margin-bottom: 1.5rem;
-  font-weight: 500;
-}
-
-.section-grid h2 {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 400;
-  line-height: 1.15;
-  margin-bottom: 1.5rem;
-}
-
-.section-grid p {
-  color: var(--warm-gray);
-  font-size: 1.05rem;
-  line-height: 1.8;
-}
-
-/* ── Demo comparison ── */
-.demo {
-  padding: 4rem 2rem 8rem;
-}
-
-.demo-container {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.demo-header {
-  text-align: center;
-  margin-bottom: 3rem;
-}
-
-.demo-header h2 {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 4vw, 2.8rem);
-  font-weight: 400;
-}
-
-.demo-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-
-.demo-panel {
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--smoke-light);
-  background: var(--ash);
-}
-
-.demo-panel-header {
-  padding: 1rem 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--smoke-light);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.panel-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.panel-dot.red { background: #E84545; }
-.panel-dot.green { background: #4ADE80; }
-
-.demo-panel-body {
-  padding: 1.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.8;
-  min-height: 220px;
-  color: var(--warm-gray);
-}
-
-.demo-panel.blocked .demo-panel-body {
-  color: #E8454580;
-}
-
-.demo-panel.success .demo-panel-body {
-  color: var(--warm-gray);
-}
-
-.demo-panel-body .cmd { color: var(--cool-gray); }
-.demo-panel-body .err { color: #E84545; }
-.demo-panel-body .ok { color: #4ADE80; }
-.demo-panel-body .content { color: var(--warm-white); }
-.demo-panel-body .dim { color: var(--cool-gray); }
-
-/* ── Features ── */
-.features {
-  padding: 8rem 2rem;
-  position: relative;
-}
-
-.features::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--smoke-light), transparent);
-}
-
-.features-header {
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto 5rem;
-}
-
-.features-header h2 {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 400;
-  margin-bottom: 1rem;
-}
-
-.features-header p {
-  color: var(--warm-gray);
-  font-size: 1.1rem;
-}
-
-.features-grid {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-}
-
-.feature-card {
-  background: var(--ash);
-  border: 1px solid var(--smoke-light);
-  border-radius: 16px;
-  padding: 2.5rem 2rem;
-  transition: all 0.4s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--flame), var(--flame-bright));
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.feature-card:hover {
-  border-color: rgba(232, 145, 58, 0.2);
-  transform: translateY(-4px);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-}
-
-.feature-card:hover::before { opacity: 1; }
-
-.feature-icon {
-  font-size: 1.8rem;
-  margin-bottom: 1.5rem;
-  display: block;
-}
-
-.feature-card h3 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.15rem;
-  margin-bottom: 0.75rem;
-}
-
-.feature-card p {
-  color: var(--warm-gray);
-  font-size: 0.95rem;
-  line-height: 1.7;
-}
-
-/* ── How it works ── */
-.how {
-  padding: 8rem 2rem;
-  position: relative;
-}
-
-.how::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--smoke-light), transparent);
-}
-
-.how-header {
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto 5rem;
-}
-
-.how-header h2 {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 400;
-  margin-bottom: 1rem;
-}
-
-.steps {
-  max-width: 700px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.step {
-  display: grid;
-  grid-template-columns: 60px 1fr;
-  gap: 1.5rem;
-  padding: 2.5rem 0;
-  border-bottom: 1px solid var(--smoke-light);
-  align-items: start;
-}
-
-.step:last-child { border-bottom: none; }
-
-.step-num {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 1px solid var(--flame);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--flame);
-  flex-shrink: 0;
-}
-
-.step h3 {
-  font-weight: 600;
-  font-size: 1.15rem;
-  margin-bottom: 0.5rem;
-}
-
-.step p {
-  color: var(--warm-gray);
-  font-size: 0.95rem;
-  line-height: 1.7;
-}
-
-.step code {
-  display: inline-block;
-  background: var(--smoke);
-  border: 1px solid var(--smoke-light);
-  border-radius: 6px;
-  padding: 0.2rem 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--flame);
-  margin-top: 0.5rem;
-}
-
-/* ── Compatibility ── */
-.compat {
-  padding: 6rem 2rem;
-  text-align: center;
-  position: relative;
-}
-
-.compat::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--smoke-light), transparent);
-}
-
-.compat h2 {
-  font-family: var(--font-serif);
-  font-size: 2rem;
-  font-weight: 400;
-  margin-bottom: 3rem;
-}
-
-.compat-logos {
-  display: flex;
-  justify-content: center;
-  gap: 4rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.compat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--warm-gray);
-  font-size: 0.9rem;
-  font-weight: 400;
-}
-
-.compat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  background: var(--smoke);
-  border: 1px solid var(--smoke-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.compat-item:hover .compat-icon {
-  border-color: var(--flame);
-  background: rgba(232, 145, 58, 0.08);
-}
-
-/* ── CTA ── */
-.cta {
-  padding: 8rem 2rem;
-  text-align: center;
-  position: relative;
-}
-
-.cta::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(ellipse at center,
-    rgba(232, 145, 58, 0.08) 0%,
-    transparent 60%
-  );
-  pointer-events: none;
-}
-
-.cta h2 {
-  font-family: var(--font-serif);
-  font-size: clamp(2.5rem, 5vw, 4rem);
-  font-weight: 400;
-  line-height: 1.1;
-  margin-bottom: 1.5rem;
-}
-
-.cta h2 em {
-  font-style: italic;
-  color: var(--flame);
-}
-
-.cta p {
-  color: var(--warm-gray);
-  font-size: 1.15rem;
-  margin-bottom: 3rem;
-  max-width: 500px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* ── Footer ── */
-footer {
-  padding: 3rem 2rem;
-  border-top: 1px solid var(--smoke-light);
-  text-align: center;
-}
-
-.footer-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.footer-brand {
-  font-size: 0.85rem;
-  color: var(--cool-gray);
-}
-
-.footer-brand a {
-  color: var(--flame);
-  text-decoration: none;
-}
-
-.footer-brand a:hover { text-decoration: underline; }
-
-.footer-links {
-  display: flex;
-  gap: 2rem;
-  list-style: none;
-}
-
-.footer-links a {
-  color: var(--cool-gray);
-  text-decoration: none;
-  font-size: 0.85rem;
-  transition: color 0.3s;
-}
-
-.footer-links a:hover { color: var(--warm-white); }
-
-/* ── Scroll animations ── */
-.reveal {
-  opacity: 0;
-  transform: translateY(32px);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.4s; }
-.reveal-delay-5 { transition-delay: 0.5s; }
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  nav { padding: 1rem 1.5rem; }
-  .nav-links { display: none; }
-  .section-grid { grid-template-columns: 1fr; gap: 3rem; }
-  .demo-panels { grid-template-columns: 1fr; }
-  .features-grid { grid-template-columns: 1fr; }
-  .footer-inner { flex-direction: column; gap: 1.5rem; }
-  .compat-logos { gap: 2rem; }
-}
-
-@media (max-width: 480px) {
-  .hero { padding: 6rem 1.5rem 3rem; }
-  .hero-actions { flex-direction: column; align-items: center; }
-  .install-code { font-size: 0.75rem; }
+:root{
+  --ink:#05070b;
+  --ink-2:#0a0e14;
+  --ink-3:#101620;
+  --veil:#161d28;
+  --line:rgba(180,210,235,.09);
+  --line-2:rgba(180,210,235,.18);
+  --fog:#8994a3;
+  --mute:#5a6573;
+  --bone:#e6ecf2;
+  --bone-dim:#b8c2cd;
+
+  /* Accent system: phosphor cyan + ember amber + violet pulse */
+  --cyan:#6fe3ff;
+  --cyan-hot:#a9f2ff;
+  --cyan-deep:#1d8fb3;
+  --amber:#ffb559;
+  --amber-hot:#ffd08a;
+  --violet:#b59cff;
+  --red:#ff6b6b;
+
+  --f-display:"Newsreader", "Iowan Old Style", Georgia, serif;
+  --f-sans:"Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --f-mono:"Geist Mono","JetBrains Mono", ui-monospace, monospace;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--ink);}
+html,body{overflow-x:hidden}
+body{
+  background:var(--ink);
+  color:var(--bone);
+  font-family:var(--f-sans);
+  font-weight:400;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  letter-spacing:-0.005em;
+}
+::selection{background:var(--cyan);color:var(--ink);}
+
+/* ═══════════════════════════════════════════════════════════════
+   ATMOSPHERIC BACKGROUND LAYERS
+   ═══════════════════════════════════════════════════════════════ */
+#atmos{position:fixed;inset:0;z-index:0;pointer-events:none;}
+#radar-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:.85;}
+/* Grid overlay */
+#atmos::before{
+  content:"";position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 0%, transparent 75%);
+  opacity:.55;
+}
+/* Vignette + scanlines */
+#atmos::after{
+  content:"";position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0, rgba(255,255,255,.012) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at 50% 0%, rgba(111,227,255,.08), transparent 60%),
+    radial-gradient(ellipse at 80% 110%, rgba(255,181,89,.06), transparent 55%);
+}
+/* Grain */
+.grain{position:fixed;inset:0;z-index:9998;pointer-events:none;opacity:.06;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Content stacks above atmosphere */
+main, nav, footer { position:relative; z-index:5; }
+
+/* ═══════════════════════════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════════════════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:18px 40px;
+  background:linear-gradient(to bottom, rgba(5,7,11,.85), rgba(5,7,11,.4));
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom:1px solid var(--line);
+  transition:padding .4s ease, background .4s ease;
+}
+nav.scrolled{padding:12px 40px;background:rgba(5,7,11,.92);}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.brand-mark{
+  width:28px;height:28px;position:relative;
+  display:grid;place-items:center;
+}
+.brand-mark svg{width:28px;height:28px;}
+.brand-mark svg circle.ring{animation:spin 14s linear infinite;transform-origin:center;transform-box:fill-box;}
+.brand-mark svg circle.ring-2{animation:spin 22s linear infinite reverse;transform-origin:center;transform-box:fill-box;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brand-text{
+  font-family:var(--f-mono);font-size:13px;font-weight:500;
+  letter-spacing:.22em;color:var(--bone);text-transform:uppercase;
+}
+.brand-text b{color:var(--cyan);font-weight:500;}
+.brand-sub{font-size:9px;color:var(--mute);letter-spacing:.3em;display:block;margin-top:1px;}
+
+.nav-links{display:flex;gap:30px;align-items:center;list-style:none;}
+.nav-links a{
+  color:var(--bone-dim);text-decoration:none;
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;
+  position:relative;transition:color .3s;
+}
+.nav-links a::after{
+  content:"";position:absolute;left:0;right:0;bottom:-6px;height:1px;
+  background:var(--cyan);transform:scaleX(0);transform-origin:left;
+  transition:transform .35s cubic-bezier(.65,0,.35,1);
+}
+.nav-links a:hover{color:var(--bone);}
+.nav-links a:hover::after{transform:scaleX(1);}
+.nav-cta{
+  padding:9px 16px !important;
+  border:1px solid var(--cyan) !important;
+  color:var(--cyan) !important;
+  background:linear-gradient(180deg, rgba(111,227,255,.05), rgba(111,227,255,.12));
+  transition:all .3s ease !important;
+}
+.nav-cta::after{display:none;}
+.nav-cta:hover{background:var(--cyan) !important;color:var(--ink) !important;box-shadow:0 0 30px rgba(111,227,255,.4);}
+
+/* ═══════════════════════════════════════════════════════════════
+   HERO
+   ═══════════════════════════════════════════════════════════════ */
+.hero{
+  min-height:100vh;
+  display:grid; grid-template-columns: 1.15fr .95fr;
+  gap:60px;
+  align-items:center;
+  padding:130px 40px 80px;
+  max-width:1360px;margin:0 auto;
+  position:relative;
+}
+.hero-left{position:relative;}
+.status-strip{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--cyan);
+  padding:8px 14px;
+  border:1px solid rgba(111,227,255,.2);
+  background:rgba(111,227,255,.04);
+  margin-bottom:40px;
+  animation:flicker 6s ease-in-out infinite;
+}
+@keyframes flicker{
+  0%,96%,100%{opacity:1}
+  97%{opacity:.4}
+  98%{opacity:.9}
+  99%{opacity:.5}
+}
+.status-strip::before{
+  content:"";width:7px;height:7px;background:var(--cyan);border-radius:50%;
+  box-shadow:0 0 10px var(--cyan);
+  animation:pulse-dot 1.8s ease-in-out infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+.hero h1{
+  font-family:var(--f-display);
+  font-weight:300;
+  font-size:clamp(48px, 6.2vw, 92px);
+  line-height:.98;
+  letter-spacing:-0.025em;
+  color:var(--bone);
+}
+.hero h1 .it{font-style:italic;color:var(--cyan);font-weight:300;position:relative;display:inline-block;}
+.hero h1 .it::after{
+  content:"";position:absolute;left:0;right:0;bottom:8%;height:2px;
+  background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity:.6; filter:blur(2px);
+}
+.hero h1 .redact{
+  display:inline-block;position:relative;
+  color:var(--bone);
+}
+
+/* Redaction-reveal headline lockup */
+.reveal-word{display:inline-block;position:relative;overflow:hidden;vertical-align:baseline;}
+.reveal-word > span{display:inline-block;position:relative;}
+.reveal-word .bar{
+  position:absolute;inset:0;background:var(--bone);
+  transform-origin:right center;
+  animation:unredact 1.6s cubic-bezier(.76,0,.24,1) forwards .5s;
+}
+.reveal-word.delay-1 .bar{animation-delay:.75s;}
+.reveal-word.delay-2 .bar{animation-delay:1.0s;}
+.reveal-word.delay-3 .bar{animation-delay:1.25s;}
+@keyframes unredact{
+  0%{transform:scaleX(1);}
+  40%{transform:scaleX(1) translateX(0);background:var(--bone);}
+  45%{background:var(--cyan);}
+  100%{transform:scaleX(0) translateX(10%);background:var(--cyan);}
+}
+
+.hero-sub{
+  margin-top:32px;max-width:520px;
+  font-size:17px;line-height:1.7;
+  color:var(--bone-dim);
+  font-weight:300;
+  opacity:0;animation:riseIn .9s ease forwards 1.7s;
+}
+.hero-sub em{font-family:var(--f-display);font-style:italic;color:var(--bone);font-weight:400;}
+
+@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+.hero-actions{display:flex;gap:14px;margin-top:36px;flex-wrap:wrap;opacity:0;animation:riseIn .9s ease forwards 1.9s;}
+
+.btn{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:13px 22px;
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  text-decoration:none;cursor:pointer;border:none;
+  transition:all .35s cubic-bezier(.65,0,.35,1);
+  position:relative;overflow:hidden;
+}
+.btn-primary{
+  background:var(--cyan);color:var(--ink);
+  box-shadow:0 0 0 1px var(--cyan), 0 0 30px rgba(111,227,255,.25);
+}
+.btn-primary:hover{
+  background:var(--cyan-hot);
+  box-shadow:0 0 0 1px var(--cyan-hot), 0 0 60px rgba(111,227,255,.6);
+  transform:translateY(-1px);
+}
+.btn-primary::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg, transparent 30%, rgba(255,255,255,.4) 50%, transparent 70%);
+  transform:translateX(-100%);transition:transform .7s;
+}
+.btn-primary:hover::before{transform:translateX(100%);}
+
+.btn-ghost{
+  background:transparent;color:var(--bone);
+  border:1px solid var(--line-2);
+}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan);}
+
+.install-row{margin-top:30px;opacity:0;animation:riseIn .9s ease forwards 2.1s;}
+.install-box{
+  display:inline-flex;align-items:center;gap:14px;
+  padding:12px 18px;
+  background:rgba(10,14,20,.7);
+  border:1px solid var(--line);
+  font-family:var(--f-mono);font-size:12.5px;
+  cursor:pointer;transition:all .3s;
+  backdrop-filter:blur(4px);
+}
+.install-box:hover{border-color:var(--cyan);background:rgba(111,227,255,.04);}
+.install-box .prompt{color:var(--cyan);user-select:none;}
+.install-box .cmd{color:var(--bone);}
+.install-box .copy{color:var(--mute);font-size:10px;letter-spacing:.2em;text-transform:uppercase;}
+
+/* Hero right — the Scope */
+.hero-right{position:relative;height:560px;display:grid;place-items:center;}
+.scope{position:relative;width:520px;height:520px;max-width:100%;}
+.scope svg{position:absolute;inset:0;width:100%;height:100%;}
+.scope .ring-a{animation:spin 28s linear infinite;transform-origin:center;transform-box:fill-box;}
+.scope .ring-b{animation:spin 44s linear infinite reverse;transform-origin:center;transform-box:fill-box;}
+.scope .ring-c{animation:spin 18s linear infinite;transform-origin:center;transform-box:fill-box;}
+.scope .ticks{animation:spin 90s linear infinite;transform-origin:center;transform-box:fill-box;}
+.scope .sweep{
+  position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg, transparent 0deg, rgba(111,227,255,.22) 20deg, rgba(111,227,255,.45) 35deg, transparent 60deg);
+  animation:spin 6s linear infinite;
+  mask-image:radial-gradient(circle, transparent 20%, #000 22%, #000 100%);
+  -webkit-mask-image:radial-gradient(circle, transparent 20%, #000 22%, #000 100%);
+  mix-blend-mode:screen;
+}
+.scope-core{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:220px;height:220px;
+  display:grid;place-items:center;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(111,227,255,.22), transparent 55%),
+    radial-gradient(circle at 70% 70%, rgba(181,156,255,.12), transparent 60%),
+    rgba(16,22,32,.8);
+  border:1px solid rgba(111,227,255,.35);
+  box-shadow:
+    0 0 40px rgba(111,227,255,.15),
+    inset 0 0 40px rgba(111,227,255,.08);
+  backdrop-filter:blur(2px);
+}
+.scope-core .readout{
+  text-align:center;font-family:var(--f-mono);
+  line-height:1.5;
+}
+.scope-core .label{font-size:10px;color:var(--cyan);letter-spacing:.3em;text-transform:uppercase;margin-bottom:8px;}
+.scope-core .big{font-family:var(--f-display);font-style:italic;font-size:46px;color:var(--bone);line-height:1;font-weight:300;}
+.scope-core .small{font-size:10px;color:var(--fog);letter-spacing:.25em;margin-top:10px;text-transform:uppercase;}
+
+.glyph-float{position:absolute;font-family:var(--f-mono);font-size:11px;color:var(--cyan);opacity:.6;letter-spacing:.1em;
+  animation:float-g 8s ease-in-out infinite;}
+.glyph-float.g1{top:8%;left:14%;animation-delay:0s;}
+.glyph-float.g2{top:22%;right:6%;color:var(--amber);animation-delay:1.2s;}
+.glyph-float.g3{bottom:18%;left:4%;animation-delay:2.4s;color:var(--violet);}
+.glyph-float.g4{bottom:10%;right:18%;animation-delay:3.6s;}
+@keyframes float-g{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-10px);opacity:.8}}
+
+/* tiny corner coords near scope */
+.scope-label{
+  position:absolute;font-family:var(--f-mono);font-size:10px;color:var(--mute);
+  letter-spacing:.18em;text-transform:uppercase;
+}
+.scope-label.tl{top:0;left:0;}
+.scope-label.tr{top:0;right:0;}
+.scope-label.bl{bottom:0;left:0;}
+.scope-label.br{bottom:0;right:0;}
+
+/* crosshair ticks on hero corners */
+.corner-tick{position:fixed;width:24px;height:24px;pointer-events:none;z-index:3;}
+.corner-tick::before,.corner-tick::after{content:"";position:absolute;background:var(--cyan);opacity:.35;}
+.corner-tick.tl{top:78px;left:18px;}
+.corner-tick.tl::before{top:0;left:0;width:1px;height:14px;}
+.corner-tick.tl::after{top:0;left:0;width:14px;height:1px;}
+.corner-tick.tr{top:78px;right:18px;}
+.corner-tick.tr::before{top:0;right:0;width:1px;height:14px;}
+.corner-tick.tr::after{top:0;right:0;width:14px;height:1px;}
+
+/* Scroll marker */
+.scroll-marker{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  opacity:0;animation:riseIn .9s ease forwards 2.4s;
+}
+.scroll-marker .txt{font-family:var(--f-mono);font-size:10px;color:var(--mute);letter-spacing:.3em;text-transform:uppercase;}
+.scroll-marker .line{width:1px;height:44px;background:linear-gradient(to bottom, var(--cyan), transparent);
+  animation:scroll-line 2s ease-in-out infinite;transform-origin:top;}
+@keyframes scroll-line{0%,100%{transform:scaleY(1);opacity:.9}50%{transform:scaleY(.2);opacity:.3}}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARED SECTION CHROME
+   ═══════════════════════════════════════════════════════════════ */
+section{position:relative;z-index:5;}
+.section-edge{
+  height:1px;background:linear-gradient(90deg,transparent,var(--line-2),transparent);
+}
+.container{max-width:1200px;margin:0 auto;padding:0 40px;}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--f-mono);font-size:11px;color:var(--cyan);
+  letter-spacing:.28em;text-transform:uppercase;margin-bottom:22px;
+}
+.eyebrow::before{content:"";width:24px;height:1px;background:var(--cyan);opacity:.7;}
+
+.h2{
+  font-family:var(--f-display);font-weight:300;
+  font-size:clamp(34px, 4.2vw, 58px);
+  line-height:1.04;letter-spacing:-.02em;
+  color:var(--bone);
+}
+.h2 em{font-style:italic;color:var(--cyan);font-weight:300;}
+.lede{color:var(--bone-dim);font-size:17px;line-height:1.7;font-weight:300;max-width:60ch;}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROBLEM / SOLUTION
+   ═══════════════════════════════════════════════════════════════ */
+.problem{padding:120px 0;}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:80px;}
+.split > div{position:relative;padding-left:28px;border-left:1px solid var(--line);}
+.split > div::before{
+  content:"";position:absolute;left:-1px;top:0;width:1px;height:40px;
+  background:var(--cyan);box-shadow:0 0 8px var(--cyan);
+}
+.split p{margin-top:16px;color:var(--bone-dim);font-size:16px;line-height:1.75;font-weight:300;}
+
+/* ═══════════════════════════════════════════════════════════════
+   UNREDACT DEMO — centerpiece
+   ═══════════════════════════════════════════════════════════════ */
+.unredact{padding:90px 0 120px;}
+.unredact-header{text-align:center;max-width:760px;margin:0 auto 56px;}
+.unredact-header .eyebrow{justify-content:center;}
+.unredact-header .eyebrow::after{content:"";width:24px;height:1px;background:var(--cyan);opacity:.7;}
+
+.dossier{
+  max-width:980px;margin:0 auto;
+  background:linear-gradient(180deg, rgba(10,14,20,.9), rgba(5,7,11,.8));
+  border:1px solid var(--line-2);
+  position:relative;
+  overflow:hidden;
+}
+.dossier::before{
+  content:"CONFIDENTIAL // AGENT-EYES-ONLY";
+  position:absolute;top:10px;right:14px;
+  font-family:var(--f-mono);font-size:9px;color:var(--amber);
+  letter-spacing:.2em;opacity:.7;
+}
+.dossier-bar{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 20px;border-bottom:1px solid var(--line);
+  font-family:var(--f-mono);font-size:11px;color:var(--fog);letter-spacing:.15em;text-transform:uppercase;
+}
+.dossier-bar .dots{display:flex;gap:6px;}
+.dossier-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--veil);}
+.dossier-bar .dot.on{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+.dossier-bar .url{color:var(--bone);font-family:var(--f-mono);font-size:11px;}
+.dossier-bar .spacer{flex:1;}
+.dossier-bar .meta{color:var(--mute);}
+
+.dossier-body{
+  display:grid;grid-template-columns:1fr 1fr;min-height:360px;
+}
+.doss-side{padding:30px;position:relative;}
+.doss-side.left{border-right:1px solid var(--line);}
+.doss-side.left::after{
+  content:"WITHOUT WICK";position:absolute;top:14px;right:18px;
+  font-family:var(--f-mono);font-size:9px;color:var(--red);letter-spacing:.2em;
+}
+.doss-side.right::after{
+  content:"WITH WICK";position:absolute;top:14px;right:18px;
+  font-family:var(--f-mono);font-size:9px;color:var(--cyan);letter-spacing:.2em;
+}
+.doss-side h4{
+  font-family:var(--f-mono);font-size:10px;color:var(--mute);
+  letter-spacing:.22em;text-transform:uppercase;margin-bottom:16px;
+}
+
+.redacted-block{font-family:var(--f-mono);font-size:12.5px;line-height:2;color:var(--fog);}
+.redacted-block .bar{
+  display:inline-block;background:var(--mute);
+  color:transparent;user-select:none;border-radius:2px;
+  animation:glitch-bar 3.2s steps(2) infinite;
+  height:14px;vertical-align:middle;
+  margin:0 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+}
+.redacted-block .bar.b1{width:90px;}
+.redacted-block .bar.b2{width:60px;}
+.redacted-block .bar.b3{width:140px;}
+.redacted-block .bar.b4{width:80px;}
+.redacted-block .bar.b5{width:110px;}
+.redacted-block .err{color:var(--red);display:block;margin-top:16px;}
+.redacted-block .err::before{content:"✕ ";}
+@keyframes glitch-bar{0%,97%,100%{filter:none}98%{filter:invert(1)}99%{filter:none}}
+
+.revealed-block{font-family:var(--f-mono);font-size:12.5px;line-height:1.85;color:var(--bone-dim);}
+.revealed-block .ok{color:var(--cyan);display:block;margin-bottom:10px;}
+.revealed-block .ok::before{content:"▸ ";}
+.revealed-block .ln{display:block;}
+.revealed-block .hi{color:var(--bone);}
+.revealed-block .kw{color:var(--amber);}
+
+/* Decode effect on reveal text */
+.decode{display:inline-block;}
+.decode .char{display:inline-block;}
+
+/* ═══════════════════════════════════════════════════════════════
+   CAPABILITIES — radar cards
+   ═══════════════════════════════════════════════════════════════ */
+.caps{padding:120px 0;}
+.caps-head{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:end;margin-bottom:60px;}
+.caps-head .lede{text-align:left;}
+.caps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);}
+.cap{
+  padding:36px 30px 40px;
+  border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  position:relative;
+  background:rgba(10,14,20,.35);
+  transition:background .4s ease;
+  overflow:hidden;
+}
+.cap:nth-child(3n){border-right:none;}
+.cap:nth-last-child(-n+3){border-bottom:none;}
+.cap:hover{background:rgba(111,227,255,.04);}
+.cap::before{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 20% 0%, rgba(111,227,255,.12), transparent 50%);
+  opacity:0;transition:opacity .5s;
+}
+.cap:hover::before{opacity:1;}
+.cap-num{font-family:var(--f-mono);font-size:10px;color:var(--mute);letter-spacing:.2em;}
+.cap-icon{
+  width:38px;height:38px;margin:20px 0 20px;
+  display:grid;place-items:center;
+  color:var(--cyan);
+}
+.cap h3{
+  font-family:var(--f-display);font-weight:400;
+  font-size:22px;line-height:1.2;margin-bottom:12px;color:var(--bone);
+}
+.cap p{font-size:14.5px;color:var(--bone-dim);line-height:1.65;font-weight:300;}
+
+/* ═══════════════════════════════════════════════════════════════
+   ANATOMY — horizontal flow
+   ═══════════════════════════════════════════════════════════════ */
+.anatomy{padding:120px 0;}
+.flow{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  margin-top:60px;position:relative;
+}
+.flow::before{
+  content:"";position:absolute;top:26px;left:4%;right:4%;height:1px;
+  background:linear-gradient(90deg, transparent, var(--cyan), var(--cyan), transparent);
+  opacity:.3;
+}
+.flow-step{padding:0 22px;position:relative;}
+.flow-step .node{
+  width:52px;height:52px;border-radius:50%;
+  background:var(--ink-2);
+  border:1px solid var(--cyan);
+  display:grid;place-items:center;
+  font-family:var(--f-mono);font-size:11px;color:var(--cyan);
+  margin-bottom:22px;position:relative;
+  box-shadow:0 0 20px rgba(111,227,255,.25), inset 0 0 10px rgba(111,227,255,.15);
+}
+.flow-step .node::before{
+  content:"";position:absolute;inset:-6px;border-radius:50%;
+  border:1px solid var(--cyan);opacity:.3;
+  animation:ping 2.8s ease-out infinite;
+}
+.flow-step:nth-child(2) .node::before{animation-delay:.7s;}
+.flow-step:nth-child(3) .node::before{animation-delay:1.4s;}
+.flow-step:nth-child(4) .node::before{animation-delay:2.1s;}
+@keyframes ping{0%{transform:scale(1);opacity:.5}80%,100%{transform:scale(1.8);opacity:0}}
+.flow-step h4{
+  font-family:var(--f-display);font-weight:400;font-size:20px;margin-bottom:10px;color:var(--bone);
+}
+.flow-step p{font-size:14px;color:var(--bone-dim);line-height:1.6;font-weight:300;}
+.flow-step code{
+  display:inline-block;margin-top:10px;padding:3px 8px;
+  font-family:var(--f-mono);font-size:11px;color:var(--amber);
+  background:rgba(255,181,89,.06);border:1px solid rgba(255,181,89,.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPARE TABLE
+   ═══════════════════════════════════════════════════════════════ */
+.compare{padding:110px 0;}
+.compare-wrap{margin-top:50px;border:1px solid var(--line);}
+.compare table{width:100%;border-collapse:collapse;font-size:13px;}
+.compare th,.compare td{padding:16px 14px;text-align:center;}
+.compare th{
+  font-family:var(--f-mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--mute);font-weight:500;background:rgba(10,14,20,.6);
+  border-bottom:1px solid var(--line-2);
+}
+.compare th.us{color:var(--cyan);}
+.compare td{border-bottom:1px solid var(--line);color:var(--bone-dim);font-family:var(--f-mono);font-size:12px;}
+.compare tr:last-child td{border-bottom:none;}
+.compare td.row-label{text-align:left;color:var(--bone);font-family:var(--f-sans);font-weight:400;font-size:14px;}
+.compare .yes{color:var(--cyan);}
+.compare .yes-strong{color:var(--cyan);}
+.compare .yes-strong::after{content:"+";font-size:11px;margin-left:2px;}
+.compare .no{color:var(--mute);opacity:.5;}
+.compare .partial{color:var(--amber);font-size:10px;letter-spacing:.15em;}
+
+/* ═══════════════════════════════════════════════════════════════
+   PLANS
+   ═══════════════════════════════════════════════════════════════ */
+.plans{padding:120px 0;}
+.plans-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:920px;margin:50px auto 0;}
+.plan{
+  padding:40px 34px;border:1px solid var(--line-2);
+  background:linear-gradient(180deg, rgba(10,14,20,.8), rgba(5,7,11,.4));
+  position:relative;
+}
+.plan.pro{border-color:var(--cyan);box-shadow:0 0 40px rgba(111,227,255,.12);}
+.plan.pro::before{
+  content:"RECOMMENDED";position:absolute;top:-10px;left:34px;
+  font-family:var(--f-mono);font-size:9px;letter-spacing:.25em;color:var(--ink);
+  background:var(--cyan);padding:3px 8px;
+}
+.plan .tier{font-family:var(--f-mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--bone-dim);}
+.plan.pro .tier{color:var(--cyan);}
+.plan .price{
+  font-family:var(--f-display);font-style:italic;font-weight:300;
+  font-size:54px;margin:14px 0 6px;color:var(--bone);line-height:1;
+}
+.plan .blurb{font-size:14px;color:var(--bone-dim);margin-bottom:24px;font-weight:300;}
+.plan ul{list-style:none;font-size:13.5px;line-height:2.1;}
+.plan li{display:flex;align-items:flex-start;gap:10px;color:var(--bone-dim);}
+.plan li .check{color:var(--cyan);font-family:var(--f-mono);flex-shrink:0;margin-top:3px;}
+.plan li.off{color:var(--mute);}
+.plan li.off .check{color:var(--mute);opacity:.4;}
+.plan .cta{margin-top:24px;}
+
+/* ═══════════════════════════════════════════════════════════════
+   INSTALL
+   ═══════════════════════════════════════════════════════════════ */
+.install{padding:120px 0;}
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--line-2);max-width:740px;margin:50px auto 0;}
+.tab{
+  flex:1;padding:14px 0;background:none;border:none;cursor:pointer;
+  font-family:var(--f-mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--mute);position:relative;transition:color .3s;
+}
+.tab.active{color:var(--cyan);}
+.tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+.tab:hover{color:var(--bone);}
+
+.tab-panes{max-width:740px;margin:0 auto;padding-top:40px;}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;animation:fadeIn .4s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.step{
+  display:grid;grid-template-columns:50px 1fr;gap:24px;
+  padding:28px 0;border-bottom:1px solid var(--line);
+}
+.step:last-child{border-bottom:none;}
+.step-num{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--cyan);
+  display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;color:var(--cyan);
+}
+.step h4{font-weight:500;font-size:16px;margin-bottom:10px;color:var(--bone);}
+.step p{color:var(--bone-dim);font-size:14.5px;font-weight:300;}
+.step code.inline{
+  display:inline-block;padding:4px 10px;
+  font-family:var(--f-mono);font-size:12.5px;color:var(--cyan);
+  background:rgba(111,227,255,.05);border:1px solid rgba(111,227,255,.18);
+  margin-top:10px;
+}
+.step pre{
+  display:block;padding:12px 14px;margin-top:10px;
+  font-family:var(--f-mono);font-size:12px;color:var(--bone-dim);
+  background:rgba(10,14,20,.7);border:1px solid var(--line);
+  white-space:pre-wrap;line-height:1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPAT
+   ═══════════════════════════════════════════════════════════════ */
+.compat{padding:90px 0;text-align:center;}
+.compat .h2{font-size:28px;margin-bottom:44px;}
+.compat-row{display:flex;justify-content:center;gap:60px;flex-wrap:wrap;}
+.compat-item{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--bone-dim);font-size:13px;font-family:var(--f-mono);letter-spacing:.1em;}
+.compat-icon{
+  width:56px;height:56px;border-radius:2px;
+  border:1px solid var(--line-2);
+  background:rgba(10,14,20,.6);
+  display:grid;place-items:center;color:var(--cyan);
+  transition:all .3s;
+}
+.compat-item:hover .compat-icon{border-color:var(--cyan);box-shadow:0 0 20px rgba(111,227,255,.25);}
+
+/* ═══════════════════════════════════════════════════════════════
+   BIG CTA
+   ═══════════════════════════════════════════════════════════════ */
+.cta{padding:140px 0;text-align:center;position:relative;overflow:hidden;}
+.cta::before{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:800px;height:800px;
+  background:radial-gradient(circle, rgba(111,227,255,.12), transparent 60%);
+  pointer-events:none;
+}
+.cta .big{
+  font-family:var(--f-display);font-weight:300;
+  font-size:clamp(44px, 7vw, 110px);line-height:1;letter-spacing:-.03em;
+  position:relative;z-index:2;
+}
+.cta .big em{font-style:italic;color:var(--cyan);}
+.cta p{margin-top:22px;color:var(--bone-dim);font-size:17px;max-width:500px;margin-left:auto;margin-right:auto;position:relative;z-index:2;font-weight:300;}
+.cta .actions{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap;position:relative;z-index:2;}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════ */
+footer{padding:40px 40px;border-top:1px solid var(--line);}
+.foot-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;}
+.foot-brand{font-family:var(--f-mono);font-size:11px;color:var(--mute);letter-spacing:.15em;text-transform:uppercase;}
+.foot-brand b{color:var(--cyan);font-weight:500;}
+.foot-links{display:flex;gap:24px;list-style:none;}
+.foot-links a{font-family:var(--f-mono);font-size:11px;color:var(--bone-dim);letter-spacing:.15em;text-decoration:none;text-transform:uppercase;transition:color .3s;}
+.foot-links a:hover{color:var(--cyan);}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCROLL REVEALS
+   ═══════════════════════════════════════════════════════════════ */
+.reveal{opacity:0;transform:translateY(22px);transition:all .9s cubic-bezier(.16,1,.3,1);}
+.reveal.in{opacity:1;transform:none;}
+.reveal.d1{transition-delay:.1s}
+.reveal.d2{transition-delay:.2s}
+.reveal.d3{transition-delay:.3s}
+.reveal.d4{transition-delay:.4s}
+.reveal.d5{transition-delay:.5s}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width:1020px){
+  .hero{grid-template-columns:1fr;gap:40px;padding-top:110px;}
+  .hero-right{height:420px;}
+  .scope{width:420px;height:420px;}
+  .split{grid-template-columns:1fr;gap:40px;}
+  .caps-head{grid-template-columns:1fr;gap:24px;}
+  .caps-grid{grid-template-columns:1fr;}
+  .cap{border-right:none !important;border-bottom:1px solid var(--line) !important;}
+  .cap:last-child{border-bottom:none !important;}
+  .flow{grid-template-columns:1fr 1fr;gap:40px;}
+  .flow::before{display:none;}
+  .dossier-body{grid-template-columns:1fr;}
+  .doss-side.left{border-right:none;border-bottom:1px solid var(--line);}
+  .plans-grid{grid-template-columns:1fr;}
+}
+@media (max-width:640px){
+  nav{padding:14px 18px;}
+  .nav-links{display:none;}
+  .container{padding:0 20px;}
+  .hero{padding:100px 20px 60px;}
+  .flow{grid-template-columns:1fr;}
+  .compare-wrap{overflow-x:auto;}
+  .compare table{min-width:720px;}
+  .foot-inner{flex-direction:column;align-items:flex-start;}
 }
 </style>
 </head>
 <body>
 
-<!-- Navigation -->
+<!-- Atmosphere -->
+<div id="atmos"></div>
+<canvas id="radar-canvas"></canvas>
+<div class="grain"></div>
+
+<!-- Fixed corner ticks -->
+<div class="corner-tick tl"></div>
+<div class="corner-tick tr"></div>
+
+<!-- Nav -->
 <nav id="nav">
-  <a href="#" class="nav-logo">
-    WICK
-    <span>open source</span>
+  <a href="#" class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1">
+        <circle class="ring" cx="14" cy="14" r="12" stroke="#6fe3ff" stroke-dasharray="2 4" opacity=".6"/>
+        <circle class="ring-2" cx="14" cy="14" r="8" stroke="#6fe3ff" stroke-dasharray="1 2" opacity=".8"/>
+        <circle cx="14" cy="14" r="2.5" fill="#6fe3ff"/>
+        <circle cx="14" cy="14" r="4" stroke="#6fe3ff" opacity=".35"/>
+      </svg>
+    </span>
+    <span class="brand-text">W<b>/</b>I<b>/</b>C<b>/</b>K <span class="brand-sub">unveil_protocol</span></span>
   </a>
   <ul class="nav-links">
-    <li><a href="#problem">Why</a></li>
+    <li><a href="#problem">Problem</a></li>
     <li><a href="#demo">Demo</a></li>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#caps">Capabilities</a></li>
+    <li><a href="#plans">Plans</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="docs.html">Docs</a></li>
     <li><a href="/blog/">Blog</a></li>
-    <li><a href="https://github.com/wickproject/wick" class="nav-cta">GitHub</a></li>
+    <li><a href="https://github.com/wickproject/wick" class="nav-cta">GitHub ↗</a></li>
   </ul>
 </nav>
 
-<!-- Hero -->
+<main>
+
+<!-- ═══ HERO ═══ -->
 <section class="hero">
-  <div class="hero-badge">Open Source &middot; Free Forever</div>
-  <h1>Your AI agent is <em>blind</em> on the web</h1>
-  <p class="hero-sub">
-    When your agent tries to read a webpage, it gets blocked. Wick gives it the same access you have &mdash; running locally, from your own&nbsp;IP.
-  </p>
-  <div class="hero-actions">
-    <a href="#install" class="btn-primary">Get Started</a>
-    <a href="https://github.com/wickproject/wick" class="btn-secondary">View on GitHub &rarr;</a>
-    <a href="https://github.com/wickproject/wick" class="btn-star" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.55rem 1rem;font-size:0.85rem;color:var(--warm-white);background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;text-decoration:none;font-weight:500;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--flame)'" onmouseout="this.style.borderColor='var(--smoke-light)'">&#9733; Star on GitHub</a>
-  </div>
-  <div class="hero-install">
-    <div class="install-code" onclick="copyInstall(this)">
-      <code><span>$</span> brew tap wickproject/wick && brew install wick && wick setup</code>
-      <button class="copy-btn" aria-label="Copy to clipboard">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-      </button>
-      <span class="copied">Copied!</span>
-    </div>
-  </div>
-  <div class="scroll-hint">
-    <span>Scroll</span>
-    <div class="scroll-line"></div>
-  </div>
-</section>
-
-<!-- Problem / Solution -->
-<section class="problem" id="problem">
-  <div class="section-grid">
-    <div class="reveal">
-      <div class="section-label">The Problem</div>
-      <h2>Anti-bot systems block every request your agent makes</h2>
-      <p>
-        Modern websites fingerprint incoming connections at multiple layers. Your AI agent's HTTP requests look nothing like a real browser &mdash; different network signature, different protocol behavior, missing browser signals. The result: 403 errors, CAPTCHA walls, or degraded content. Your agent is left apologizing instead of helping.
-      </p>
-    </div>
-    <div class="reveal reveal-delay-2">
-      <div class="section-label">The Fix</div>
-      <h2>Wick makes your agent's requests indistinguishable from yours</h2>
-      <p>
-        Wick runs as a lightweight local service on your machine. When your agent needs to fetch a page, Wick handles the request using the same technology real browsers use &mdash; authentic, not mimicked. The request goes out from your own residential IP, with your own cookies. To the website, it looks like you browsing normally. Because it basically&nbsp;is.
-      </p>
-    </div>
-  </div>
-</section>
-
-<!-- Demo -->
-<section class="demo" id="demo">
-  <div class="demo-container">
-    <div class="demo-header reveal">
-      <div class="section-label">See the difference</div>
-      <h2>Same page. Different results.</h2>
-    </div>
-    <div class="demo-panels">
-      <div class="demo-panel blocked reveal reveal-delay-1">
-        <div class="demo-panel-header">
-          <span class="panel-dot red"></span>
-          Without Wick
-        </div>
-        <div class="demo-panel-body">
-          <span class="cmd">&gt; agent fetches nytimes.com</span><br><br>
-          <span class="err">403 Forbidden</span><br><br>
-          <span class="dim">I'm sorry, I wasn't able to access<br>
-          that page. The site appears to be<br>
-          blocking automated requests.<br><br>
-          You could try copying the content<br>
-          and pasting it here...</span>
-        </div>
-      </div>
-      <div class="demo-panel success reveal reveal-delay-2">
-        <div class="demo-panel-header">
-          <span class="panel-dot green"></span>
-          With Wick
-        </div>
-        <div class="demo-panel-body">
-          <span class="cmd">&gt; agent fetches nytimes.com</span><br><br>
-          <span class="ok">200 OK</span> <span class="dim">&middot; 897ms</span><br><br>
-          <span class="content"># The New York Times<br><br>
-          BREAKING: The Justice Department<br>
-          is examining whether President...<br><br>
-          The pace of ICE arrests nationwide<br>
-          has topped 1,100 per day on average...</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Search demo -->
-    <div style="max-width: 600px; margin: 2.5rem auto 0;">
-      <div class="demo-panel success reveal" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--smoke-light); background: var(--ash);">
-        <div class="demo-panel-header" style="padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--smoke-light); font-size: 0.85rem; font-weight: 500;">
-          <span class="panel-dot green" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;"></span>
-          wick_search
-        </div>
-        <div class="demo-panel-body" style="padding: 1.5rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.8; color: var(--warm-gray);">
-          <span style="color:var(--cool-gray);">&gt; wick search "rust programming language"</span><br><br>
-          <span style="color:var(--warm-white);">1. <a href="#" style="color:var(--flame);text-decoration:none;">Rust Programming Language</a></span><br>
-          <span style="color:var(--warm-gray);">&nbsp;&nbsp; rust-lang.org — Fast, reliable, productive.</span><br>
-          <span style="color:var(--warm-white);">2. <a href="#" style="color:var(--flame);text-decoration:none;">Rust (programming language) - Wikipedia</a></span><br>
-          <span style="color:var(--warm-gray);">&nbsp;&nbsp; General-purpose language emphasizing performance...</span><br>
-          <span style="color:var(--warm-white);">3. <a href="#" style="color:var(--flame);text-decoration:none;">wick-mcp on NPM</a></span><br>
-          <span style="color:var(--warm-gray);">&nbsp;&nbsp; Browser-grade web access for AI agents.</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- API demo -->
-    <div style="max-width: 600px; margin: 2.5rem auto 0;">
-      <div class="demo-panel success reveal" style="border-radius: 16px; overflow: hidden; border: 1px solid var(--smoke-light); background: var(--ash);">
-        <div class="demo-panel-header" style="padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--smoke-light); font-size: 0.85rem; font-weight: 500;">
-          <span class="panel-dot green" style="width:8px;height:8px;border-radius:50%;background:#4ADE80;"></span>
-          HTTP API &mdash; works with any tool
-        </div>
-        <div class="demo-panel-body" style="padding: 1.5rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.8; color: var(--warm-gray);">
-          <span style="color:var(--cool-gray);">$ wick serve --api</span><br>
-          <span style="color:var(--warm-gray);">API running at http://127.0.0.1:8090</span><br><br>
-          <span style="color:var(--cool-gray);">$ curl "localhost:8090/v1/fetch?url=https://nytimes.com"</span><br>
-          <span style="color:var(--warm-white);">{"status": 200, "content": "# The New York Times..."}</span><br><br>
-          <span style="color:#F5B74C;">Python, LangChain, n8n, Jupyter, curl &mdash; anything.</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Features -->
-<section class="features" id="features">
-  <div class="features-header reveal">
-    <div class="section-label">Why Wick</div>
-    <h2>Built for agents. Trusted by&nbsp;humans.</h2>
-    <p>Everything your agent needs to access the real web, nothing it doesn't.</p>
-  </div>
-  <div class="features-grid">
-    <div class="feature-card reveal reveal-delay-1">
-      <span class="feature-icon">&#x1f310;</span>
-      <h3>Browser-Grade Access</h3>
-      <p>Wick uses the same networking technology as real browsers. Not an imitation &mdash; the real thing. Websites can't tell the difference because there isn't one.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-2">
-      <span class="feature-icon">&#x1f3e0;</span>
-      <h3>Runs Locally</h3>
-      <p>Everything happens on your machine. No cloud proxy, no third-party servers. Your data never leaves your network unless you're the one sending it.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-3">
-      <span class="feature-icon">&#x1f4c4;</span>
-      <h3>Clean Markdown Output</h3>
-      <p>Raw HTML is useless to an LLM. Wick strips boilerplate, navigation, and ads, returning clean, structured markdown your agent can actually use.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-4">
-      <span class="feature-icon">&#x1f512;</span>
-      <h3>Your IP, Your Request</h3>
-      <p>No pooled residential IPs. No sketchy proxy networks. Requests go out from your own connection &mdash; because you're the one making them, through your agent.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-5">
-      <span class="feature-icon">&#x1f577;</span>
-      <h3>Crawl &amp; Map</h3>
-      <p><code>wick_crawl</code> follows links and returns markdown from multiple pages. <code>wick_map</code> discovers all URLs on a site. Build RAG pipelines, scrape docs, index entire sites.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-5">
-      <span class="feature-icon">&#x1f916;</span>
-      <h3>MCP + HTTP API</h3>
-      <p>Works with Claude Code, Cursor, and any MCP client. Also runs as a <a href="/docs.html#api-server" style="color:var(--flame);">local HTTP API</a> &mdash; <code>wick serve --api</code> gives Python, LangChain, n8n, and anything else browser-grade access.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-5">
-      <span class="feature-icon">&#x1f50d;</span>
-      <h3>Search &amp; Download</h3>
-      <p><code>wick_search</code> for web search. <code>wick_download</code> for video/audio from Reddit, YouTube, Twitter, and 1000+ sites. Six tools, one server.</p>
-    </div>
-    <div class="feature-card reveal reveal-delay-5">
-      <span class="feature-icon">&#x2764;</span>
-      <h3>Free &amp; Open Source</h3>
-      <p>Wick is MIT-licensed and costs nothing to run. Built by the creator of <a href="https://lantern.io" style="color:var(--flame);">Lantern</a>, with over a decade of experience in internet access technology.</p>
-    </div>
-  </div>
-</section>
-
-<!-- Pricing -->
-<section class="features" id="pricing">
-  <div class="features-header reveal">
-    <div class="section-label">Plans</div>
-    <h2>Free to start. Scale when you&nbsp;need&nbsp;more.</h2>
-  </div>
-  <div class="features-grid" style="grid-template-columns: 1fr 1fr 1fr; max-width: 1100px; margin: 0 auto;">
-    <div class="feature-card reveal reveal-delay-1" style="border-color: var(--smoke-light);">
-      <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 1rem;">Free</div>
-      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">$0</div>
-      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For developers and individual agents</p>
-      <ul style="list-style: none; font-size: 0.9rem; line-height: 2.2; color: var(--warm-gray);">
-        <li style="color: var(--warm-white);">&#x2713; Browser-grade TLS fingerprint</li>
-        <li style="color: var(--warm-white);">&#x2713; Clean markdown extraction</li>
-        <li style="color: var(--warm-white);">&#x2713; MCP server (Claude, Cursor, etc.)</li>
-        <li style="color: var(--warm-white);">&#x2713; Persistent cookies</li>
-        <li style="color: var(--warm-white);">&#x2713; robots.txt respect</li>
-        <li style="color: var(--warm-white);">&#x2713; Residential IP routing</li>
-        <li style="color: var(--warm-white);">&#x2713; IP tunneling to local machine</li>
-        <li style="color: var(--warm-white);">&#x2713; macOS + Linux, one-command install</li>
-        <li style="color: var(--warm-white);">&#x2713; Open source, runs locally</li>
-      </ul>
-      <div style="margin-top: 1.5rem;">
-        <a href="#install" class="btn-secondary" style="width: 100%; justify-content: center;">Get Started Free</a>
-      </div>
-    </div>
-    <div class="feature-card reveal reveal-delay-2" style="border-color: var(--flame);">
-      <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--flame); margin-bottom: 1rem;">Pro</div>
-      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">$20<span style="font-size: 1rem; font-weight: 400; color: var(--warm-gray);">/mo</span></div>
-      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For power users and teams</p>
-      <ul style="list-style: none; font-size: 0.9rem; line-height: 2.2; color: var(--warm-gray);">
-        <li style="color: var(--warm-white);">&#x2713; Everything in Free</li>
-        <li style="color: var(--flame);">&#x2713; Full JavaScript rendering</li>
-        <li style="color: var(--flame);">&#x2713; Advanced anti-detection</li>
-        <li style="color: var(--flame);">&#x2713; Adaptive per-site optimization</li>
-      </ul>
-      <div style="margin-top: 1.5rem;">
-        <a href="#install" class="btn-primary" style="width: 100%; justify-content: center;">Upgrade in CLI</a>
-      </div>
-    </div>
-    <div class="feature-card reveal reveal-delay-3" style="border-color: var(--ember);">
-      <div style="font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ember); margin-bottom: 1rem;">Enterprise</div>
-      <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem;">Custom</div>
-      <p style="color: var(--warm-gray); font-size: 0.9rem; margin-bottom: 1.5rem;">For companies accessing high-value data</p>
-      <ul style="list-style: none; font-size: 0.9rem; line-height: 2.2; color: var(--warm-gray);">
-        <li style="color: var(--warm-white);">&#x2713; Everything in Pro</li>
-        <li style="color: var(--ember);">&#x2713; Automated CAPTCHA handling</li>
-        <li style="color: var(--ember);">&#x2713; Geo-restriction bypass</li>
-        <li style="color: var(--ember);">&#x2713; Dedicated support + SLA</li>
-      </ul>
-      <div style="margin-top: 1.5rem;">
-        <a href="mailto:hello@getwick.dev" class="btn-primary" style="width: 100%; justify-content: center;">Contact Us</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- How Pro Works -->
-<section class="how" id="pro-setup">
-  <div class="how-header reveal">
-    <div class="section-label">Wick Pro</div>
-    <h2>Cloud server. Your residential&nbsp;IP.</h2>
-  </div>
-  <div style="max-width: 700px; margin: 0 auto;">
-    <p class="reveal" style="color: var(--warm-gray); text-align: center; margin-bottom: 2.5rem; font-size: 1.05rem; line-height: 1.7;">
-      Run Wick on a cloud server but exit from your residential IP. Three commands, zero configuration files.
+  <div class="hero-left">
+    <div class="status-strip">SIGNAL ACQUIRED · AGENT-GRADE ACCESS · v1.0</div>
+    <h1>
+      The web your agent <em class="it">can't</em>&nbsp;see —
+      <span class="reveal-word">
+        <span>unveiled.</span>
+        <span class="bar"></span>
+      </span>
+    </h1>
+    <p class="hero-sub">
+      Modern sites fingerprint every request your agent makes and quietly serve it a <em>lesser web</em> — 403s, CAPTCHAs, degraded content. Wick runs locally, speaks the same protocol real browsers do, and exits from your own IP. The page your agent fetches is the same page you see.
     </p>
-    <div class="step reveal" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
-      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install</h3>
-        <code style="display:block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.5rem 0.6rem;font-family:var(--font-mono);font-size:0.8rem;color:var(--flame);line-height:1.6;white-space:pre-wrap;"># Linux server:
-curl -fsSL https://releases.getwick.dev/install-pro.sh -o /tmp/wp.sh &amp;&amp; WICK_KEY=your_key sudo -E bash /tmp/wp.sh
-# macOS:
-WICK_KEY=your_key curl -fsSL https://releases.getwick.dev/install-pro-mac.sh | bash</code>
-        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">We'll give you an API key when you sign up. One command, both platforms.</p>
+    <div class="hero-actions">
+      <a href="#install" class="btn btn-primary">Deploy Wick →</a>
+      <a href="https://github.com/wickproject/wick" class="btn btn-ghost">Inspect Source</a>
+      <a href="https://github.com/wickproject/wick" class="btn btn-ghost" title="Star on GitHub">★ Star</a>
+    </div>
+    <div class="install-row">
+      <div class="install-box" onclick="copyInstall(this)">
+        <span class="prompt">$</span>
+        <span class="cmd">brew tap wickproject/wick && brew install wick</span>
+        <span class="copy" id="copy-label">⧉ copy</span>
       </div>
     </div>
-    <div class="step reveal reveal-delay-1" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
-      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Connect your residential IP</h3>
-        <code style="display:block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.5rem 0.6rem;font-family:var(--font-mono);font-size:0.8rem;color:var(--flame);line-height:1.6;white-space:pre-wrap;"># On your server:
-sudo wick-tunnel init          # prints a token
-# On your laptop:
-sudo wick-tunnel join &lt;token&gt;  # connects your IP</code>
-        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">WireGuard tunnel routes server traffic through your residential IP. Survives wifi changes.</p>
+  </div>
+
+  <div class="hero-right">
+    <div class="scope">
+      <span class="scope-label tl">LAT 37.7749</span>
+      <span class="scope-label tr">LON -122.419</span>
+      <span class="scope-label bl">T+00:14:08</span>
+      <span class="scope-label br">SWEEP 0x2F</span>
+
+      <!-- Outer ring / ticks -->
+      <svg viewBox="0 0 520 520">
+        <g class="ticks">
+          <circle cx="260" cy="260" r="250" stroke="rgba(180,210,235,.18)" fill="none" stroke-width="1" />
+          <!-- generated tick marks -->
+          <g stroke="rgba(111,227,255,.4)" stroke-width="1">
+            <line x1="260" y1="10" x2="260" y2="22"/>
+            <line x1="260" y1="498" x2="260" y2="510"/>
+            <line x1="10" y1="260" x2="22" y2="260"/>
+            <line x1="498" y1="260" x2="510" y2="260"/>
+          </g>
+          <g stroke="rgba(180,210,235,.2)" stroke-width="1">
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(30 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(60 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(90 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(120 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(150 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(210 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(240 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(270 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(300 260 260)"/>
+            <line x1="260" y1="14" x2="260" y2="20" transform="rotate(330 260 260)"/>
+          </g>
+        </g>
+
+        <g class="ring-a">
+          <circle cx="260" cy="260" r="205" stroke="rgba(111,227,255,.25)" fill="none" stroke-width="1" stroke-dasharray="4 8"/>
+        </g>
+        <g class="ring-b">
+          <circle cx="260" cy="260" r="170" stroke="rgba(180,210,235,.14)" fill="none" stroke-width="1"/>
+          <circle cx="260" cy="55" r="3" fill="#ffb559"/>
+          <circle cx="380" cy="380" r="2" fill="#6fe3ff"/>
+          <circle cx="120" cy="320" r="2.5" fill="#b59cff"/>
+        </g>
+        <g class="ring-c">
+          <circle cx="260" cy="260" r="135" stroke="rgba(111,227,255,.35)" fill="none" stroke-width="1" stroke-dasharray="1 3"/>
+        </g>
+        <!-- crosshair -->
+        <line x1="260" y1="40" x2="260" y2="480" stroke="rgba(180,210,235,.06)" stroke-width="1"/>
+        <line x1="40" y1="260" x2="480" y2="260" stroke="rgba(180,210,235,.06)" stroke-width="1"/>
+      </svg>
+
+      <!-- rotating sweep -->
+      <div class="sweep"></div>
+
+      <!-- glyph floats -->
+      <span class="glyph-float g1">41°24'N · 02°11'E</span>
+      <span class="glyph-float g2">◈ GET /202 OK</span>
+      <span class="glyph-float g3">{ agent: "you" }</span>
+      <span class="glyph-float g4">TLS · ch+1.3</span>
+
+      <div class="scope-core">
+        <div class="readout">
+          <div class="label">Signal</div>
+          <div class="big" id="scope-big">clear</div>
+          <div class="small">integrity · 99.7<span style="color:var(--cyan)">%</span></div>
+        </div>
       </div>
     </div>
-    <div class="step reveal reveal-delay-2" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
-      <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
-      <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Fetch anything</h3>
-        <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.3rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick fetch https://any-site.com</code>
-        <p style="color:var(--cool-gray);font-size:0.85rem;margin-top:0.5rem;">Renders JavaScript, bypasses anti-bot systems, adapts to each site. Gets faster over time.</p>
+  </div>
+
+  <div class="scroll-marker">
+    <span class="txt">Descend</span>
+    <span class="line"></span>
+  </div>
+</section>
+
+<div class="section-edge"></div>
+
+<!-- ═══ PROBLEM / SOLUTION ═══ -->
+<section class="problem" id="problem">
+  <div class="container">
+    <div class="split">
+      <div class="reveal">
+        <div class="eyebrow">01 · Diagnosis</div>
+        <h2 class="h2">Your agent is given a <em>redacted</em> web.</h2>
+        <p>Anti-bot systems fingerprint at the TLS layer, HTTP layer, JS layer — dozens of signals in the first hundred milliseconds. Your agent's requests don't match any real browser's, so the site serves a CAPTCHA, a 403, or a lobotomized version of the page. You built the agent to read the internet; it is reading a suggestion of it.</p>
+      </div>
+      <div class="reveal d2">
+        <div class="eyebrow">02 · Remedy</div>
+        <h2 class="h2">Wick un-redacts it.</h2>
+        <p>Wick sits on your machine, routes the fetch through the same stack real Chrome uses, and exits from your own residential IP with your own cookies. To the site, there is no agent. There is only you, browsing. Every bit the site would show a human, it shows your agent.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Benchmark callout -->
-<section class="features" id="benchmark">
-  <div class="features-header reveal">
-    <div class="section-label">Tested against 25 protected sites</div>
-    <h2 style="font-size:3rem;">100% success rate</h2>
-    <p style="color:var(--warm-gray);max-width:640px;margin:1rem auto 0;font-size:0.95rem;">We tested Wick Pro against 25 sites spanning Cloudflare, Akamai, PerimeterX, AWS WAF, and custom anti-bot systems. Wikipedia, NYTimes, Amazon, LinkedIn, Bloomberg, Walmart, Glassdoor, Instagram, Twitter/X &mdash; every single one returned content.</p>
-    <div style="display:flex;justify-content:center;gap:3rem;margin-top:2rem;flex-wrap:wrap;">
-      <div style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;color:var(--flame);">25/25</div>
-        <div style="font-size:0.8rem;color:var(--cool-gray);">sites fetched</div>
+<div class="section-edge"></div>
+
+<!-- ═══ UNREDACT DEMO ═══ -->
+<section class="unredact" id="demo">
+  <div class="container">
+    <div class="unredact-header reveal">
+      <div class="eyebrow">Live transmission</div>
+      <h2 class="h2">Same URL. Two different realities.</h2>
+      <p class="lede" style="margin-top:18px;margin-inline:auto;">Left: what your agent sees without Wick. Right: what it sees with. Hover the dossier to toggle the reveal sweep.</p>
+    </div>
+
+    <div class="dossier reveal d1" id="dossier">
+      <div class="dossier-bar">
+        <span class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot"></span></span>
+        <span class="url">GET · https://nytimes.com/breaking</span>
+        <span class="spacer"></span>
+        <span class="meta">INTERCEPT · 0x7A9F</span>
       </div>
-      <div style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;color:var(--warm-white);">5 tiers</div>
-        <div style="font-size:0.8rem;color:var(--cool-gray);">of anti-bot protection</div>
-      </div>
-      <div style="text-align:center;">
-        <div style="font-size:2rem;font-weight:700;color:var(--warm-white);">0 cloud</div>
-        <div style="font-size:0.8rem;color:var(--cool-gray);">dependencies</div>
+      <div class="dossier-body">
+        <div class="doss-side left">
+          <h4>Raw intercept · bot-detected</h4>
+          <div class="redacted-block" id="blk-left">
+            <div><span class="bar b3"></span> <span class="bar b1"></span> <span class="bar b2"></span></div>
+            <div><span class="bar b2"></span> <span class="bar b4"></span> <span class="bar b3"></span> <span class="bar b1"></span></div>
+            <div><span class="bar b1"></span> <span class="bar b5"></span> <span class="bar b2"></span></div>
+            <div><span class="bar b4"></span> <span class="bar b3"></span> <span class="bar b2"></span> <span class="bar b1"></span></div>
+            <div class="err">403 Forbidden · access denied by perimeter</div>
+          </div>
+        </div>
+        <div class="doss-side right">
+          <h4>With Wick · 200 OK · 614ms</h4>
+          <div class="revealed-block">
+            <span class="ok">Content delivered in full</span>
+            <span class="ln">› <span class="hi">BREAKING —</span> The Justice Department is examining</span>
+            <span class="ln">&nbsp;&nbsp;whether the <span class="kw">proposed merger</span> satisfies</span>
+            <span class="ln">&nbsp;&nbsp;antitrust conditions imposed in March…</span>
+            <span class="ln" style="margin-top:12px;display:inline-block;">› ICE arrests topped <span class="kw">1,100</span>/day on average</span>
+            <span class="ln">&nbsp;&nbsp;through Q1, according to <span class="hi">internal memos</span></span>
+            <span class="ln">&nbsp;&nbsp;obtained by our newsroom this morning.</span>
+            <span class="ln" style="margin-top:12px;color:var(--mute);display:inline-block;">[ + 2,847 more words · clean markdown ]</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Competitive comparison -->
-<section class="features" id="compare">
-  <div class="features-header reveal">
-    <div class="section-label">How we compare</div>
-    <h2>Wick vs. the alternatives</h2>
-  </div>
-  <div class="reveal" style="max-width: 1000px; margin: 0 auto; overflow-x: auto;">
-    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-      <thead>
-        <tr style="border-bottom: 2px solid var(--smoke-light);">
-          <th style="text-align: left; padding: 1rem 0.75rem; color: var(--warm-gray); font-weight: 500;"></th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--flame); font-weight: 600;">Wick Free</th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--flame); font-weight: 600;">Wick Pro</th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--warm-gray); font-weight: 500;">Firecrawl</th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--warm-gray); font-weight: 500;">Bright Data MCP</th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--warm-gray); font-weight: 500;">Browserbase</th>
-          <th style="text-align: center; padding: 1rem 0.75rem; color: var(--warm-gray); font-weight: 500;">Playwright MCP</th>
-        </tr>
-      </thead>
-      <tbody style="color: var(--warm-gray);">
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Anti-bot success rate</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame); font-weight: 600;">100%</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame); font-weight: 600;">100%</td>
-          <td style="text-align: center; padding: 0.75rem;">83%</td>
-          <td style="text-align: center; padding: 0.75rem;">~100%</td>
-          <td style="text-align: center; padding: 0.75rem;">90%</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">JS rendering</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Runs locally</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Your residential IP</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">Pooled</td>
-          <td style="text-align: center; padding: 0.75rem;">Pooled</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Clean markdown</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Geo-restriction bypass</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">Paid</td>
-          <td style="text-align: center; padding: 0.75rem;">Paid</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Your data stays local</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2717;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">MCP native</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-          <td style="text-align: center; padding: 0.75rem;">&#x2713;</td>
-        </tr>
-        <tr style="border-bottom: 1px solid var(--smoke-light);">
-          <td style="padding: 0.75rem; color: var(--warm-white);">Free tier</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">Forever</td>
-          <td style="text-align: center; padding: 0.75rem;">&mdash;</td>
-          <td style="text-align: center; padding: 0.75rem;">500 pages</td>
-          <td style="text-align: center; padding: 0.75rem;">5K requests</td>
-          <td style="text-align: center; padding: 0.75rem;">Trial</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">Free</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.75rem; color: var(--warm-white);">Paid pricing</td>
-          <td style="text-align: center; padding: 0.75rem;">$0</td>
-          <td style="text-align: center; padding: 0.75rem; color: var(--flame);">$20/mo flat</td>
-          <td style="text-align: center; padding: 0.75rem;">$19-599/mo</td>
-          <td style="text-align: center; padding: 0.75rem;">Usage-based</td>
-          <td style="text-align: center; padding: 0.75rem;">$20-99/mo</td>
-          <td style="text-align: center; padding: 0.75rem;">$0</td>
-        </tr>
-      </tbody>
-    </table>
+<div class="section-edge"></div>
+
+<!-- ═══ CAPABILITIES ═══ -->
+<section class="caps" id="caps">
+  <div class="container">
+    <div class="caps-head">
+      <div class="reveal">
+        <div class="eyebrow">Capabilities</div>
+        <h2 class="h2">Six instruments. One <em>clean</em>&nbsp;signal.</h2>
+      </div>
+      <p class="lede reveal d1">Everything required to put a real browser's access behind your agent's fetch call — and nothing that phones home.</p>
+    </div>
+    <div class="caps-grid reveal d1">
+      <article class="cap">
+        <div class="cap-num">I · 001</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <circle cx="15" cy="15" r="12"/><path d="M3 15h24M15 3a18 12 0 010 24M15 3a18 12 0 000 24"/>
+          </svg>
+        </div>
+        <h3>Browser-grade fingerprint</h3>
+        <p>The TLS handshake, HTTP/2 frames, header ordering, JA3/JA4 — indistinguishable from a real Chrome session because it uses the same networking stack.</p>
+      </article>
+      <article class="cap">
+        <div class="cap-num">I · 002</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <path d="M3 26l12-20 12 20H3z"/><path d="M10 26v-7h10v7"/>
+          </svg>
+        </div>
+        <h3>Runs on your machine</h3>
+        <p>No cloud proxy, no third-party servers, no middleman. The binary lives on your laptop. Requests and responses never leave your network.</p>
+      </article>
+      <article class="cap">
+        <div class="cap-num">I · 003</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <rect x="5" y="4" width="20" height="22"/><path d="M9 10h12M9 14h12M9 18h8"/>
+          </svg>
+        </div>
+        <h3>Markdown, not noise</h3>
+        <p>Raw HTML wastes tokens. Wick strips chrome, ads, and scaffolding and returns structured markdown your model can actually reason over.</p>
+      </article>
+      <article class="cap">
+        <div class="cap-num">I · 004</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <rect x="7" y="13" width="16" height="12" rx="2"/><path d="M10 13V9a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <h3>Your IP, your cookies</h3>
+        <p>No pooled residential exit networks. Requests carry your signals because you are the one making them — through the agent you wrote.</p>
+      </article>
+      <article class="cap">
+        <div class="cap-num">I · 005</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <rect x="4" y="8" width="22" height="14" rx="2"/><circle cx="11" cy="15" r="1.6" fill="currentColor"/><circle cx="19" cy="15" r="1.6" fill="currentColor"/><path d="M15 4v4M10 26v2M20 26v2"/>
+          </svg>
+        </div>
+        <h3>MCP-native</h3>
+        <p>Works out of the box with Claude Code, Cursor, Windsurf, and any MCP-compatible client. One install and your agent gains <code style="font-family:var(--f-mono);font-size:12px;color:var(--amber)">wick_fetch</code>.</p>
+      </article>
+      <article class="cap">
+        <div class="cap-num">I · 006</div>
+        <div class="cap-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3">
+            <circle cx="13" cy="13" r="8"/><path d="M19 19l7 7"/>
+          </svg>
+        </div>
+        <h3>Search built in</h3>
+        <p><code style="font-family:var(--f-mono);font-size:12px;color:var(--amber)">wick_search</code> issues real browser queries and returns clean result sets. Pair with <code style="font-family:var(--f-mono);font-size:12px;color:var(--amber)">wick_fetch</code> for end-to-end research.</p>
+      </article>
+    </div>
   </div>
 </section>
 
-<!-- Install -->
-<section class="how" id="install">
-  <div class="how-header reveal">
-    <div class="section-label">Get started</div>
-    <h2>Install in seconds. Any platform.</h2>
+<div class="section-edge"></div>
+
+<!-- ═══ ANATOMY ═══ -->
+<section class="anatomy">
+  <div class="container">
+    <div class="reveal" style="max-width:660px;">
+      <div class="eyebrow">Anatomy of a fetch</div>
+      <h2 class="h2">From agent call to <em>rendered</em> page.</h2>
+    </div>
+    <div class="flow reveal d1">
+      <div class="flow-step">
+        <div class="node">01</div>
+        <h4>Agent calls</h4>
+        <p>Your MCP client invokes <code>wick_fetch(url)</code> — no SDK, no API key.</p>
+      </div>
+      <div class="flow-step">
+        <div class="node">02</div>
+        <h4>Local resolve</h4>
+        <p>Wick's daemon accepts the call on <code>127.0.0.1</code>. Nothing leaves the machine yet.</p>
+      </div>
+      <div class="flow-step">
+        <div class="node">03</div>
+        <h4>Browser stack</h4>
+        <p>The request goes out through Chromium's real network layer — TLS, HTTP/2, everything.</p>
+      </div>
+      <div class="flow-step">
+        <div class="node">04</div>
+        <h4>Clean return</h4>
+        <p>Response is extracted, boilerplate stripped, handed back as markdown with metadata.</p>
+      </div>
+    </div>
   </div>
+</section>
 
-  <!-- Platform tabs -->
-  <div style="max-width: 700px; margin: 0 auto;">
-    <div style="display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--smoke-light);" class="reveal">
-      <button onclick="showPlatform('macos')" id="tab-macos" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid var(--flame); margin-bottom: -2px; color: var(--flame); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">macOS</button>
-      <button onclick="showPlatform('linux')" id="tab-linux" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--warm-gray); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">Linux (apt)</button>
-      <button onclick="showPlatform('npm')" id="tab-npm" style="flex:1; padding: 0.75rem; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--warm-gray); font-family: var(--font-display); font-size: 0.9rem; font-weight: 500; cursor: pointer;">npm</button>
+<div class="section-edge"></div>
+
+<!-- ═══ COMPARE ═══ -->
+<section class="compare" id="compare">
+  <div class="container">
+    <div class="reveal" style="max-width:720px;">
+      <div class="eyebrow">How Wick compares</div>
+      <h2 class="h2">Against every other way your agent reads the web.</h2>
+    </div>
+    <div class="compare-wrap reveal d1">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left;padding-left:18px;">&nbsp;</th>
+            <th class="us">Wick<br><span style="font-size:9px;color:var(--mute)">FREE</span></th>
+            <th class="us">Wick<br><span style="font-size:9px;color:var(--mute)">PRO</span></th>
+            <th>Firecrawl</th>
+            <th>Bright Data</th>
+            <th>Browserbase</th>
+            <th>Playwright</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-label">Anti-bot bypass</td>
+            <td class="yes">●</td><td class="yes-strong">●●</td><td class="no">○</td><td class="partial">part</td><td class="no">○</td><td class="no">○</td>
+          </tr>
+          <tr>
+            <td class="row-label">JavaScript rendering</td>
+            <td class="no">○</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td>
+          </tr>
+          <tr>
+            <td class="row-label">Runs locally</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
+          </tr>
+          <tr>
+            <td class="row-label">Your residential IP</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="partial">pool</td><td class="no">○</td><td class="yes">●</td>
+          </tr>
+          <tr>
+            <td class="row-label">Markdown output</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td>
+          </tr>
+          <tr>
+            <td class="row-label">No cloud round-trip</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
+          </tr>
+          <tr>
+            <td class="row-label">Paid starting at</td>
+            <td style="color:var(--cyan);">$0</td><td style="color:var(--cyan);">custom</td><td>$19/mo</td><td>metered</td><td>$150/mo</td><td>$0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="section-edge"></div>
+
+<!-- ═══ PLANS ═══ -->
+<section class="plans" id="plans">
+  <div class="container">
+    <div class="reveal" style="text-align:center;max-width:560px;margin:0 auto;">
+      <div class="eyebrow" style="justify-content:center;">Plans</div>
+      <h2 class="h2">Free for your <em>agent</em>. Custom for fleets.</h2>
+    </div>
+    <div class="plans-grid">
+      <div class="plan reveal d1">
+        <div class="tier">Free · open source</div>
+        <div class="price">$0</div>
+        <div class="blurb">For individual developers, indie agents, local workflows.</div>
+        <ul>
+          <li><span class="check">▸</span> Browser-grade TLS fingerprint</li>
+          <li><span class="check">▸</span> Clean markdown extraction</li>
+          <li><span class="check">▸</span> MCP server for all major clients</li>
+          <li><span class="check">▸</span> Persistent cookie vault</li>
+          <li><span class="check">▸</span> robots.txt compliance</li>
+          <li><span class="check">▸</span> Open source (MIT)</li>
+          <li class="off"><span class="check">○</span> JavaScript rendering</li>
+          <li class="off"><span class="check">○</span> Advanced evasions</li>
+        </ul>
+        <div class="cta"><a href="#install" class="btn btn-ghost" style="width:100%;justify-content:center;">Get Wick Free</a></div>
+      </div>
+      <div class="plan pro reveal d2">
+        <div class="tier">Pro · commercial</div>
+        <div class="price">Custom</div>
+        <div class="blurb">For teams running agents against hard-to-reach data.</div>
+        <ul>
+          <li><span class="check">▸</span> Everything in Free</li>
+          <li><span class="check">▸</span> Full JavaScript rendering</li>
+          <li><span class="check">▸</span> Advanced anti-detection suite</li>
+          <li><span class="check">▸</span> Continuously updated evasions</li>
+          <li><span class="check">▸</span> Custom fingerprint profiles</li>
+          <li><span class="check">▸</span> Integrated CAPTCHA handling</li>
+          <li><span class="check">▸</span> Residential IP tunneling</li>
+          <li><span class="check">▸</span> Dedicated support + SLA</li>
+        </ul>
+        <div class="cta"><a href="mailto:hello@getwick.dev" class="btn btn-primary" style="width:100%;justify-content:center;">Contact us →</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-edge"></div>
+
+<!-- ═══ INSTALL ═══ -->
+<section class="install" id="install">
+  <div class="container">
+    <div class="reveal" style="text-align:center;max-width:540px;margin:0 auto;">
+      <div class="eyebrow" style="justify-content:center;">Deploy</div>
+      <h2 class="h2">Install in seconds. Any&nbsp;platform.</h2>
     </div>
 
-    <div id="platform-macos" class="reveal reveal-delay-1" style="padding-top: 2rem;">
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install via Homebrew</h3>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">brew tap wickproject/wick && brew install wick</code>
-        </div>
-      </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Auto-detects Claude Code, Cursor, and other MCP clients.</p>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);margin-top:0.5rem;">wick setup</code>
-        </div>
-      </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
-        </div>
-      </div>
+    <div class="tab-bar reveal d1">
+      <button class="tab active" data-tab="macos">macOS</button>
+      <button class="tab" data-tab="linux">Linux (apt)</button>
+      <button class="tab" data-tab="npm">npm</button>
     </div>
+    <div class="tab-panes reveal d1">
+      <div class="tab-pane active" id="pane-macos">
+        <div class="step"><div class="step-num">01</div><div>
+          <h4>Tap and install via Homebrew</h4>
+          <code class="inline">brew tap wickproject/wick && brew install wick</code>
+        </div></div>
+        <div class="step"><div class="step-num">02</div><div>
+          <h4>Autoconfigure your clients</h4>
+          <p>Detects Claude Code, Cursor, Windsurf, and other MCP clients.</p>
+          <code class="inline">wick setup</code>
+        </div></div>
+        <div class="step"><div class="step-num">03</div><div>
+          <h4>Use</h4>
+          <p>Your agent now has <code class="inline" style="margin-top:0">wick_fetch</code> and <code class="inline" style="margin-top:0">wick_search</code>. Search the web, read any page — clean markdown returned.</p>
+        </div></div>
+      </div>
 
-    <div id="platform-linux" class="reveal reveal-delay-1" style="padding-top: 2rem; display: none;">
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">One-liner install</h3>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">curl -fsSL https://wickproject.github.io/wick/apt/install.sh | bash</code>
-          <p style="color:var(--cool-gray);font-size:0.8rem;margin-top:0.75rem;">Or add the APT repository manually:</p>
-          <code style="display:block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.5rem 0.6rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--warm-gray);margin-top:0.25rem;line-height:1.6;white-space:pre-wrap;">echo "deb [trusted=yes] https://wickproject.github.io/wick/apt stable main" \
+      <div class="tab-pane" id="pane-linux">
+        <div class="step"><div class="step-num">01</div><div>
+          <h4>One-line installer</h4>
+          <code class="inline">curl -fsSL https://wickproject.github.io/wick/apt/install.sh | bash</code>
+          <p style="margin-top:14px;font-size:12.5px;color:var(--mute);">Or add the APT repo manually:</p>
+<pre>echo "deb [trusted=yes] https://wickproject.github.io/wick/apt stable main" \
   | sudo tee /etc/apt/sources.list.d/wick.list
-sudo apt update && sudo apt install wick</code>
-        </div>
+sudo apt update && sudo apt install wick</pre>
+        </div></div>
+        <div class="step"><div class="step-num">02</div><div>
+          <h4>Configure</h4>
+          <code class="inline">wick setup</code>
+        </div></div>
+        <div class="step"><div class="step-num">03</div><div>
+          <h4>Use</h4>
+          <p>Agent gains <code class="inline" style="margin-top:0">wick_fetch</code> and <code class="inline" style="margin-top:0">wick_search</code>.</p>
+        </div></div>
       </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick setup</code>
-        </div>
-      </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
-        </div>
-      </div>
-    </div>
 
-    <div id="platform-npm" class="reveal reveal-delay-1" style="padding-top: 2rem; display: none;">
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">01</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Install via npm</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Works on any platform with Node.js.</p>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);margin-top:0.5rem;">npm install -g wick-mcp</code>
-        </div>
-      </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--smoke-light);">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">02</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Configure</h3>
-          <code style="display:inline-block;background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;padding:0.2rem 0.6rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick setup</code>
-        </div>
-      </div>
-      <div class="step" style="display: grid; grid-template-columns: 48px 1fr; gap: 1.5rem; padding: 1.5rem 0;">
-        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--flame);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.9rem;color:var(--flame);">03</div>
-        <div><h3 style="font-weight:600;font-size:1.15rem;margin-bottom:0.5rem;">Use</h3>
-          <p style="color:var(--warm-gray);font-size:0.95rem;">Your agent now has <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_fetch</code> and <code style="background:var(--smoke);border:1px solid var(--smoke-light);border-radius:4px;padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85rem;color:var(--flame);">wick_search</code>. Search the web, read any page.</p>
-        </div>
+      <div class="tab-pane" id="pane-npm">
+        <div class="step"><div class="step-num">01</div><div>
+          <h4>Install via npm</h4>
+          <p>Works anywhere Node.js does.</p>
+          <code class="inline">npm install -g wick-mcp</code>
+        </div></div>
+        <div class="step"><div class="step-num">02</div><div>
+          <h4>Configure</h4>
+          <code class="inline">wick setup</code>
+        </div></div>
+        <div class="step"><div class="step-num">03</div><div>
+          <h4>Use</h4>
+          <p>Agent gains <code class="inline" style="margin-top:0">wick_fetch</code> and <code class="inline" style="margin-top:0">wick_search</code>.</p>
+        </div></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Compatibility -->
-<section class="compat reveal">
-  <h2>Works with your tools</h2>
-  <div class="compat-logos">
-    <div class="compat-item">
-      <div class="compat-icon">&gt;_</div>
-      Claude Code
-    </div>
-    <div class="compat-item">
-      <div class="compat-icon">&#x25B6;</div>
-      Cursor
-    </div>
-    <div class="compat-item">
-      <div class="compat-icon">&#x2756;</div>
-      Windsurf
-    </div>
-    <div class="compat-item">
-      <div class="compat-icon">&#x26A1;</div>
-      Any MCP Client
-    </div>
+<div class="section-edge"></div>
+
+<!-- ═══ COMPAT ═══ -->
+<section class="compat">
+  <h2 class="h2">Interoperable with every major MCP client</h2>
+  <div class="compat-row">
+    <div class="compat-item"><div class="compat-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 7l4 4-4 4M11 15h6"/></svg></div>Claude Code</div>
+    <div class="compat-item"><div class="compat-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l12 7-12 7z"/></svg></div>Cursor</div>
+    <div class="compat-item"><div class="compat-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3C7 7 7 15 11 19M11 3c4 4 4 12 0 16M3 11h16"/></svg></div>Windsurf</div>
+    <div class="compat-item"><div class="compat-icon"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l-4 10h4l-2 8 8-12h-4l2-6z"/></svg></div>Any MCP Client</div>
   </div>
 </section>
 
-<!-- CTA -->
+<!-- ═══ BIG CTA ═══ -->
 <section class="cta">
-  <h2 class="reveal">Light the <em>wick</em></h2>
-  <p class="reveal reveal-delay-1">Free and open source for developers. Custom solutions for companies that need more.</p>
-  <div class="reveal reveal-delay-2" style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-    <a href="https://github.com/wickproject/wick" class="btn-primary">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+  <div class="big reveal">Light the <em>wick.</em></div>
+  <p class="reveal d1">Free for individuals. Open source, MIT. Pro for teams that need to read what they're blocked from reading.</p>
+  <div class="actions reveal d2">
+    <a href="https://github.com/wickproject/wick" class="btn btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.6 0-12 5.4-12 12 0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4 1 0 2 .1 3 .4 2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2V23c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4 0-6.6-5.4-12-12-12z"/></svg>
       Get Wick Free
     </a>
-    <a href="mailto:hello@getwick.dev" class="btn-secondary">Talk to us about Pro &rarr;</a>
-    <a href="https://github.com/wickproject/wick" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.55rem 1rem;font-size:0.85rem;color:var(--warm-white);background:var(--smoke);border:1px solid var(--smoke-light);border-radius:6px;text-decoration:none;font-weight:500;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--flame)'" onmouseout="this.style.borderColor='var(--smoke-light)'">&#9733; Star on GitHub</a>
+    <a href="mailto:hello@getwick.dev" class="btn btn-ghost">Talk to us about Pro →</a>
   </div>
 </section>
 
-<!-- Footer -->
+</main>
+
 <footer>
-  <div class="footer-inner">
-    <div class="footer-brand">
-      Wick &mdash; by Pseudo Anonymous, Inc. Open source, free forever.
-    </div>
-    <ul class="footer-links">
-      <li><a href="https://github.com/wickproject/wick">GitHub</a></li>
+  <div class="foot-inner">
+    <div class="foot-brand">W<b>/</b>I<b>/</b>C<b>/</b>K · Open source · MIT · <span style="color:var(--cyan)">●</span> operational</div>
+    <ul class="foot-links">
       <li><a href="docs.html">Docs</a></li>
       <li><a href="/blog/">Blog</a></li>
+      <li><a href="https://github.com/wickproject/wick">GitHub</a></li>
+      <li><a href="https://github.com/wickproject/wick/issues">Issues</a></li>
       <li><a href="terms.html">Terms</a></li>
-      <li><a href="mailto:hello@getwick.dev">Contact</a></li>
       <li><a href="https://github.com/wickproject/wick/blob/main/LICENSE">License</a></li>
     </ul>
   </div>
 </footer>
 
 <script>
-// Scroll-triggered reveals
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
+/* ──────────────────────────────────────────────────────────
+   RADAR / CONSTELLATION CANVAS
+   ────────────────────────────────────────────────────────── */
+(function(){
+  const cvs = document.getElementById('radar-canvas');
+  const ctx = cvs.getContext('2d');
+  let W=0, H=0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const nodes = [];
+  const NODE_COUNT = 46;
+  const GLYPHS = ['0','1','◇','◆','◈','⌬','⎯','│','┼','·','•','⊕','⊗','Λ','Δ','Σ','Ψ','Ω','·','/','\\'];
+
+  function resize(){
+    W = cvs.clientWidth = window.innerWidth;
+    H = cvs.clientHeight = window.innerHeight;
+    cvs.width = W*dpr; cvs.height = H*dpr;
+    ctx.scale(dpr, dpr);
+  }
+  function makeNodes(){
+    nodes.length = 0;
+    for(let i=0;i<NODE_COUNT;i++){
+      nodes.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: 1 + Math.random()*1.6,
+        vx: (Math.random()-.5)*.08,
+        vy: (Math.random()-.5)*.08,
+        glyph: GLYPHS[(Math.random()*GLYPHS.length)|0],
+        reveal: 0, // 0..1, raised by sweep proximity
+        seed: Math.random()*100,
+      });
     }
-  });
-}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  }
+  resize(); makeNodes();
+  window.addEventListener('resize', () => { resize(); makeNodes(); });
 
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  // Sweep: angle progresses steadily. Origin fixed somewhere off-upper area
+  let sweepAngle = 0;
+  let mx = W*0.5, my = H*0.4;
+  window.addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; });
 
-// Nav scroll effect
-const nav = document.getElementById('nav');
-window.addEventListener('scroll', () => {
-  nav.classList.toggle('scrolled', window.scrollY > 60);
-});
+  function draw(t){
+    ctx.clearRect(0,0,W,H);
 
-// Copy install command
-function copyInstall(el) {
-  const text = 'brew tap wickproject/wick && brew install wick && wick setup';
-  navigator.clipboard.writeText(text).then(() => {
-    const copied = el.querySelector('.copied');
-    copied.classList.add('show');
-    setTimeout(() => copied.classList.remove('show'), 2000);
-  });
-}
+    // sweep origin drifts slowly
+    const cx = W*0.5 + Math.sin(t*0.00013)*W*0.12;
+    const cy = H*0.4 + Math.cos(t*0.00017)*H*0.08;
 
-// Platform tabs
-function showPlatform(platform) {
-  ['macos', 'linux', 'npm'].forEach(p => {
-    document.getElementById('platform-' + p).style.display = p === platform ? 'block' : 'none';
-    var tab = document.getElementById('tab-' + p);
-    tab.style.borderBottomColor = p === platform ? 'var(--flame)' : 'transparent';
-    tab.style.color = p === platform ? 'var(--flame)' : 'var(--warm-gray)';
-  });
-}
+    sweepAngle += 0.0062;
+    if (sweepAngle > Math.PI*2) sweepAngle -= Math.PI*2;
 
-// Auto-detect platform
-(function() {
-  var ua = navigator.userAgent.toLowerCase();
-  if (ua.indexOf('linux') !== -1) showPlatform('linux');
-  else if (ua.indexOf('mac') !== -1) showPlatform('macos');
+    // draw faint radial grid circles
+    ctx.strokeStyle = 'rgba(111,227,255,0.05)';
+    ctx.lineWidth = 1;
+    for(let r=120; r<Math.max(W,H); r+=150){
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+    }
+
+    // draw sweep cone
+    const coneWidth = 0.55;
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,Math.hypot(W,H));
+    grad.addColorStop(0,'rgba(111,227,255,0.0)');
+    grad.addColorStop(0.4,'rgba(111,227,255,0.06)');
+    grad.addColorStop(1,'rgba(111,227,255,0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy, Math.hypot(W,H), sweepAngle, sweepAngle+coneWidth);
+    ctx.closePath();
+    ctx.fill();
+
+    // leading edge line of sweep
+    ctx.strokeStyle='rgba(111,227,255,0.28)';
+    ctx.lineWidth = 1.1;
+    const edgeR = Math.hypot(W,H);
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx + Math.cos(sweepAngle+coneWidth)*edgeR, cy + Math.sin(sweepAngle+coneWidth)*edgeR);
+    ctx.stroke();
+
+    // nodes + connections
+    // advance and compute reveal
+    for(const n of nodes){
+      n.x += n.vx; n.y += n.vy;
+      if(n.x<0) n.x+=W; if(n.x>W) n.x-=W;
+      if(n.y<0) n.y+=H; if(n.y>H) n.y-=H;
+
+      // angle from sweep origin to node
+      const ang = Math.atan2(n.y-cy, n.x-cx);
+      // angular distance to sweep leading edge (wrap)
+      let d = (sweepAngle + coneWidth) - ang;
+      while (d < 0) d += Math.PI*2;
+      while (d > Math.PI*2) d -= Math.PI*2;
+      // node gets lit if within cone behind the edge
+      const lit = d < coneWidth;
+      if (lit){
+        n.reveal = Math.max(n.reveal, 1 - (d/coneWidth));
+      }
+      n.reveal *= 0.988;
+    }
+
+    // connections (only among lit-ish)
+    ctx.lineWidth = 1;
+    for(let i=0;i<nodes.length;i++){
+      const a = nodes[i];
+      for(let j=i+1;j<nodes.length;j++){
+        const b = nodes[j];
+        const dx=a.x-b.x, dy=a.y-b.y;
+        const dist = Math.hypot(dx,dy);
+        if (dist < 160){
+          const brightness = (a.reveal + b.reveal) * 0.5;
+          const base = 0.04 + brightness*0.4;
+          const alpha = base * (1 - dist/160);
+          if (alpha < 0.012) continue;
+          ctx.strokeStyle = `rgba(111,227,255,${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+    }
+
+    // draw nodes + glyphs
+    ctx.font = '10px "Geist Mono", ui-monospace, monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const n of nodes){
+      const baseAlpha = 0.22 + n.reveal*0.65;
+      // node
+      ctx.fillStyle = `rgba(111,227,255,${baseAlpha.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(n.x,n.y, n.r + n.reveal*1.2, 0, Math.PI*2); ctx.fill();
+
+      // glyph only when revealed
+      if (n.reveal > 0.25){
+        ctx.fillStyle = `rgba(230,236,242,${(n.reveal-0.15).toFixed(3)})`;
+        ctx.fillText(n.glyph, n.x, n.y - 10);
+      }
+      // halo
+      if (n.reveal > 0.5){
+        ctx.fillStyle = `rgba(111,227,255,${(n.reveal*0.25).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(n.x,n.y, n.r + 6*n.reveal, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
 })();
 
-// Smooth scroll for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', e => {
-    e.preventDefault();
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+/* ──────────────────────────────────────────────────────────
+   SCOPE CORE READOUT — rotates through states
+   ────────────────────────────────────────────────────────── */
+(function(){
+  const el = document.getElementById('scope-big');
+  if(!el) return;
+  const words = ['clear','open','live','ready','unveil','200 OK','truth'];
+  let i = 0;
+  setInterval(()=>{
+    const chars = '0123456789abcdefABCDEF▓░';
+    const target = words[(i=(i+1)%words.length)];
+    let frame = 0;
+    const total = 14;
+    const tick = setInterval(()=>{
+      let out = '';
+      for (let k=0; k<target.length; k++){
+        if (k < (frame/total)*target.length) out += target[k];
+        else out += chars[(Math.random()*chars.length)|0];
+      }
+      el.textContent = out;
+      frame++;
+      if (frame > total){ clearInterval(tick); el.textContent = target; }
+    }, 35);
+  }, 2800);
+})();
+
+/* ──────────────────────────────────────────────────────────
+   CRYPTOGRAM DECODE for .decode elements on enter
+   ────────────────────────────────────────────────────────── */
+function decodeText(el, duration){
+  const target = el.getAttribute('data-text') || el.textContent;
+  const len = target.length;
+  const chars = '!<>-_\\/[]{}—=+*^?#0123456789ABCDEF';
+  const startTime = performance.now();
+  function tick(now){
+    const t = Math.min(1, (now - startTime) / duration);
+    let out = '';
+    for (let i=0; i<len; i++){
+      const p = (i+1)/len;
+      if (t > p*0.9) out += target[i];
+      else if (target[i] === ' ') out += ' ';
+      else out += chars[(Math.random()*chars.length)|0];
+    }
+    el.textContent = out;
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ──────────────────────────────────────────────────────────
+   SCROLL REVEALS
+   ────────────────────────────────────────────────────────── */
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if (e.isIntersecting){
+      e.target.classList.add('in');
+      // trigger decode if present
+      e.target.querySelectorAll('[data-decode]').forEach(el=>decodeText(el, 900));
+      io.unobserve(e.target);
+    }
+  });
+},{threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ──────────────────────────────────────────────────────────
+   NAV SHRINK
+   ────────────────────────────────────────────────────────── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll',()=>{ nav.classList.toggle('scrolled', window.scrollY > 50); });
+
+/* ──────────────────────────────────────────────────────────
+   COPY
+   ────────────────────────────────────────────────────────── */
+function copyInstall(el){
+  navigator.clipboard.writeText('brew tap wickproject/wick && brew install wick').then(()=>{
+    const lbl = el.querySelector('#copy-label') || el.querySelector('.copy');
+    const original = lbl.textContent;
+    lbl.textContent = '✓ copied';
+    lbl.style.color = 'var(--cyan)';
+    setTimeout(()=>{ lbl.textContent = original; lbl.style.color=''; }, 1800);
+  });
+}
+window.copyInstall = copyInstall;
+
+/* ──────────────────────────────────────────────────────────
+   TABS
+   ────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const t = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b===btn));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active', p.id === 'pane-'+t));
+  });
+});
+(function(){
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('linux') !== -1) document.querySelector('.tab[data-tab="linux"]').click();
+  else if (ua.indexOf('mac') === -1 && ua.indexOf('win') !== -1) document.querySelector('.tab[data-tab="npm"]').click();
+})();
+
+/* ──────────────────────────────────────────────────────────
+   DOSSIER hover → pulse
+   ────────────────────────────────────────────────────────── */
+const dossier = document.getElementById('dossier');
+if(dossier){
+  dossier.addEventListener('mouseenter', ()=>{
+    dossier.style.transition = 'box-shadow .6s ease';
+    dossier.style.boxShadow = '0 0 60px rgba(111,227,255,.15)';
+  });
+  dossier.addEventListener('mouseleave', ()=>{
+    dossier.style.boxShadow = 'none';
+  });
+}
+
+/* ──────────────────────────────────────────────────────────
+   SMOOTH scroll anchors
+   ────────────────────────────────────────────────────────── */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',(e)=>{
+    const tgt = document.querySelector(a.getAttribute('href'));
+    if(tgt){ e.preventDefault(); window.scrollTo({top: tgt.getBoundingClientRect().top + window.scrollY - 40, behavior:'smooth'}); }
   });
 });
 </script>
-
 </body>
 </html>
