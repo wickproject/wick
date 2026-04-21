@@ -33,10 +33,12 @@
   "url": "https://getwick.dev",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "macOS, Linux",
-  "offers": [
-    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier"},
-    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Pro — custom pricing"}
-  ],
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Fully open source (MIT) — all features free"
+  },
   "author": {"@type": "Person", "name": "Adam Fisk"}
 }
 </script>
@@ -1138,42 +1140,29 @@ footer{padding:40px 40px;border-top:1px solid var(--line);}
 <!-- ═══ PLANS ═══ -->
 <section class="plans" id="plans">
   <div class="container">
-    <div class="reveal" style="text-align:center;max-width:560px;margin:0 auto;">
-      <div class="eyebrow" style="justify-content:center;">Plans</div>
-      <h2 class="h2">Free for your <em>agent</em>. Custom for fleets.</h2>
+    <div class="reveal" style="text-align:center;max-width:620px;margin:0 auto;">
+      <div class="eyebrow" style="justify-content:center;">All free · MIT</div>
+      <h2 class="h2">One version. <em>Everything</em> included.</h2>
+      <p style="color:var(--fog);margin-top:1rem;">Wick is unified open source. TLS fingerprinting, JS rendering, stealth patches, auto-CAPTCHA, residential tunneling — all free, all in one binary.</p>
     </div>
-    <div class="plans-grid">
+    <div class="plans-grid" style="grid-template-columns: 1fr; max-width: 680px; margin: 2.5rem auto 0;">
       <div class="plan reveal d1">
-        <div class="tier">Free · open source</div>
+        <div class="tier">Wick · open source</div>
         <div class="price">$0</div>
-        <div class="blurb">For individual developers, indie agents, local workflows.</div>
+        <div class="blurb">Everything. For individual developers, teams, and automated fleets alike.</div>
         <ul>
-          <li><span class="check">▸</span> Browser-grade TLS fingerprint</li>
+          <li><span class="check">▸</span> Browser-grade TLS fingerprint (Cronet)</li>
+          <li><span class="check">▸</span> JavaScript rendering (CEF) — auto-detected</li>
+          <li><span class="check">▸</span> 20+ stealth patches against anti-bot fingerprinting</li>
+          <li><span class="check">▸</span> Integrated CAPTCHA handling</li>
+          <li><span class="check">▸</span> Residential IP tunneling</li>
           <li><span class="check">▸</span> Clean markdown extraction</li>
           <li><span class="check">▸</span> MCP server for all major clients</li>
           <li><span class="check">▸</span> Persistent cookie vault</li>
           <li><span class="check">▸</span> robots.txt compliance</li>
           <li><span class="check">▸</span> Open source (MIT)</li>
-          <li class="off"><span class="check">○</span> JavaScript rendering</li>
-          <li class="off"><span class="check">○</span> Advanced evasions</li>
         </ul>
-        <div class="cta"><a href="#install" class="btn btn-ghost" style="width:100%;justify-content:center;">Get Wick Free</a></div>
-      </div>
-      <div class="plan pro reveal d2">
-        <div class="tier">Pro · commercial</div>
-        <div class="price">Custom</div>
-        <div class="blurb">For teams running agents against hard-to-reach data.</div>
-        <ul>
-          <li><span class="check">▸</span> Everything in Free</li>
-          <li><span class="check">▸</span> Full JavaScript rendering</li>
-          <li><span class="check">▸</span> Advanced anti-detection suite</li>
-          <li><span class="check">▸</span> Continuously updated evasions</li>
-          <li><span class="check">▸</span> Custom fingerprint profiles</li>
-          <li><span class="check">▸</span> Integrated CAPTCHA handling</li>
-          <li><span class="check">▸</span> Residential IP tunneling</li>
-          <li><span class="check">▸</span> Dedicated support + SLA</li>
-        </ul>
-        <div class="cta"><a href="mailto:hello@getwick.dev" class="btn btn-primary" style="width:100%;justify-content:center;">Contact us →</a></div>
+        <div class="cta"><a href="#install" class="btn btn-primary" style="width:100%;justify-content:center;">Install Wick →</a></div>
       </div>
     </div>
   </div>
@@ -1265,13 +1254,13 @@ sudo apt update && sudo apt install wick</pre>
 <!-- ═══ BIG CTA ═══ -->
 <section class="cta">
   <div class="big reveal">Light the <em>wick.</em></div>
-  <p class="reveal d1">Free for individuals. Open source, MIT. Pro for teams that need to read what they're blocked from reading.</p>
+  <p class="reveal d1">Fully open source (MIT). Every feature — free. Contribute, fork, build on it.</p>
   <div class="actions reveal d2">
     <a href="https://github.com/wickproject/wick" class="btn btn-primary">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.6 0-12 5.4-12 12 0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2 1-.3 2-.4 3-.4 1 0 2 .1 3 .4 2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2V23c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4 0-6.6-5.4-12-12-12z"/></svg>
-      Get Wick Free
+      View source on GitHub
     </a>
-    <a href="mailto:hello@getwick.dev" class="btn btn-ghost">Talk to us about Pro →</a>
+    <a href="#install" class="btn btn-ghost">Install Wick →</a>
   </div>
 </section>
 

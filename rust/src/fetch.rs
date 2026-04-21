@@ -145,13 +145,14 @@ pub async fn fetch(
     if status == 403 || status == 503 {
         crate::analytics::report_failure(host, status, "blocked");
 
-        // Smart upsell: suggest Pro when it would help
+        // If CEF is not installed, suggest running `wick install cef` for
+        // JS rendering + stealth patches which handle most blocked pages.
         if !crate::cef::is_available() {
             let hint = format!(
                 "HTTP {status}\n\n\
-                 This site blocked the request. Wick Pro ($20/mo) bypasses\n\
-                 anti-bot protection with JS rendering and advanced stealth.\n\n\
-                 Activate: wick pro activate"
+                 This site blocked the request. Install the CEF renderer\n\
+                 for JS rendering and advanced stealth:\n\n\
+                 wick install cef"
             );
             return Ok(FetchResult {
                 content: hint,

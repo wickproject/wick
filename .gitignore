@@ -8,8 +8,13 @@
 lib/*/libcronet.*
 rust/target/
 
-# CEF binaries and frameworks (Pro only)
-rust/cef/
+# CEF compiled artifacts (source files are tracked in rust/cef/)
+rust/cef/wick-renderer
+rust/cef/wick-renderer.app/
+rust/cef/wick-helper
+rust/cef/wick-helper-mac
+rust/cef/wick-renderer-mac
+rust/cef/cef_binary_*/
 rust/Frameworks/
 rust/captcha/
 
