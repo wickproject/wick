@@ -212,12 +212,13 @@ async fn handle_search(
 }
 
 async fn handle_health() -> impl IntoResponse {
-    let pro = if crate::cef::is_available() { " + Pro" } else { "" };
+    let cef = crate::cef::is_available();
+    let suffix = if cef { " + CEF" } else { "" };
     Json(serde_json::json!({
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION"),
-        "pro": crate::cef::is_available(),
-        "label": format!("wick {}{}", env!("CARGO_PKG_VERSION"), pro),
+        "cef": cef,
+        "label": format!("wick {}{}", env!("CARGO_PKG_VERSION"), suffix),
     }))
 }
 
@@ -241,8 +242,8 @@ pub async fn serve(port: u16, proxy: Option<&str>) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
-    let pro = if crate::cef::is_available() { " + Pro" } else { "" };
-    eprintln!("Wick {}{} API server running at http://{}", env!("CARGO_PKG_VERSION"), pro, addr);
+    let suffix = if crate::cef::is_available() { " + CEF" } else { "" };
+    eprintln!("Wick {}{} API server running at http://{}", env!("CARGO_PKG_VERSION"), suffix, addr);
     eprintln!("");
     eprintln!("  GET /v1/fetch?url=...          Fetch a page as markdown");
     eprintln!("  GET /v1/crawl?url=...          Crawl a site");
