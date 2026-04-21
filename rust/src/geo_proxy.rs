@@ -7,7 +7,7 @@ const PROXY_URL: &str = "https://releases.getwick.dev/proxy";
 /// (Tokyo, Taipei, etc.) instead of the server's datacenter location.
 pub async fn fetch(url: &str) -> Result<ProxyResponse> {
     let wick_key = std::env::var("WICK_KEY")
-        .map_err(|_| anyhow::anyhow!("WICK_KEY not set — geo-proxy requires Pro API key"))?;
+        .map_err(|_| anyhow::anyhow!("WICK_KEY not set — geo-proxy requires a Worker API key"))?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))

@@ -217,13 +217,30 @@ EOF
 # ── STATUS ─────────────────────────────────────────────────────
 
 cmd_status() {
-    # On macOS, wg-quick maps wg-wick to a utun interface,
-    # so `wg show wg-wick` fails. Use `wg show` (all interfaces) instead.
-    local wg_output
-    wg_output=$(wg show 2>/dev/null)
+    check_deps
 
-    if [[ -z "$wg_output" ]]; then
-        red "Tunnel not active"
+    # On macOS, wg-quick maps wg-wick to a utun interface, so
+    # `wg show wg-wick` fails. We therefore query all interfaces
+    # and then confirm the Wick tunnel specifically is present by
+    # looking for its configured SERVER_IP / endpoint.
+    #
+    # The `|| true` prevents `set -e` from aborting the script when
+    # `wg show` returns non-zero (e.g., on systems with no active
+    # WireGuard interface at all).
+    local wg_output
+    wg_output=$(wg show 2>/dev/null || true)
+
+    # Confirm the Wick tunnel is what's up — not just some other
+    # WireGuard interface.
+    local is_wick=0
+    if [[ -n "$wg_output" ]]; then
+        if echo "$wg_output" | grep -qE "(interface: $WG_IFACE\b|endpoint: .+|$SERVER_IP)"; then
+            is_wick=1
+        fi
+    fi
+
+    if [[ "$is_wick" -eq 0 ]]; then
+        red "Wick tunnel not active"
         echo "  Start it with: sudo wg-quick up $WG_IFACE"
         exit 1
     fi

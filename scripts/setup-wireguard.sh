@@ -1,9 +1,10 @@
 #!/bin/bash
-# Wick Pro: WireGuard tunnel setup for residential IP routing.
+# Wick: WireGuard tunnel setup for routing CEF requests through a
+# residential IP.
 #
 # Usage:
 #   On the cloud server:  ./setup-wireguard.sh server <client-public-key>
-#   On the client laptop:  ./setup-wireguard.sh client <server-ip> <server-public-key>
+#   On the client laptop: ./setup-wireguard.sh client <server-ip> <server-public-key>
 #
 # Generates keys, creates configs, starts the tunnel.
 # Requires: wireguard-tools, root/sudo access.

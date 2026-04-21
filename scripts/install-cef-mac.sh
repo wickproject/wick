@@ -1,14 +1,21 @@
 #!/bin/bash
-# install-pro-mac.sh: One-command Wick Pro installation for macOS.
+# install-cef-mac.sh: Install the CEF renderer for Wick on macOS.
 #
-# Usage:
-#   WICK_KEY=wk_yourkey curl -fsSL https://releases.getwick.dev/install-pro-mac.sh | bash
+# Wick is fully open source; this installer fetches the CEF (Chromium Embedded
+# Framework) runtime and builds the wick-renderer/wick-helper helpers from
+# source. Required once per machine to enable JavaScript rendering.
 #
-# Installs to ~/.wick/pro/ with the full CEF renderer bundle.
+# Usage (from a wick checkout):
+#   bash scripts/install-cef-mac.sh
+#
+# Usage via `wick install cef`:
+#   wick install cef   # runs this script for you
+#
+# Installs to ~/.wick/cef/ with the full CEF renderer bundle.
 
 set -euo pipefail
 
-WICK_DIR="$HOME/.wick/pro"
+WICK_DIR="$HOME/.wick/cef"
 CEF_VERSION="144.0.18+gc5b2ec2+chromium-144.0.7559.246"
 CEF_PLATFORM="macosarm64"
 
@@ -17,7 +24,7 @@ green() { echo -e "\033[0;32m$*\033[0m"; }
 bold()  { echo -e "\033[1m$*\033[0m"; }
 
 if [[ "$(uname)" != "Darwin" ]]; then
-    red "This installer is for macOS. For Linux, use install-pro.sh"
+    red "This installer is for macOS. For Linux, use install-cef-linux.sh"
     exit 1
 fi
 

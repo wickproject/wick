@@ -92,8 +92,9 @@ fn save_cache(cache: &HashMap<String, SiteStrategy>) -> std::io::Result<()> {
     std::fs::write(&path, data)
 }
 
+/// Returns current time as UNIX epoch seconds (as a string).
+/// Chosen over ISO 8601 to avoid the `chrono` dependency.
 fn chrono_now() -> String {
-    // Simple ISO 8601 without chrono dependency
     let dur = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();

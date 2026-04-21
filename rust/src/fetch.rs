@@ -90,8 +90,36 @@ pub async fn fetch(
     let status = resp.status;
     let body = resp.body;
 
-    // CAPTCHA detection → user-in-the-loop solving
+    // CAPTCHA detection → auto-solve (BYO CapSolver key) or user-in-the-loop.
     if (status == 403 || status == 503) && is_challenge(&body) {
+        // 1. Auto-solve path: if the user has CAPSOLVER_API_KEY set and
+        // the page's CAPTCHA type is one CapSolver supports, try that first.
+        if let Some(cap_key) = crate::captcha_auto::load_capsolver_key() {
+            if let Some(detected) = crate::captcha_auto::detect_captcha(&body) {
+                tracing::info!("CAPTCHA detected on {}. Trying auto-solve via CapSolver...", host);
+                match crate::captcha_auto::solve(&cap_key, url, &detected).await {
+                    Ok(_token) => {
+                        // Retry — Cronet picks up any cookies set during the solve.
+                        let retry = client.get(url).await?;
+                        if retry.status < 400 {
+                            let extracted = extract::extract(&retry.body, &parsed, format)?;
+                            return Ok(FetchResult {
+                                content: extracted.content,
+                                title: extracted.title,
+                                url: url.to_string(),
+                                status_code: retry.status,
+                                timing_ms: start.elapsed().as_millis() as u64,
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Auto-CAPTCHA failed ({}); falling back to interactive solver.", e);
+                    }
+                }
+            }
+        }
+
+        // 2. Interactive fallback: launch wick-captcha for user-in-the-loop.
         if captcha::is_available() {
             tracing::info!("CAPTCHA detected on {}. Launching solver...", host);
             match captcha::solve(url).await {
@@ -100,9 +128,6 @@ pub async fn fetch(
                         "CAPTCHA solved! Got {} cookies. Retrying request...",
                         cookies.len()
                     );
-                    // Retry the request — Cronet should pick up cookies from
-                    // its persistent store, but also add them as a header
-                    // in case the cookie store doesn't sync immediately.
                     let retry = client.get(url).await?;
                     if retry.status < 400 {
                         let extracted = extract::extract(&retry.body, &parsed, format)?;
@@ -114,7 +139,6 @@ pub async fn fetch(
                             timing_ms: start.elapsed().as_millis() as u64,
                         });
                     }
-                    // Retry still failed — return the retry response
                     return Ok(FetchResult {
                         content: format!("HTTP {} after CAPTCHA solve: {}", retry.status, retry.body),
                         title: None,
@@ -125,7 +149,6 @@ pub async fn fetch(
                 }
                 Err(e) => {
                     tracing::warn!("CAPTCHA solving failed: {}", e);
-                    // Fall through to return the challenge response
                 }
             }
         }

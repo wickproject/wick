@@ -98,10 +98,49 @@ pub fn is_available() -> bool {
     load_capsolver_key().is_some()
 }
 
+/// Case-insensitive ASCII substring search. Works on byte offsets of the
+/// original string, so slicing the result is always UTF-8 safe.
+fn find_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    let hb = haystack.as_bytes();
+    let nb = needle.as_bytes();
+    if nb.is_empty() || nb.len() > hb.len() {
+        return None;
+    }
+    'outer: for i in 0..=hb.len() - nb.len() {
+        for (j, &nc) in nb.iter().enumerate() {
+            if hb[i + j].to_ascii_lowercase() != nc.to_ascii_lowercase() {
+                continue 'outer;
+            }
+        }
+        // Found — but the match must start on a char boundary for slicing.
+        if haystack.is_char_boundary(i) {
+            return Some(i);
+        }
+    }
+    None
+}
+
 /// Extract data-sitekey from a CAPTCHA widget div.
+/// Uses byte-level ASCII case-insensitive search on the original string
+/// (not a lowercased copy) so offsets are safe to slice on pages
+/// containing non-ASCII bytes.
 fn extract_site_key(html: &str, class_hint: &str) -> Option<String> {
-    let hint_pos = html.to_lowercase().find(&class_hint.to_lowercase())?;
-    let region = &html[hint_pos.saturating_sub(500)..html.len().min(hint_pos + 2000)];
+    let hint_pos = find_case_insensitive(html, class_hint)?;
+
+    // Build a slice window that respects char boundaries.
+    let lo = {
+        let target = hint_pos.saturating_sub(500);
+        let mut i = target;
+        while i > 0 && !html.is_char_boundary(i) { i -= 1; }
+        i
+    };
+    let hi = {
+        let target = html.len().min(hint_pos + 2000);
+        let mut i = target;
+        while i < html.len() && !html.is_char_boundary(i) { i += 1; }
+        i
+    };
+    let region = &html[lo..hi];
 
     if let Some(pos) = region.find("data-sitekey=\"") {
         let start = pos + 14;
