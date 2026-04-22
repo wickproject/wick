@@ -72,14 +72,14 @@ Each dataset row contains:
 
 For additional anti-detection, you can connect this Actor to your own Wick instance running on your machine. Requests then route through your residential IP, combining Apify's scheduling and monitoring with your own network.
 
-1. Install [Wick Pro](https://getwick.dev) on your machine
+1. Install [Wick](https://getwick.dev) on your machine (`brew install wick` or `npm i -g wick-mcp`)
 2. Start the API server: `wick serve --api`
 3. Expose it via a tunnel (Cloudflare Tunnel, ngrok, etc.)
 4. Enter the tunnel URL in the **Wick Tunnel URL** input field
 
 ## Limitations
 
-- **No JavaScript rendering** in the bundled engine. For JS-heavy SPAs, pair this Actor with a browser-based Actor like [Website Content Crawler](https://apify.com/apify/website-content-crawler) or use Wick's tunnel mode with a Pro instance that includes JS rendering.
+- **This Actor uses Wick's Cronet-only build.** The full Wick binary also supports CEF-based JavaScript rendering, but the Cronet build keeps this Actor lightweight (256 MB vs ~1.5 GB with CEF bundled). For JS-heavy SPAs, run Wick locally with the CEF renderer or pair this with a browser-based Actor.
 - **Best for content pages.** Wick excels at articles, documentation, blogs, and product pages. For structured data extraction (e.g., specific fields from a listing), consider combining Wick's output with an LLM or a purpose-built scraper.
 
 ## Integrations
@@ -103,9 +103,7 @@ This Actor uses 256 MB of memory and runs fast, so compute costs are low:
 | Crawl 50 pages | ~$0.005 |
 | Map a site (100 URLs) | ~$0.001 |
 
-You only pay for Apify compute units. The Wick engine is open source ([MIT license](https://github.com/wickproject/wick)).
-
-Residential IP mode requires [Wick Pro](https://getwick.dev) ($20/month).
+You only pay for Apify compute units. The Wick engine is fully open source ([MIT license](https://github.com/wickproject/wick)) — no subscription, no paid tier.
 
 ## Resources
 

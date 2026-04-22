@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wick is Now Fully Open Source — Wick</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="description" content="Wick is collapsing the Free/Pro tiers into a single fully open-source project. CEF rendering, stealth patches, auto-CAPTCHA, residential tunneling — all free, MIT, in one binary.">
+<meta name="keywords" content="wick open source, mcp server, web scraping, anti-bot, CEF, stealth, unified">
+<meta property="og:title" content="Wick is Now Fully Open Source">
+<meta property="og:description" content="One binary. Every feature. Free and MIT. We've collapsed the Free/Pro split into a single open-source project.">
+<meta property="og:url" content="https://getwick.dev/blog/wick-unified.html">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://getwick.dev/og-image.png">
+<meta property="article:published_time" content="2026-04-21T00:00:00Z">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wick is Now Fully Open Source">
+<meta name="twitter:description" content="One binary. Every feature. Free and MIT.">
+<meta name="twitter:image" content="https://getwick.dev/og-image.png">
+<link rel="canonical" href="https://getwick.dev/blog/wick-unified.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--flame:#E8913A;--ash:#1A1714;--smoke:#2A2520;--smoke-light:#3D3630;--warm-white:#F0E6D8;--warm-gray:#9E958A;--cool-gray:#6B635A;--black:#0D0B09;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--warm-gray);font-family:var(--font-display);font-weight:300;line-height:1.8;-webkit-font-smoothing:antialiased}
+::selection{background:var(--flame);color:var(--black)}
+article{max-width:680px;margin:0 auto;padding:3rem 2rem 6rem}
+.back{display:inline-block;font-size:0.8rem;color:var(--flame);text-decoration:none;margin-bottom:2rem}
+.back:hover{text-decoration:underline}
+h1{font-size:1.8rem;font-weight:700;color:var(--warm-white);line-height:1.3;margin-bottom:0.5rem}
+.date{font-size:0.75rem;color:var(--cool-gray);margin-bottom:2rem}
+h2{font-size:1.15rem;font-weight:600;color:var(--warm-white);margin-top:2.5rem;margin-bottom:0.75rem}
+p{margin-bottom:1rem;font-size:0.92rem}
+strong{color:var(--warm-white);font-weight:500}
+a{color:var(--flame)}
+ul{padding-left:1.5rem;margin-bottom:1rem;font-size:0.92rem}
+li{margin-bottom:0.4rem}
+code{font-family:var(--font-mono);font-size:0.82rem;background:var(--smoke);padding:0.15rem 0.4rem;border-radius:3px;color:#F5B74C}
+pre{background:var(--ash);border:1px solid var(--smoke-light);border-radius:6px;padding:1.25rem 1.5rem;overflow-x:auto;margin-bottom:1.5rem;line-height:1.7}
+pre code{background:none;padding:0;font-size:0.8rem;color:var(--warm-white)}
+hr{border:none;border-top:1px solid var(--smoke-light);margin:3rem 0 1.5rem}
+</style>
+</head>
+<body>
+<article>
+<a href="/" class="back">&larr; Back to Wick</a>
+
+<h1>Wick is Now Fully Open Source</h1>
+<p class="date">April 21, 2026</p>
+
+<p>Short version: the Free/Pro split is gone. Everything that used to be Pro — CEF-based JavaScript rendering, stealth patches, auto-CAPTCHA, residential IP tunneling — is now in the free, open-source Wick binary. MIT licensed. No paid tier.</p>
+
+<h2>Why</h2>
+
+<p>Wick's adoption was capped by the paywall, not by the code. The free tier's Cronet-only path handles a lot, but the moment a site needs JS rendering, free users hit a dead end that asks them to pay $20/month. Most of those users don't convert — they just leave.</p>
+
+<p>Meanwhile, Wick's technical moat was never the paywall. The moat is using real Chromium internals (Cronet, CEF) instead of bolted-on fingerprint spoofing. That work stands on its own, and publishing it helps the tool spread further than gating it ever did.</p>
+
+<h2>What's unified</h2>
+
+<p>One binary now includes:</p>
+
+<ul>
+<li><strong>Cronet</strong> — Chrome's network stack for real TLS fingerprints on every HTTP request</li>
+<li><strong>CEF renderer</strong> — embedded Chromium for pages that need JavaScript execution</li>
+<li><strong>20+ stealth patches</strong> — injected before page scripts run, removing automation fingerprints</li>
+<li><strong>CAPTCHA handling</strong> — detects Turnstile, reCAPTCHA, hCaptcha, DataDome. Manual user-in-the-loop by default; bring your own CapSolver API key for automated solving (you pay CapSolver directly, we don't touch the key)</li>
+<li><strong>Residential IP tunneling</strong> — WireGuard-based routing for when datacenter IPs get flagged</li>
+<li><strong>Adaptive fallback</strong> — starts with fast Cronet, escalates to full CEF only when needed</li>
+</ul>
+
+<h2>How the auto-detection works</h2>
+
+<p>Most pages don't need a full browser. Wick's default path is Cronet — a direct HTTP request with Chrome's TLS handshake. It's fast (sub-second for most sites) and uses almost no memory.</p>
+
+<p>When Cronet gets a 403, a challenge page, or a near-empty HTML body (SPA shell with no server-rendered content), Wick transparently escalates to CEF. The page renders in an embedded Chromium with all stealth patches injected before the first script runs. The result comes back as clean markdown.</p>
+
+<p>Per-domain strategy learning means the second visit to a site that needed CEF skips Cronet entirely. Sites that worked fine with Cronet skip the CEF cost forever.</p>
+
+<h2>Why CEF, not Playwright</h2>
+
+<p>Every Playwright/Puppeteer-based tool controls Chrome via CDP — the Chrome DevTools Protocol. CDP is detectable. Sites check for <code>navigator.webdriver</code>, extra runtime contexts, and the WebSocket debugger. Tools try to hide the CDP artifacts; detection vendors find new ones.</p>
+
+<p>CEF is different. It embeds Chrome's rendering engine directly in the process. No debug protocol. No <code>navigator.webdriver</code>. No automation layer to hide. The page sees a normal Chromium because it <em>is</em> a normal Chromium — just hosted inside Wick instead of a standalone browser.</p>
+
+<p>More on this: <a href="cef-vs-cdp.html">Why CEF Beats CDP for Anti-Detection</a>.</p>
+
+<h2>The censorship connection</h2>
+
+<p>Wick's techniques come from a decade of work on <a href="https://lantern.io">Lantern</a>, a censorship circumvention tool used by millions in China, Iran, Russia, and the UAE. The same principles apply:</p>
+
+<ul>
+<li><strong>Blend in</strong>, don't disguise. Real TLS beats fake TLS. Real browser beats automated browser.</li>
+<li><strong>Collateral freedom.</strong> If your traffic looks like everyone else's, censors can't block you without blocking everyone.</li>
+<li><strong>Minimal attack surface.</strong> Fewer unique fingerprints means fewer things to detect.</li>
+</ul>
+
+<p>Moving all this to open source lines up with Lantern's philosophy. Anti-bot and anti-censorship are the same technical problem seen from opposite sides.</p>
+
+<h2>Install</h2>
+
+<pre><code># macOS
+brew tap wickproject/wick && brew install wick
+
+# Linux
+curl -fsSL https://wickproject.github.io/wick/apt/install.sh | bash
+
+# Any platform
+npm install -g wick-mcp
+
+# Then add the CEF renderer for JS rendering
+wick install cef</code></pre>
+
+<p>CEF is a ~200MB separate download because most users don't need it and baking it into the binary would bloat the core install. Adaptive fallback handles the escalation automatically.</p>
+
+<h2>What this means for you</h2>
+
+<ul>
+<li><strong>If you were on the free tier:</strong> you now have access to everything. Just run <code>wick install cef</code> once to add JS rendering.</li>
+<li><strong>If you were considering Pro:</strong> you don't need to. It's free.</li>
+<li><strong>If you've contributed or want to:</strong> the stealth patches and CEF integration are now in the public repo. Pull requests welcome.</li>
+</ul>
+
+<h2>Previous releases</h2>
+<ul>
+<li><a href="cef-vs-cdp.html">Why CEF Beats CDP for Anti-Detection</a></li>
+<li><a href="wick-on-apify.html">Wick is Now on Apify</a></li>
+<li><a href="wick-0-7-http-api.html">Wick 0.7: Local HTTP API</a></li>
+</ul>
+
+<hr>
+
+<p><a href="https://github.com/wickproject/wick">GitHub</a> | <a href="https://getwick.dev/docs.html">Docs</a> | <a href="mailto:hello@getwick.dev">Contact</a></p>
+
+</article>
+</body>
+</html>

@@ -1,12 +1,14 @@
 mod analytics;
 mod api;
 mod captcha;
+mod captcha_auto;
 mod cef;
 mod crawl;
 #[cfg(feature = "cronet")]
 mod cronet;
 mod download;
 mod engine;
+mod geo_proxy;
 mod media;
 mod extract;
 mod fetch;
@@ -16,6 +18,7 @@ mod robots;
 mod search;
 mod session;
 mod setup;
+mod site_cache;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -113,7 +116,15 @@ enum Command {
     },
     /// Auto-configure MCP clients (Claude Code, Cursor)
     Setup,
-    /// Manage Pro subscription
+    /// Install additional components (e.g. CEF renderer)
+    Install {
+        #[command(subcommand)]
+        what: InstallWhat,
+    },
+    /// Show component install status
+    Status,
+    /// [Deprecated] Manage Pro subscription — Wick is now fully open source
+    #[command(hide = true)]
     Pro {
         #[command(subcommand)]
         action: ProAction,
@@ -123,14 +134,19 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum InstallWhat {
+    /// Install the CEF renderer (JS rendering + stealth patches, ~200MB)
+    Cef,
+}
+
+#[derive(Subcommand)]
 enum ProAction {
-    /// Activate Pro (opens browser for $20/month subscription)
+    /// Install CEF renderer (formerly Pro activate)
     Activate {
-        /// Use an existing API key instead of creating a new subscription
         #[arg(long)]
         key: Option<String>,
     },
-    /// Show Pro subscription status
+    /// Show install status (formerly Pro status)
     Status,
 }
 
@@ -270,13 +286,20 @@ async fn main() -> Result<()> {
             analytics::ping("install");
             setup::setup()
         }
+        Command::Install { what } => match what {
+            InstallWhat::Cef => {
+                analytics::ping("install_cef");
+                pro::activate(None).await
+            }
+        },
+        Command::Status => pro::status().await,
         Command::Pro { action } => match action {
             ProAction::Activate { key } => pro::activate(key).await,
             ProAction::Status => pro::status().await,
         },
         Command::Version => {
-            let pro = if cef::is_available() { " + Pro" } else { "" };
-            println!("wick {}{} (rust)", env!("CARGO_PKG_VERSION"), pro);
+            let cef_status = if cef::is_available() { " + CEF" } else { "" };
+            println!("wick {}{} (rust)", env!("CARGO_PKG_VERSION"), cef_status);
             Ok(())
         }
     }
