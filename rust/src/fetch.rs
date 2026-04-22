@@ -351,6 +351,16 @@ pub async fn fetch_html(
 
     let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("missing host"))?;
 
+    // Mirror fetch()'s Reddit rewrite so `wick crawl` doesn't land on
+    // new-reddit's challenge wall when fetch() would have taken the
+    // old-reddit happy path.
+    if host == "www.reddit.com" || host == "reddit.com" {
+        let old_url = url
+            .replace("://www.reddit.com", "://old.reddit.com")
+            .replace("://reddit.com", "://old.reddit.com");
+        return Box::pin(fetch_html(client, &old_url, respect_robots)).await;
+    }
+
     if respect_robots && !robots::check(client, url).await {
         return Ok(FetchHtmlResult {
             html: String::new(), url: url.to_string(), status_code: 0,
