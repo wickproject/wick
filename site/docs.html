@@ -231,6 +231,7 @@ body {
     <div class="sidebar-label">Reference</div>
     <a href="#output-formats">Output Formats</a>
     <a href="#how-it-works">How It Works</a>
+    <a href="#telemetry">Telemetry</a>
     <a href="#troubleshooting">Troubleshooting</a>
   </div>
 </nav>
@@ -610,6 +611,40 @@ Options:
 <div class="callout">
   <strong>Why not just use curl?</strong> Anti-bot systems (Cloudflare, Akamai, etc.) fingerprint the TLS handshake. curl, Python requests, Go's net/http, and Node's fetch all have distinct TLS signatures that get blocked instantly. Wick's request is indistinguishable from a real Chrome browser visiting the page.
 </div>
+
+<!-- ═══════════════════════════════════════════ -->
+<h2 id="telemetry">Telemetry</h2>
+
+<p>Wick reports anonymized per-fetch telemetry so we can see which sites work, which need the CEF renderer, and which are currently broken. This is what powers the <a href="/stats.html">public stats page</a>.</p>
+
+<h3>What's collected</h3>
+<ul>
+  <li><strong>Hostname only</strong> — e.g. <code>nytimes.com</code>. No URL paths, no query strings, no fragments.</li>
+  <li><strong>Strategy</strong> — which fetch path succeeded: <code>cronet</code>, <code>cef</code>, <code>cef-after-cronet</code>, <code>captcha-auto</code>, <code>captcha-interactive</code>, or a blocked/error variant.</li>
+  <li><strong>Outcome</strong> — ok / not ok, HTTP status code, timing in milliseconds.</li>
+  <li><strong>Environment</strong> — Wick version and OS (<code>macos</code> / <code>linux</code>).</li>
+</ul>
+
+<h3>What's <em>not</em> collected</h3>
+<ul>
+  <li>URL paths, query strings, request headers, request or response bodies.</li>
+  <li>Page titles, extracted content, media URLs.</li>
+  <li>Your IP address is not stored as a data point. Cloudflare sees it at ingest time, like any HTTP request, but it isn't persisted in the event record.</li>
+  <li>No user identifier, no machine ID, no account linkage.</li>
+</ul>
+
+<h3>How to opt out</h3>
+<p>Set an env var:</p>
+<pre><code>export WICK_TELEMETRY=0</code></pre>
+<p>Or create a marker file:</p>
+<pre><code>touch ~/.wick/no-telemetry</code></pre>
+<p>Either disables all telemetry — per-fetch reports, daily usage pings, and failure reports.</p>
+
+<h3>Retention</h3>
+<p>Event records are kept for 92 days (Cloudflare Analytics Engine default), then deleted.</p>
+
+<h3>Why collect this at all</h3>
+<p>Without per-fetch signal, we can't tell the difference between "Wick works on 95% of sites we care about" and "Wick's success rate is collapsing." The data lets us ship fixes faster when a new anti-bot technique shows up. Hostnames are also essential because the fix for one site is often different from the fix for another — we need to know <em>which</em> sites are failing, not just that some are.</p>
 
 <!-- ═══════════════════════════════════════════ -->
 <h2 id="troubleshooting">Troubleshooting</h2>
