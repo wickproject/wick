@@ -181,19 +181,32 @@ export default {
       const date = new Date().toISOString().split("T")[0];
       const key = `evt:${date}:${host}:${strategy}`;
 
+      // Load + coerce the current aggregate. Anything that isn't a
+      // plain object with numeric fields (null, a string, something
+      // manually edited in the KV dashboard) is treated as "start
+      // fresh" so we never throw during increment or write back a
+      // poisoned value.
+      const existing = { fetches: 0, successes: 0, total_ms: 0 };
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
-      let existing = { fetches: 0, successes: 0, total_ms: 0 };
       if (existingRaw) {
         try {
-          existing = JSON.parse(existingRaw);
-        } catch {
-          // Corrupted KV value — start fresh rather than 500 ingestion.
-          existing = { fetches: 0, successes: 0, total_ms: 0 };
-        }
+          const parsed = JSON.parse(existingRaw);
+          if (parsed && typeof parsed === "object") {
+            const f = Number(parsed.fetches);
+            const s = Number(parsed.successes);
+            const t = Number(parsed.total_ms);
+            if (Number.isFinite(f)) existing.fetches = f;
+            if (Number.isFinite(s)) existing.successes = s;
+            if (Number.isFinite(t)) existing.total_ms = t;
+          }
+        } catch { /* corrupt JSON — start fresh */ }
       }
 
       existing.fetches += 1;
-      if (body.ok) existing.successes += 1;
+      // Strict boolean: the endpoint is unauthenticated, so a truthy
+      // check would let `"false"` (a string) count as a success and
+      // skew the stats.
+      if (body.ok === true) existing.successes += 1;
       const ms = Number(body.timing_ms) || 0;
       if (ms > 0) existing.total_ms += Math.min(ms, 600000); // clamp at 10 min to avoid runaway sums
 
@@ -208,7 +221,8 @@ export default {
     //
     // GET /v1/stats/summary — 7-day aggregate of the KV event counters,
     // cached 5 minutes. Public, no auth. Refreshing on a cache miss
-    // scans up to 7*1000 KV keys so keep the cache honest.
+    // scans across the 7-day window with a single global cap of 5000
+    // KV keys, so keep the cache honest.
     if (request.method === "GET" && path === "/v1/stats/summary") {
       const cacheKey = "stats:summary:v1";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
@@ -269,9 +283,16 @@ export default {
             const cur = agg.get(aggKey) || {
               host, strategy, fetches: 0, successes: 0, total_ms: 0,
             };
-            cur.fetches += v.fetches || 0;
-            cur.successes += v.successes || 0;
-            cur.total_ms += v.total_ms || 0;
+            // Coerce each field via Number() and ignore non-finite
+            // values — a stringly-typed stored value (`"1"`) would
+            // otherwise turn `cur.fetches` into a string and break
+            // arithmetic + sorting downstream.
+            const fetches = Number(v.fetches);
+            const successes = Number(v.successes);
+            const totalMs = Number(v.total_ms);
+            if (Number.isFinite(fetches)) cur.fetches += fetches;
+            if (Number.isFinite(successes)) cur.successes += successes;
+            if (Number.isFinite(totalMs)) cur.total_ms += totalMs;
             agg.set(aggKey, cur);
           }
           cursor = list.list_complete ? undefined : list.cursor;
@@ -493,22 +514,29 @@ export default {
         const contentType = resp.headers.get("content-type") || "text/html";
         const responseBody = await resp.text();
 
+        // Log `host + path` rather than the full URL so signed-URL
+        // tokens and other query-string secrets don't leak into
+        // worker logs. `targetUrl` is the parsed URL from above.
         console.log(JSON.stringify({
           event: "proxy",
           customer: keys[proxyKey].customer,
-          url: body.url,
+          host: targetUrl.hostname,
+          path: targetUrl.pathname,
           status: resp.status,
           bytes: responseBody.length,
           timestamp: new Date().toISOString(),
         }));
 
+        // Don't reflect the user-controlled URL back in a response
+        // header — newlines in `body.url` can trigger invalid-header
+        // errors, and query-string secrets can leak into any tooling
+        // that records response headers.
         return new Response(responseBody, {
           status: resp.status,
           headers: {
             ...headers,
             "Content-Type": contentType,
             "X-Proxy-Status": resp.status.toString(),
-            "X-Proxy-Url": body.url,
           },
         });
       } catch (e) {
@@ -575,10 +603,20 @@ export default {
       timestamp: new Date().toISOString(),
     }));
 
+    // Pick Content-Type by extension so `.tar.bz2` files aren't
+    // served as `application/gzip`. Fall back to octet-stream for
+    // anything we don't recognize.
+    let contentType = "application/octet-stream";
+    if (filename.endsWith(".tar.gz") || filename.endsWith(".tgz")) {
+      contentType = "application/gzip";
+    } else if (filename.endsWith(".tar.bz2")) {
+      contentType = "application/x-bzip2";
+    }
+
     return new Response(object.body, {
       headers: {
         ...headers,
-        "Content-Type": "application/gzip",
+        "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "private, no-cache",
       },

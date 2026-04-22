@@ -6,7 +6,7 @@ Cloudflare Worker backing `releases.getwick.dev`. Handles:
 - **Usage telemetry ingest** — two endpoints:
   - `POST /ping` (legacy) — daily usage pings + failure reports, aggregated into KV.
   - `POST /v1/events` — per-fetch telemetry `{host, strategy, ok, status, timing_ms, …}` stored in KV.
-- **Public stats** — `GET /v1/stats/summary` aggregates 7 days of KV-stored events for `https://getwick.dev/stats.html`. Cached 5 min in KV.
+- **Public stats** — `GET /v1/stats/summary` aggregates 7 days of KV-stored events. The renderer (`site/stats.html`) ships in a follow-up PR; this endpoint is usable on its own in the meantime. Cached 5 min in KV.
 - **Legacy analytics dashboard** — `GET /analytics/:key` (KV-based, auth-gated).
 
 Everything here runs on Workers Free — no Analytics Engine, no paid Workers plan required. If Wick grows past the free KV limits, the `/v1/events` handler can be swapped for Analytics Engine by flipping a binding.
@@ -57,7 +57,7 @@ No additional secrets needed for the telemetry endpoints.
 
 Stored in `SUBSCRIPTIONS` KV as one key per `(date, host, strategy)`:
 
-| | |
+| Field | Format |
 |---|---|
 | Key | `evt:YYYY-MM-DD:{host}:{strategy}` |
 | Value | `{"fetches": N, "successes": M, "total_ms": T}` (JSON) |
@@ -69,7 +69,7 @@ What's **not** stored: URL paths or query strings, request/response bodies, page
 
 ## Querying
 
-`GET /v1/stats/summary` does the aggregation and returns shaped JSON. See `site/stats.html` for the public renderer.
+`GET /v1/stats/summary` does the aggregation and returns shaped JSON. The public renderer (`site/stats.html`) ships in a follow-up PR.
 
 For ad-hoc debugging you can list KV keys directly:
 
