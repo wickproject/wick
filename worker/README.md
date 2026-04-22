@@ -5,9 +5,11 @@ Cloudflare Worker backing `releases.getwick.dev`. Handles:
 - **Release distribution** — signed downloads of prebuilt binaries from R2.
 - **Usage telemetry ingest** — two endpoints:
   - `POST /ping` (legacy) — daily usage pings + failure reports, aggregated into KV.
-  - `POST /v1/events` — per-fetch telemetry `{host, strategy, ok, status, timing_ms, …}` written to Cloudflare Analytics Engine.
-- **Public stats** — `GET /v1/stats/summary` serves shaped rows from Analytics Engine for `https://getwick.dev/stats.html`. Cached 5 min in KV.
+  - `POST /v1/events` — per-fetch telemetry `{host, strategy, ok, status, timing_ms, …}` stored in KV.
+- **Public stats** — `GET /v1/stats/summary` aggregates 7 days of KV-stored events for `https://getwick.dev/stats.html`. Cached 5 min in KV.
 - **Legacy analytics dashboard** — `GET /analytics/:key` (KV-based, auth-gated).
+
+Everything here runs on Workers Free — no Analytics Engine, no paid Workers plan required. If Wick grows past the free KV limits, the `/v1/events` handler can be swapped for Analytics Engine by flipping a binding.
 
 ## Development
 
@@ -28,19 +30,13 @@ npx wrangler deploy
 Bindings declared in `wrangler.toml`:
 
 - `RELEASES` — R2 bucket `wick-releases`
-- `SUBSCRIPTIONS` — KV namespace (also used as the 5-min cache for stats)
-- `WICK_EVENTS` — Analytics Engine dataset `wick_events`
+- `SUBSCRIPTIONS` — KV namespace (holds Pro keys, legacy ping counters, per-fetch event counters under `evt:` prefix, and the 5-min stats cache)
 
 Secrets (set via `wrangler secret put`):
 
 - `API_KEYS` — JSON object of Pro customer keys (legacy, kept for existing customers).
-- `CF_ANALYTICS_ACCOUNT_ID` — Cloudflare account ID used for the AE SQL API.
-- `CF_ANALYTICS_TOKEN` — API token with `Analytics Engine:Read` and `Workers:Read` (or scoped to the `wick_events` dataset).
 
-```bash
-echo 'cc1234...' | npx wrangler secret put CF_ANALYTICS_ACCOUNT_ID
-echo '<token>'  | npx wrangler secret put CF_ANALYTICS_TOKEN
-```
+No additional secrets needed for the telemetry endpoints.
 
 ## Telemetry schema
 
@@ -59,37 +55,25 @@ echo '<token>'  | npx wrangler secret put CF_ANALYTICS_TOKEN
 }
 ```
 
-Stored in `wick_events` as:
+Stored in `SUBSCRIPTIONS` KV as one key per `(date, host, strategy)`:
 
-| Column | Meaning |
+| | |
 |---|---|
-| `blob1` | host |
-| `blob2` | strategy (`cronet`, `cef`, `cef-after-cronet`, `captcha-auto`, …) |
-| `blob3` | escalated_from (empty if none) |
-| `blob4` | wick version |
-| `blob5` | OS |
-| `double1` | ok (0 or 1) |
-| `double2` | HTTP status |
-| `double3` | timing_ms |
-| `index1` | host truncated to 32 bytes (used as shard key) |
+| Key | `evt:YYYY-MM-DD:{host}:{strategy}` |
+| Value | `{"fetches": N, "successes": M, "total_ms": T}` (JSON) |
+| TTL | 30 days |
 
-No IP, no path, no content.
+Increments are read-modify-write, same pattern as the legacy `/ping` counters. Under heavy concurrency a small number of increments may be lost; this is fine for telemetry.
+
+What's **not** stored: URL paths or query strings, request/response bodies, page titles, caller IP (Cloudflare sees it at ingest, but it's never persisted as a data point), user identifier, machine ID.
 
 ## Querying
 
+`GET /v1/stats/summary` does the aggregation and returns shaped JSON. See `site/stats.html` for the public renderer.
+
+For ad-hoc debugging you can list KV keys directly:
+
 ```bash
-npx wrangler queues   # (unrelated — just to confirm wrangler auth)
-
-# via SQL API (requires CF_ANALYTICS_TOKEN env var):
-curl -fsSL https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/analytics_engine/sql \
-  -H "Authorization: Bearer $TOKEN" \
-  --data-raw "SELECT blob1 AS host, blob2 AS strategy,
-              SUM(_sample_interval) AS fetches,
-              SUM(double1 * _sample_interval) AS successes
-              FROM wick_events
-              WHERE timestamp > NOW() - INTERVAL '1' DAY
-              GROUP BY host, strategy
-              ORDER BY fetches DESC LIMIT 50 FORMAT JSON"
+npx wrangler kv key list --binding=SUBSCRIPTIONS --prefix='evt:' | head -20
+npx wrangler kv key get --binding=SUBSCRIPTIONS 'evt:2026-04-21:example.com:cronet'
 ```
-
-See `site/stats.html` for the public version.

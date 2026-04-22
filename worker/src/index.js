@@ -295,22 +295,23 @@ poll();
       return new Response("ok\n", { status: 200, headers });
     }
 
-    // ── Per-fetch telemetry (Analytics Engine) ───────────────────
+    // ── Per-fetch telemetry (KV-backed) ──────────────────────────
     //
     // POST /v1/events with body:
     // { "host": "nytimes.com", "strategy": "cef", "escalated_from": null|"cronet",
     //   "ok": true, "status": 200, "timing_ms": 1840,
     //   "version": "0.9.2", "os": "macos" }
     //
-    // What's stored: only the fields in the body. Cloudflare sees the
-    // caller IP at ingest but we don't persist it as a data point.
-    // Retention: Analytics Engine default (~92 days).
+    // Storage model: one KV key per (date, host, strategy) with a merged
+    // JSON value `{ fetches, successes, total_ms }`. Each event is a
+    // read-modify-write — matches the pattern the existing /ping counters
+    // use. Eventually consistent at high concurrency (some increments may
+    // be lost if two writes race in the same second), which is fine for
+    // telemetry.
+    //
+    // Cloudflare sees the caller IP at ingest but we don't persist it.
+    // Retention: 30 days via KV TTL.
     if (request.method === "POST" && path === "/v1/events") {
-      if (!env.WICK_EVENTS) {
-        // Binding not configured — silently accept so old clients don't error.
-        return new Response("", { status: 204, headers });
-      }
-
       let body;
       try {
         body = await request.json();
@@ -321,22 +322,26 @@ poll();
       // Reject absurdly long fields — RFC 1035 max hostname is 253 chars.
       const host = String(body.host || "").slice(0, 253);
       const strategy = String(body.strategy || "").slice(0, 32);
-      const escalatedFrom = body.escalated_from == null
-        ? ""
-        : String(body.escalated_from).slice(0, 32);
-      const version = String(body.version || "").slice(0, 16);
-      const os = String(body.os || "").slice(0, 16);
+      if (!host || !strategy) {
+        return new Response("", { status: 204, headers });
+      }
 
-      env.WICK_EVENTS.writeDataPoint({
-        blobs: [host, strategy, escalatedFrom, version, os],
-        doubles: [
-          body.ok ? 1 : 0,
-          Number(body.status) || 0,
-          Number(body.timing_ms) || 0,
-        ],
-        // The index column is used for partitioning/sharding — use host so
-        // per-host queries are fast. Capped at 32 bytes per AE constraints.
-        indexes: [host.slice(0, 32)],
+      // Normalize date to YYYY-MM-DD UTC to keep keys sortable.
+      const date = new Date().toISOString().split("T")[0];
+      const key = `evt:${date}:${host}:${strategy}`;
+
+      const existingRaw = await env.SUBSCRIPTIONS.get(key);
+      const existing = existingRaw
+        ? JSON.parse(existingRaw)
+        : { fetches: 0, successes: 0, total_ms: 0 };
+
+      existing.fetches += 1;
+      if (body.ok) existing.successes += 1;
+      const ms = Number(body.timing_ms) || 0;
+      if (ms > 0) existing.total_ms += Math.min(ms, 600000); // clamp at 10 min to avoid runaway sums
+
+      await env.SUBSCRIPTIONS.put(key, JSON.stringify(existing), {
+        expirationTtl: 30 * 86400,
       });
 
       return new Response("", { status: 204, headers });
@@ -344,17 +349,10 @@ poll();
 
     // ── Public stats summary ─────────────────────────────────────
     //
-    // GET /v1/stats/summary — returns aggregated per-host success stats
-    // for the public stats page. No auth required. Response is cached for
-    // 5 minutes to keep Analytics Engine query volume down.
+    // GET /v1/stats/summary — 7-day aggregate of the KV event counters,
+    // cached 5 minutes. Public, no auth. Refreshing on a cache miss
+    // scans up to 7*1000 KV keys so keep the cache honest.
     if (request.method === "GET" && path === "/v1/stats/summary") {
-      if (!env.CF_ANALYTICS_ACCOUNT_ID || !env.CF_ANALYTICS_TOKEN) {
-        return new Response(
-          JSON.stringify({ error: "analytics not configured" }),
-          { status: 503, headers: { ...headers, "Content-Type": "application/json" } },
-        );
-      }
-
       const cacheKey = "stats:summary:v1";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
       if (cached) {
@@ -367,55 +365,64 @@ poll();
         });
       }
 
-      // Query Analytics Engine via SQL API.
-      // blob1=host, blob2=strategy, double1=ok, double2=status, double3=timing_ms
-      const sql = `
-        SELECT
-          blob1 AS host,
-          blob2 AS strategy,
-          SUM(_sample_interval) AS fetches,
-          SUM(double1 * _sample_interval) AS successes,
-          quantileWeighted(0.5)(double3, _sample_interval) AS p50_ms
-        FROM wick_events
-        WHERE timestamp > NOW() - INTERVAL '7' DAY
-          AND blob1 != ''
-        GROUP BY host, strategy
-        ORDER BY fetches DESC
-        LIMIT 200
-        FORMAT JSON
-      `.trim();
-
-      const resp = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${env.CF_ANALYTICS_ACCOUNT_ID}/analytics_engine/sql`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${env.CF_ANALYTICS_TOKEN}`,
-            "Content-Type": "text/plain",
-          },
-          body: sql,
-        },
-      );
-
-      if (!resp.ok) {
-        return new Response(
-          JSON.stringify({ error: "query failed", status: resp.status }),
-          { status: 502, headers: { ...headers, "Content-Type": "application/json" } },
-        );
+      // Aggregate across the last 7 days.
+      const now = new Date();
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(now.getTime() - i * 86400_000);
+        dates.push(d.toISOString().split("T")[0]);
       }
 
-      const raw = await resp.json();
-      // Shape the response for the public stats page.
-      const rows = (raw.data || []).map(r => ({
-        host: r.host,
-        strategy: r.strategy,
-        fetches: Number(r.fetches) || 0,
-        successes: Number(r.successes) || 0,
-        success_rate: (Number(r.fetches) || 0) > 0
-          ? (Number(r.successes) || 0) / Number(r.fetches)
-          : 0,
-        p50_ms: Number(r.p50_ms) || 0,
-      }));
+      // Keep the accumulation small: one entry per (host, strategy).
+      const agg = new Map(); // key: `${host}|${strategy}` → { host, strategy, fetches, successes, total_ms }
+
+      for (const date of dates) {
+        let cursor = undefined;
+        let scanned = 0;
+        do {
+          const list = await env.SUBSCRIPTIONS.list({
+            prefix: `evt:${date}:`,
+            limit: 1000,
+            cursor,
+          });
+          for (const k of list.keys) {
+            scanned++;
+            if (scanned > 5000) break; // safety cap per day
+            const raw = await env.SUBSCRIPTIONS.get(k.name);
+            if (!raw) continue;
+            let v;
+            try { v = JSON.parse(raw); } catch { continue; }
+            // Key format: evt:YYYY-MM-DD:host:strategy
+            const rest = k.name.slice(`evt:${date}:`.length);
+            const lastColon = rest.lastIndexOf(":");
+            if (lastColon < 0) continue;
+            const host = rest.slice(0, lastColon);
+            const strategy = rest.slice(lastColon + 1);
+            const aggKey = `${host}|${strategy}`;
+            const cur = agg.get(aggKey) || {
+              host, strategy, fetches: 0, successes: 0, total_ms: 0,
+            };
+            cur.fetches += v.fetches || 0;
+            cur.successes += v.successes || 0;
+            cur.total_ms += v.total_ms || 0;
+            agg.set(aggKey, cur);
+          }
+          cursor = list.list_complete ? undefined : list.cursor;
+        } while (cursor);
+      }
+
+      const rows = [...agg.values()]
+        .map(r => ({
+          host: r.host,
+          strategy: r.strategy,
+          fetches: r.fetches,
+          successes: r.successes,
+          success_rate: r.fetches > 0 ? r.successes / r.fetches : 0,
+          // No real p50 without raw samples — use mean_ms as an approximation.
+          p50_ms: r.fetches > 0 ? Math.round(r.total_ms / r.fetches) : 0,
+        }))
+        .sort((a, b) => b.fetches - a.fetches)
+        .slice(0, 500);
 
       const payload = JSON.stringify({
         generated_at: new Date().toISOString(),

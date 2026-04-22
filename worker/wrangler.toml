@@ -20,8 +20,6 @@ id = "cc2ea7f5a022431dbb5361c3741786d1"
 # { "key1": { "customer": "Acme Corp", "active": true }, ... }
 # Set with: npx wrangler secret put API_KEYS
 
-# Analytics Engine dataset for per-fetch telemetry events.
-# Written by POST /v1/events, queried by GET /v1/stats/summary.
-[[analytics_engine_datasets]]
-binding = "WICK_EVENTS"
-dataset = "wick_events"
+# Per-fetch telemetry is stored in the same SUBSCRIPTIONS KV namespace
+# under the `evt:` prefix. No additional binding required — keeping this
+# on Workers Free avoids pulling in the Analytics Engine paid tier.
