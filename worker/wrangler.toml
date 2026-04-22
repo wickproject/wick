@@ -1,0 +1,27 @@
+name = "wick-releases"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = false
+
+# Custom domain: releases.getwick.dev
+routes = [{ pattern = "releases.getwick.dev/*", zone_name = "getwick.dev" }]
+
+# R2 bucket for storing release tarballs
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "wick-releases"
+
+# KV for Pro subscriptions (email → key → status)
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "cc2ea7f5a022431dbb5361c3741786d1"
+
+# API keys stored as a JSON object in a secret:
+# { "key1": { "customer": "Acme Corp", "active": true }, ... }
+# Set with: npx wrangler secret put API_KEYS
+
+# Analytics Engine dataset for per-fetch telemetry events.
+# Written by POST /v1/events, queried by GET /v1/stats/summary.
+[[analytics_engine_datasets]]
+binding = "WICK_EVENTS"
+dataset = "wick_events"
