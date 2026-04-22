@@ -17,6 +17,95 @@
  *   POST /proxy/:key            → geo-proxy
  */
 
+// ── Helpers ─────────────────────────────────────────────────
+
+/**
+ * Verify a Stripe webhook signature header.
+ * Stripe-Signature is formatted `t=<timestamp>,v1=<hex>`; we reconstruct
+ * the signed payload (`<t>.<raw body>`), HMAC-SHA256 it with the webhook
+ * secret, and constant-time compare to the `v1` value. A 5-minute
+ * timestamp tolerance rejects replays. Returns true only on a match.
+ * See https://docs.stripe.com/webhooks/signatures.
+ */
+async function verifyStripeSignature(payload, sigHeader, secret) {
+  if (!sigHeader || !secret) return false;
+  const parts = {};
+  for (const p of sigHeader.split(",")) {
+    const eq = p.indexOf("=");
+    if (eq <= 0) continue;
+    const k = p.slice(0, eq).trim();
+    const v = p.slice(eq + 1).trim();
+    // Keep only the first value per key — matches Stripe's v1/v0 format.
+    if (!(k in parts)) parts[k] = v;
+  }
+  const t = parts.t;
+  const v1 = parts.v1;
+  if (!t || !v1) return false;
+  const ts = Number(t);
+  if (!Number.isFinite(ts)) return false;
+  const age = Math.abs(Date.now() / 1000 - ts);
+  if (age > 300) return false;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${t}.${payload}`));
+  const expected = [...new Uint8Array(sig)]
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+
+  if (expected.length !== v1.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ v1.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
+ * True if `hostname` is a loopback/private/link-local address literal.
+ * Used by the geo-proxy to block SSRF against internal networks. Only
+ * catches IP-literal targets; DNS-based rebinding is not prevented
+ * here (Workers fetch() resolves names internally).
+ */
+function isPrivateHost(hostname) {
+  if (!hostname) return true;
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "localhost." || h.endsWith(".localhost")) return true;
+
+  // IPv4 literal
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]), b = Number(v4[2]);
+    if ([a, b, Number(v4[3]), Number(v4[4])].some(x => x > 255)) return true;
+    if (a === 0) return true;                                 // 0.0.0.0/8
+    if (a === 10) return true;                                // 10.0.0.0/8
+    if (a === 127) return true;                               // loopback
+    if (a === 169 && b === 254) return true;                  // link-local
+    if (a === 172 && b >= 16 && b <= 31) return true;         // RFC1918
+    if (a === 192 && b === 168) return true;                  // RFC1918
+    if (a === 192 && b === 0 && Number(v4[3]) === 2) return true; // TEST-NET
+    if (a === 100 && b >= 64 && b <= 127) return true;        // CGNAT
+    return false;
+  }
+
+  // IPv6 literal — URL parses as `[...]`; hostname strips brackets.
+  if (h.includes(":")) {
+    if (h === "::" || h === "::1") return true;
+    if (h.startsWith("fc") || h.startsWith("fd")) return true; // ULA fc00::/7
+    if (h.startsWith("fe8") || h.startsWith("fe9") ||
+        h.startsWith("fea") || h.startsWith("feb")) return true; // fe80::/10
+    if (h.startsWith("::ffff:")) {
+      // IPv4-mapped — recurse on the v4 portion.
+      return isPrivateHost(h.slice(7));
+    }
+    return false;
+  }
+
+  return false;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -132,8 +221,18 @@ export default {
     if (request.method === "POST" && path === "/pro/webhook") {
       const payload = await request.text();
 
-      // In production, verify Stripe signature with env.STRIPE_WEBHOOK_SECRET
-      // For now, parse the event directly
+      // Verify the Stripe-Signature header before trusting the event —
+      // otherwise anyone who can reach this endpoint can forge a
+      // `checkout.session.completed` event and mint an API key.
+      if (!env.STRIPE_WEBHOOK_SECRET) {
+        return new Response("Webhook not configured\n", { status: 503, headers });
+      }
+      const sig = request.headers.get("Stripe-Signature");
+      const ok = await verifyStripeSignature(payload, sig, env.STRIPE_WEBHOOK_SECRET);
+      if (!ok) {
+        return new Response("Invalid signature\n", { status: 400, headers });
+      }
+
       let event;
       try {
         event = JSON.parse(payload);
@@ -161,12 +260,15 @@ export default {
             created: new Date().toISOString(),
           }));
 
-          // Update session status
+          // Update session status. Keep a TTL on the active record so
+          // `session:` entries don't grow unbounded in KV — the key
+          // itself lives in `key:<apiKey>` without a TTL, and the
+          // client has ~24h to poll this session for the API key.
           await env.SUBSCRIPTIONS.put(`session:${wickSession}`, JSON.stringify({
             status: "active",
             key,
             email,
-          }));
+          }), { expirationTtl: 60 * 60 * 24 });
 
           // Also add to the legacy API_KEYS for backward compat
           // (existing endpoints validate against API_KEYS secret)
@@ -214,7 +316,10 @@ export default {
 
     // Success page after Stripe checkout
     if (path === "/pro/success") {
-      const sessionId = url.searchParams.get("session");
+      // Don't server-side-interpolate the query parameter into the
+      // inline script — read it on the client instead. That avoids
+      // any XSS risk from malformed `?session=...` values ending up
+      // inside a `<script>` string literal.
       return new Response(`<!DOCTYPE html>
 <html><head><title>Wick Pro - Activated</title>
 <style>body{background:#0D0B09;color:#F0E6D8;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
@@ -234,10 +339,10 @@ p{color:#9E958A;line-height:1.6;font-size:0.9rem;}
 </div>
 <script>
 async function poll() {
-  const sid = "${sessionId || ''}";
+  const sid = new URLSearchParams(window.location.search).get('session') || '';
   if (!sid) { document.getElementById('status').textContent = 'Missing session.'; return; }
   for (let i = 0; i < 30; i++) {
-    const r = await fetch('/pro/status/' + sid);
+    const r = await fetch('/pro/status/' + encodeURIComponent(sid));
     const d = await r.json();
     if (d.status === 'active' && d.key) {
       document.getElementById('status').textContent = 'Ready!';
@@ -320,9 +425,16 @@ poll();
       }
 
       // Reject absurdly long fields — RFC 1035 max hostname is 253 chars.
+      // Also validate character sets so the `:` delimiter in the KV key
+      // format `evt:<date>:<host>:<strategy>` can't be injected through
+      // either field. Hostnames follow RFC 952/1123 (letters, digits,
+      // dots, hyphens). Strategies are ASCII word characters.
       const host = String(body.host || "").slice(0, 253);
       const strategy = String(body.strategy || "").slice(0, 32);
-      if (!host || !strategy) {
+      if (!host || !/^[a-zA-Z0-9.-]+$/.test(host)) {
+        return new Response("", { status: 204, headers });
+      }
+      if (!strategy || !/^[a-zA-Z0-9_-]+$/.test(strategy)) {
         return new Response("", { status: 204, headers });
       }
 
@@ -331,9 +443,15 @@ poll();
       const key = `evt:${date}:${host}:${strategy}`;
 
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
-      const existing = existingRaw
-        ? JSON.parse(existingRaw)
-        : { fetches: 0, successes: 0, total_ms: 0 };
+      let existing = { fetches: 0, successes: 0, total_ms: 0 };
+      if (existingRaw) {
+        try {
+          existing = JSON.parse(existingRaw);
+        } catch {
+          // Corrupted KV value — start fresh rather than 500 ingestion.
+          existing = { fetches: 0, successes: 0, total_ms: 0 };
+        }
+      }
 
       existing.fetches += 1;
       if (body.ok) existing.successes += 1;
@@ -376,9 +494,16 @@ poll();
       // Keep the accumulation small: one entry per (host, strategy).
       const agg = new Map(); // key: `${host}|${strategy}` → { host, strategy, fetches, successes, total_ms }
 
+      // Single global cap across all 7 days — prevents a pathological
+      // 7 * per_day_cap worst case. Each scanned key is a read-modify-
+      // write aggregate (already de-duped per host+strategy+day at
+      // ingest), so 5000 keys is comfortably more than we expect
+      // and leaves headroom under Workers CPU limits.
+      const SCAN_CAP = 5000;
+      let scanned = 0;
+      outer:
       for (const date of dates) {
         let cursor = undefined;
-        let scanned = 0;
         do {
           const list = await env.SUBSCRIPTIONS.list({
             prefix: `evt:${date}:`,
@@ -386,8 +511,11 @@ poll();
             cursor,
           });
           for (const k of list.keys) {
+            if (scanned >= SCAN_CAP) {
+              // Stop paginating further — not just the inner loop.
+              break outer;
+            }
             scanned++;
-            if (scanned > 5000) break; // safety cap per day
             const raw = await env.SUBSCRIPTIONS.get(k.name);
             if (!raw) continue;
             let v;
@@ -581,12 +709,18 @@ poll();
         return new Response("Missing url in request body\n", { status: 400, headers });
       }
 
-      // Validate URL (only http/https, no internal IPs)
+      // Validate URL: only http/https, reject private/loopback/
+      // link-local IP literals so a paid key can't be used to probe
+      // our internal networks (SSRF). DNS-based targets are not
+      // resolved here — this catches only IP-literal URLs.
       let targetUrl;
       try {
         targetUrl = new URL(body.url);
         if (!["http:", "https:"].includes(targetUrl.protocol)) {
           return new Response("Only http/https URLs\n", { status: 400, headers });
+        }
+        if (isPrivateHost(targetUrl.hostname)) {
+          return new Response("Target host not allowed\n", { status: 400, headers });
         }
       } catch {
         return new Response("Invalid URL\n", { status: 400, headers });
@@ -691,12 +825,14 @@ poll();
       );
     }
 
-    // Log download for tracking
+    // Log download for tracking. Caller IP is intentionally omitted —
+    // the repo's privacy posture is to not persist IP addresses as a
+    // data point anywhere (worker logs included, since they're
+    // retained/exported).
     console.log(JSON.stringify({
       event: "download",
       customer: keyInfo.customer,
       file: filename,
-      ip: request.headers.get("CF-Connecting-IP"),
       timestamp: new Date().toISOString(),
     }));
 
