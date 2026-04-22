@@ -15,24 +15,36 @@ pub async fn activate(_legacy_key: Option<String>) -> Result<()> {
 
     println!("Installing CEF renderer (~200 MB download)...");
 
+    // Pin the install script + fetched source files to the same wick binary
+    // version — avoids version skew between the binary, the installer, and
+    // the CEF renderer sources built from main.
+    let version = env!("CARGO_PKG_VERSION");
+    let ref_name = format!("v{}", version);
+
     #[cfg(target_os = "macos")]
     {
-        let script_url = "https://raw.githubusercontent.com/wickproject/wick/main/scripts/install-cef-mac.sh";
+        let script_url = format!(
+            "https://raw.githubusercontent.com/wickproject/wick/{}/scripts/install-cef-mac.sh",
+            ref_name
+        );
         let status = std::process::Command::new("bash")
             .arg("-c")
-            .arg(format!("curl -fsSL {} | bash", script_url))
+            .arg(format!("curl -fsSL {} | WICK_VERSION={} bash", script_url, version))
             .status()?;
         if !status.success() {
             println!("Auto-install failed. Run manually:");
-            println!("  curl -fsSL {} | bash", script_url);
+            println!("  curl -fsSL {} | WICK_VERSION={} bash", script_url, version);
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        let script_url = "https://raw.githubusercontent.com/wickproject/wick/main/scripts/install-cef-linux.sh";
+        let script_url = format!(
+            "https://raw.githubusercontent.com/wickproject/wick/{}/scripts/install-cef-linux.sh",
+            ref_name
+        );
         println!("Run this to install the CEF renderer:");
-        println!("  curl -fsSL {} | sudo -E bash", script_url);
+        println!("  curl -fsSL {} | sudo WICK_VERSION={} -E bash", script_url, version);
     }
 
     Ok(())

@@ -166,19 +166,53 @@ if [[ ! -f "$WICK_DIR/wick-renderer" ]]; then
     if command -v gcc &>/dev/null; then
         echo "Building CEF renderer..."
 
+        # WICK_VERSION pins which ref to fetch source files from when
+        # running via curl|bash (no local checkout). Defaults to "main".
+        WICK_VERSION="${WICK_VERSION:-main}"
+        if [[ "$WICK_VERSION" != "main" && "$WICK_VERSION" != v* ]]; then
+            WICK_VERSION="v$WICK_VERSION"
+        fi
+        RAW_BASE="https://raw.githubusercontent.com/wickproject/wick/${WICK_VERSION}/rust/cef"
+
         # Check if source files exist (from git clone)
         RENDERER_SRC=""
-        for src_dir in "$WICK_DIR/src" "/root/wick-pro/rust/cef" "${SCRIPT_DIR:+$SCRIPT_DIR/../rust/cef}"; do
+        for src_dir in "$WICK_DIR/src" "${SCRIPT_DIR:+$SCRIPT_DIR/../rust/cef}"; do
             if [[ -f "$src_dir/renderer_linux.c" ]]; then
                 RENDERER_SRC="$src_dir"
                 break
             fi
         done
 
+        # Fall back to fetching sources from the wick repo at WICK_VERSION.
+        if [[ -z "$RENDERER_SRC" ]]; then
+            echo "  No local source found. Fetching from ${RAW_BASE}..."
+            RENDERER_SRC="$WICK_DIR/src"
+            mkdir -p "$RENDERER_SRC"
+            SRC_OK=1
+            for f in renderer_linux.c helper_linux.c stealth.h; do
+                curl -fsSL -o "$RENDERER_SRC/$f" "$RAW_BASE/$f" || {
+                    echo "  Failed to fetch $f" >&2
+                    SRC_OK=0
+                    break
+                }
+            done
+            if [[ "$SRC_OK" -ne 1 ]]; then
+                RENDERER_SRC=""
+                echo "  Fetch failed. Falling back to any prebuilt binary in GitHub releases..."
+                curl -fL --progress-bar -o wick-renderer \
+                    "https://github.com/wickproject/wick/releases/latest/download/wick-renderer-linux-$ARCH" \
+                    2>/dev/null || echo "  Prebuilt renderer not available either. Clone the repo and rerun."
+                curl -fL --progress-bar -o wick-helper \
+                    "https://github.com/wickproject/wick/releases/latest/download/wick-helper-linux-$ARCH" \
+                    2>/dev/null || true
+            fi
+        fi
+
         if [[ -n "$RENDERER_SRC" ]]; then
             gcc -o wick-renderer "$RENDERER_SRC/renderer_linux.c" \
                 -DCEF_API_VERSION=14400 \
                 -I"$CEF_DIR" \
+                -I"$RENDERER_SRC" \
                 -L. -lcef \
                 -Wl,-rpath,'$ORIGIN' \
                 -pthread
@@ -186,20 +220,13 @@ if [[ ! -f "$WICK_DIR/wick-renderer" ]]; then
             gcc -o wick-helper "$RENDERER_SRC/helper_linux.c" \
                 -DCEF_API_VERSION=14400 \
                 -I"$CEF_DIR" \
+                -I"$RENDERER_SRC" \
                 -L. -lcef \
                 -Wl,-rpath,'$ORIGIN' \
                 -pthread 2>/dev/null || true
 
             strip wick-renderer wick-helper 2>/dev/null || true
             echo "  Built wick-renderer and wick-helper."
-        else
-            echo "  CEF source not found. Downloading pre-built renderer..."
-            curl -fL --progress-bar -o wick-renderer \
-                "https://github.com/wickproject/wick/releases/latest/download/wick-renderer-linux-$ARCH" \
-                2>/dev/null || echo "  Pre-built renderer not available yet."
-            curl -fL --progress-bar -o wick-helper \
-                "https://github.com/wickproject/wick/releases/latest/download/wick-helper-linux-$ARCH" \
-                2>/dev/null || true
         fi
     else
         echo "  gcc not found. Install build-essential: apt install build-essential"

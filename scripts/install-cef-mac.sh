@@ -89,10 +89,20 @@ fi
 
 APP_DIR="$WICK_DIR/wick-renderer.app"
 
+# WICK_VERSION pins which ref to fetch source files from when running
+# via `curl | bash` (no local checkout). Defaults to "main" for dev use.
+# `wick install cef` passes the wick binary's own version.
+WICK_VERSION="${WICK_VERSION:-main}"
+if [[ "$WICK_VERSION" != "main" && "$WICK_VERSION" != v* ]]; then
+    WICK_VERSION="v$WICK_VERSION"
+fi
+RAW_BASE="https://raw.githubusercontent.com/wickproject/wick/${WICK_VERSION}/rust/cef"
+
 if [[ ! -f "$APP_DIR/Contents/MacOS/wick-renderer" ]]; then
     echo "Building wick-renderer..."
 
-    # Check for source files
+    # Check for source files — prefer a local checkout, fall back to
+    # fetching from the wick repo at WICK_VERSION.
     RENDERER_SRC=""
     for src_dir in "$WICK_DIR/src" "${BASH_SOURCE[0]:+$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../rust/cef}"; do
         if [[ -f "$src_dir/renderer.m" ]]; then
@@ -102,9 +112,18 @@ if [[ ! -f "$APP_DIR/Contents/MacOS/wick-renderer" ]]; then
     done
 
     if [[ -z "$RENDERER_SRC" ]]; then
-        red "CEF source files not found. Clone the repo first:"
-        echo "  git clone ... && cd wick-pro && bash scripts/install-pro-mac.sh"
-        exit 1
+        echo "  No local source found. Fetching from ${RAW_BASE}..."
+        RENDERER_SRC="$WICK_DIR/src"
+        mkdir -p "$RENDERER_SRC"
+        for f in renderer.m helper.m stealth.h setup-helpers.sh; do
+            curl -fsSL -o "$RENDERER_SRC/$f" "$RAW_BASE/$f" || {
+                red "Failed to fetch $f from $RAW_BASE"
+                echo "  If you're offline or behind a proxy, clone the repo and run:"
+                echo "    git clone https://github.com/wickproject/wick.git && cd wick && bash scripts/install-cef-mac.sh"
+                exit 1
+            }
+        done
+        chmod +x "$RENDERER_SRC/setup-helpers.sh"
     fi
 
     # Build renderer
