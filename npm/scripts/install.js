@@ -3,17 +3,17 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const VERSION = "0.10.0";
+const VERSION = "0.10.1";
 const PLATFORM = `${process.platform}-${process.arch}`;
 
 const ASSETS = {
   "darwin-arm64": {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-darwin-arm64.tar.gz`,
-    sha256: "5f8bc1dfd5897f31c526efe9d4898497f3bce6dacdb729764de35ca6bdba3f30",
+    sha256: "46588c818ffe8e845bf097bcf036cd0a710ec3e27441fab56d9a79600b1c2548",
   },
   "linux-x64": {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-linux-amd64.tar.gz`,
-    sha256: "4820d497a9de721203cae69aefa62db7f4b9972dab60caf1cd72890688032fc2",
+    sha256: "2a7bdc564ad775d8ba7216c43ae0bac9ed310c2679d8989c4fd8a2d7947c89cf",
     hasLib: true,
   },
 };
