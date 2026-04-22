@@ -205,7 +205,7 @@ td.bar { width: 12rem; padding: 0.4rem 0.75rem; }
 </section>
 
 <div class="footer">
-  <p>Data refreshes every 5 minutes. Nothing here identifies individual users or includes URL paths — see the <a href="/docs.html#telemetry">telemetry docs</a> for exactly what's collected and how to opt out.</p>
+  <p>Backend data is refreshed every 5 minutes; reload this page to see the latest updates. Nothing here identifies individual users or includes URL paths — see the <a href="/docs.html#telemetry">telemetry docs</a> for exactly what's collected and how to opt out.</p>
 </div>
 
 </div>
@@ -291,8 +291,13 @@ function renderTopHosts(rows) {
 
   const builders = hosts.map(h => {
     const rate = h.total ? h.ok / h.total : 0;
-    const p50s = [...h.strategies.values()].map(s => s.p50).filter(n => n > 0);
-    const p50 = p50s.length ? Math.round(p50s.reduce((a, b) => a + b, 0) / p50s.length) : 0;
+    // Fetch-weighted p50 across strategies. The unweighted mean skews
+    // toward rare strategies (e.g. a single slow `captcha-*` fetch
+    // dominates a host with thousands of fast `cronet` fetches).
+    const p50Stats = [...h.strategies.values()].filter(s => s.p50 > 0 && s.fetches > 0);
+    const weightedFetches = p50Stats.reduce((sum, s) => sum + s.fetches, 0);
+    const weightedP50 = p50Stats.reduce((sum, s) => sum + s.p50 * s.fetches, 0);
+    const p50 = weightedFetches ? Math.round(weightedP50 / weightedFetches) : 0;
     const chips = [...h.strategies.keys()].sort().map(s => el("span", { className: strategyClass(s), text: s }));
     const stratCell = el("td", { className: "strategy" });
     chips.forEach(c => stratCell.appendChild(c));
@@ -306,7 +311,30 @@ function renderTopHosts(rows) {
     ];
   });
 
-  return mkTable(["Host", "Strategies seen", "Fetches", "OK", "", "p50"], builders);
+  return mkTable(["Host", "Strategies seen", "Fetches", "OK", "OK bar", "p50"], builders);
+}
+
+// Cronet-family strategies are all Cronet-transport outcomes: the plain
+// happy path, the blocked/error branches, transport errors, and the
+// captcha-* branches (which are enrichments of a Cronet attempt rather
+// than a transport switch). When comparing CEF to "did Cronet work?",
+// we need to aggregate all of these — counting only raw `"cronet"` rows
+// dramatically understates Cronet volume on hosts that see a lot of
+// blocks or challenges, and makes the Cronet-OK column misleading.
+function isCronetFamilyStrategy(strategy) {
+  return strategy === "cronet" ||
+         strategy.startsWith("cronet-") ||
+         strategy.startsWith("captcha-");
+}
+
+function mergeCronetBaseline(current, row) {
+  const fetches = (current ? current.fetches : 0) + (row.fetches || 0);
+  const successes = (current ? current.successes : 0) + (row.successes || 0);
+  return {
+    fetches,
+    successes,
+    success_rate: fetches > 0 ? successes / fetches : 0,
+  };
 }
 
 function renderCefRequired(rows) {
@@ -314,8 +342,9 @@ function renderCefRequired(rows) {
   for (const r of rows) {
     if (!perHost.has(r.host)) perHost.set(r.host, { cronet: null, cef: null });
     const e = perHost.get(r.host);
-    if (r.strategy === "cronet") e.cronet = r;
-    else if (r.strategy === "cef" || r.strategy === "cef-after-cronet") {
+    if (isCronetFamilyStrategy(r.strategy)) {
+      e.cronet = mergeCronetBaseline(e.cronet, r);
+    } else if (r.strategy === "cef" || r.strategy === "cef-after-cronet") {
       if (!e.cef || r.fetches > e.cef.fetches) e.cef = r;
     }
   }
@@ -363,6 +392,16 @@ function renderFailures(rows) {
   return mkTable(["Host", "Attempts"], builders);
 }
 
+// Paint the same error state across every section, so the page
+// never looks "partially loaded" with some sections stuck on
+// "Waiting for data…". Called from both the non-OK response path
+// and the catch path.
+function renderAllError(message) {
+  for (const id of ["top-hosts", "cef-required", "failures"]) {
+    replace(document.getElementById(id), errorBox(message));
+  }
+}
+
 async function load() {
   const gen = document.getElementById("generated");
   try {
@@ -370,8 +409,7 @@ async function load() {
     if (!resp.ok) {
       gen.textContent = "Stats backend not available yet.";
       gen.classList.remove("live");
-      replace(document.getElementById("top-hosts"),
-              errorBox("Stats endpoint returned HTTP " + resp.status + ". Check back shortly."));
+      renderAllError("Stats endpoint returned HTTP " + resp.status + ". Check back shortly.");
       return;
     }
     const data = await resp.json();
@@ -385,7 +423,7 @@ async function load() {
     replace(document.getElementById("failures"), renderFailures(data.rows || []));
   } catch (e) {
     gen.textContent = "Couldn't load stats.";
-    replace(document.getElementById("top-hosts"), errorBox(String(e)));
+    renderAllError(String(e));
   }
 }
 
