@@ -8,8 +8,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Wick binary + libcronet.so from GitHub release
-ARG WICK_VERSION=0.9.0
-ARG WICK_SHA256=b84193f307fc8d2491af84af281a83ebb5031814648a4b2404027996f860b151
+ARG WICK_VERSION=0.9.1
+ARG WICK_SHA256=54169b1438a4d60aeffd97a4eb49fa9ca1ca10a2d418cfd260ce546c530b2fa2
 
 RUN cd /tmp \
     && curl -fsSL "https://github.com/wickproject/wick/releases/download/v${WICK_VERSION}/wick-linux-amd64.tar.gz" -o wick.tar.gz \
