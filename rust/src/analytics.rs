@@ -10,15 +10,32 @@
 //!
 //! What is NOT collected:
 //!   - URL paths or query strings, request headers, page content, titles
-//!   - User identity, IP addresses (Analytics Engine sees the caller IP at
-//!     ingest but doesn't store it as a data point), machine IDs.
+//!   - User identity, IP addresses (the receiving Worker sees the caller IP
+//!     at ingest, like any HTTP request, but doesn't persist it as a data
+//!     point), machine IDs.
 //!
-//! Opt out by setting `WICK_TELEMETRY=0` or creating `~/.wick/no-telemetry`.
+//! Opt out by setting `WICK_TELEMETRY=0` or creating `<wick-home>/no-telemetry`.
+//! `wick-home` is `$HOME/.wick` if `HOME` is set, otherwise `/tmp/.wick`.
+//!
+//! Implementation notes: a single background worker thread drains a bounded
+//! channel of pending events. Reusing one `reqwest::blocking::Client` and
+//! one thread keeps overhead bounded under high fetch concurrency
+//! (e.g. `wick serve --api` with many in-flight requests).
 
 use std::path::PathBuf;
+use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::OnceLock;
+use std::time::Duration;
+
+use serde_json::json;
 
 const PING_URL: &str = "https://releases.getwick.dev/ping";
 const EVENTS_URL: &str = "https://releases.getwick.dev/v1/events";
+const HTTP_TIMEOUT: Duration = Duration::from_secs(3);
+/// Bounded queue cap. If the worker can't keep up (e.g. network is slow
+/// and `try_send` returns Full), we drop events on the floor — telemetry
+/// must never apply backpressure to the user's fetches.
+const QUEUE_CAP: usize = 512;
 
 /// Structured per-fetch telemetry record. See module docs for what's in
 /// and out of scope.
@@ -31,40 +48,62 @@ pub struct FetchEvent<'a> {
     pub timing_ms: u64,
 }
 
-/// Report a per-fetch outcome to releases.getwick.dev. Fire-and-forget.
+enum Job {
+    PostJson(&'static str, String), // (url, JSON body)
+}
+
+fn worker_sender() -> &'static SyncSender<Job> {
+    static SENDER: OnceLock<SyncSender<Job>> = OnceLock::new();
+    SENDER.get_or_init(|| {
+        let (tx, rx) = sync_channel::<Job>(QUEUE_CAP);
+        std::thread::Builder::new()
+            .name("wick-analytics".into())
+            .spawn(move || {
+                // One reused client for the lifetime of the worker.
+                let client = reqwest::blocking::Client::builder()
+                    .timeout(HTTP_TIMEOUT)
+                    .build()
+                    .ok();
+                while let Ok(job) = rx.recv() {
+                    match (&client, job) {
+                        (Some(c), Job::PostJson(url, body)) => {
+                            let _ = c
+                                .post(url)
+                                .header("Content-Type", "application/json")
+                                .body(body)
+                                .send();
+                        }
+                        (None, _) => { /* client failed to build; drop silently */ }
+                    }
+                }
+            })
+            .expect("spawn wick-analytics thread");
+        tx
+    })
+}
+
+/// Enqueue a JSON post. Returns immediately; on a full queue the event is
+/// dropped (telemetry never applies backpressure).
+fn enqueue(url: &'static str, body: String) {
+    let _ = worker_sender().try_send(Job::PostJson(url, body));
+}
+
+/// Report a per-fetch outcome. Fire-and-forget.
 pub fn report_fetch(ev: FetchEvent) {
     if is_opted_out() {
         return;
     }
-    let host = ev.host.to_string();
-    let strategy = ev.strategy.to_string();
-    let escalated_from = ev.escalated_from.map(|s| s.to_string());
-    let ok = ev.ok;
-    let status = ev.status;
-    let timing_ms = ev.timing_ms;
-    let version = env!("CARGO_PKG_VERSION").to_string();
-    let os = std::env::consts::OS.to_string();
-
-    std::thread::spawn(move || {
-        let escalated = match escalated_from {
-            Some(s) => format!("\"{}\"", s),
-            None => "null".to_string(),
-        };
-        let body = format!(
-            r#"{{"host":"{}","strategy":"{}","escalated_from":{},"ok":{},"status":{},"timing_ms":{},"version":"{}","os":"{}"}}"#,
-            host, strategy, escalated, ok, status, timing_ms, version, os
-        );
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(3))
-            .build()
-            .ok();
-        if let Some(c) = client {
-            let _ = c.post(EVENTS_URL)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .send();
-        }
+    let payload = json!({
+        "host": ev.host,
+        "strategy": ev.strategy,
+        "escalated_from": ev.escalated_from,
+        "ok": ev.ok,
+        "status": ev.status,
+        "timing_ms": ev.timing_ms,
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
     });
+    enqueue(EVENTS_URL, payload.to_string());
 }
 
 /// Report a fetch failure — legacy endpoint. Still useful for aggregate
@@ -74,57 +113,46 @@ pub fn report_failure(domain: &str, status: u16, error_type: &str) {
     if is_opted_out() {
         return;
     }
-    let domain = domain.to_string();
-    let error_type = error_type.to_string();
-    let version = env!("CARGO_PKG_VERSION").to_string();
-    let os = std::env::consts::OS.to_string();
-    let has_cef = crate::cef::is_available();
-
-    std::thread::spawn(move || {
-        let body = format!(
-            r#"{{"event":"error","version":"{}","os":"{}","domain":"{}","status":{},"error":"{}","pro":{}}}"#,
-            version, os, domain, status, error_type, has_cef
-        );
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(3))
-            .build()
-            .ok();
-        if let Some(c) = client {
-            let _ = c.post(PING_URL)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .send();
-        }
+    let payload = json!({
+        "event": "error",
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
+        "domain": domain,
+        "status": status,
+        "error": error_type,
+        "pro": crate::cef::is_available(),
     });
+    enqueue(PING_URL, payload.to_string());
 }
 
-/// Send a daily command-level ping (fire-and-forget).
+/// Send a daily command-level ping.
 pub fn ping(event: &str) {
     if is_opted_out() {
         return;
     }
-    let event = event.to_string();
-    let version = env!("CARGO_PKG_VERSION").to_string();
-    let os = std::env::consts::OS.to_string();
-
     // Don't ping more than once per event per day.
-    let marker = ping_marker(&event);
+    let marker = ping_marker(event);
     if marker.exists() {
         return;
     }
-
-    std::thread::spawn(move || {
-        let _ = send_ping(&event, &version, &os);
-        if let Some(dir) = marker.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let _ = std::fs::write(&marker, "");
+    let payload = json!({
+        "event": event,
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
     });
+    enqueue(PING_URL, payload.to_string());
+
+    // Write the dedup marker after enqueueing — even if the actual POST
+    // fails later, we don't want to spam the daily endpoint on retries.
+    if let Some(dir) = marker.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&marker, "");
 }
 
-/// Extract the registrable hostname from a URL. Falls back to the raw
-/// host if parsing fails. Keeps subdomains (e.g. `docs.example.com`) —
-/// we can PSL-normalize later if needed.
+/// Extract the hostname from a URL. Returns `"unknown"` if parsing fails
+/// or the URL has no host. Keeps subdomains (e.g. `docs.example.com`);
+/// this does **not** perform PSL normalization (eTLD+1).
 pub fn extract_host(url: &str) -> String {
     url::Url::parse(url)
         .ok()
@@ -133,7 +161,7 @@ pub fn extract_host(url: &str) -> String {
 }
 
 /// True if telemetry should be suppressed.
-/// Checked via `WICK_TELEMETRY=0` env var or `~/.wick/no-telemetry` marker.
+/// Checked via `WICK_TELEMETRY=0` env var or `<wick-home>/no-telemetry` marker.
 pub fn is_opted_out() -> bool {
     if let Ok(v) = std::env::var("WICK_TELEMETRY") {
         let v = v.trim();
@@ -141,21 +169,19 @@ pub fn is_opted_out() -> bool {
             return true;
         }
     }
-    if let Some(home) = std::env::var_os("HOME") {
-        if PathBuf::from(home).join(".wick").join("no-telemetry").exists() {
-            return true;
-        }
-    }
-    false
+    wick_home().join("no-telemetry").exists()
+}
+
+/// Resolve `<HOME>/.wick`, falling back to `/tmp/.wick` if `HOME` is unset.
+/// Used by all on-disk wick state (telemetry markers, opt-out flag, etc.)
+/// so behavior is consistent across env configurations.
+pub(crate) fn wick_home() -> PathBuf {
+    let home = std::env::var_os("HOME").unwrap_or_else(|| "/tmp".into());
+    PathBuf::from(home).join(".wick")
 }
 
 fn ping_marker(event: &str) -> PathBuf {
-    let home = std::env::var_os("HOME").unwrap_or_else(|| "/tmp".into());
-    let date = epoch_day();
-    PathBuf::from(home)
-        .join(".wick")
-        .join("pings")
-        .join(format!("{}-{}", date, event))
+    wick_home().join("pings").join(format!("{}-{}", epoch_day(), event))
 }
 
 fn epoch_day() -> String {
@@ -164,22 +190,4 @@ fn epoch_day() -> String {
         .unwrap_or_default()
         .as_secs();
     format!("{}", secs / 86400)
-}
-
-fn send_ping(event: &str, version: &str, os: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let body = format!(
-        r#"{{"event":"{}","version":"{}","os":"{}"}}"#,
-        event, version, os
-    );
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()?;
-
-    client.post(PING_URL)
-        .header("Content-Type", "application/json")
-        .body(body)
-        .send()?;
-
-    Ok(())
 }

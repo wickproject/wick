@@ -26,11 +26,20 @@ pub struct FetchHtmlResult {
 /// Full fetch pipeline: validate → robots.txt → fetch → CAPTCHA → extract.
 ///
 /// Strategy selection:
-///   - site_cache "cronet" for this host → try Cronet first; only escalate if it fails.
-///   - site_cache "cef" for this host → go straight to CEF.
-///   - No cache entry → prefer CEF if installed (current default), else Cronet.
+///   - site_cache "cef" for this host → skip Cronet probe, go straight to CEF.
+///   - site_cache "cronet" (or unset) → try Cronet first; CEF is the
+///     escalation path if Cronet returns 403/503 and CEF is installed.
+///   - No cache entry → default to Cronet first; CEF is used only when
+///     escalation logic later selects it.
 ///
-/// Every terminal return point records a `FetchEvent` and updates `site_cache`.
+/// Terminal return points record a `FetchEvent` and update `site_cache`,
+/// except for the intentional robots.txt early return, which skips both
+/// (it's a user-config outcome, not a site-strategy outcome).
+///
+/// `site_cache::strategy` only ever holds "cef", "cronet", or "cef_timeout"
+/// — see `rust/src/site_cache.rs`. CAPTCHA outcomes are reported via
+/// `report_fetch` but recorded into the cache as the underlying transport
+/// strategy ("cronet"), since the next visit should retry that transport.
 pub async fn fetch(
     client: &Client,
     url: &str,
@@ -75,14 +84,7 @@ pub async fn fetch(
 
     let cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
-
-    // Strategy selection:
-    //   Cache says "cef" → skip Cronet probe, go straight to CEF.
-    //   Cache says "cronet" (or unset) → try Cronet first; CEF is the
-    //     escalation path if Cronet gets blocked. Default is Cronet-first
-    //     because most sites don't need JS rendering and Cronet is
-    //     ~20x faster. CEF gets used when the site actually demands it.
-    let cef_first = matches!(&cached, Some(s) if s.strategy == "cef") && cef_installed;
+    let cef_first = should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed);
 
     if cef_first {
         match crate::cef::render(url).await {
@@ -126,7 +128,11 @@ pub async fn fetch(
                         if retry.status < 400 {
                             let extracted = extract::extract(&retry.body, &parsed, format)?;
                             let timing_ms = start.elapsed().as_millis() as u64;
-                            site_cache::record(host, "captcha-auto", false, timing_ms);
+                            // Underlying transport is still Cronet — the
+                            // CAPTCHA might be gone or the cookies might
+                            // persist on the next visit. Telemetry tags
+                            // it as captcha-auto for our analysis.
+                            site_cache::record(host, "cronet", false, timing_ms);
                             analytics::report_fetch(FetchEvent {
                                 host, strategy: "captcha-auto",
                                 escalated_from: Some("cronet"),
@@ -155,7 +161,8 @@ pub async fn fetch(
                     let timing_ms = start.elapsed().as_millis() as u64;
                     if retry.status < 400 {
                         let extracted = extract::extract(&retry.body, &parsed, format)?;
-                        site_cache::record(host, "captcha-interactive", false, timing_ms);
+                        // Cache the underlying transport, not the CAPTCHA flow.
+                        site_cache::record(host, "cronet", false, timing_ms);
                         analytics::report_fetch(FetchEvent {
                             host, strategy: "captcha-interactive",
                             escalated_from: Some("cronet"),
@@ -312,7 +319,7 @@ pub async fn fetch_html(
 
     let cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
-    let cef_first = matches!(&cached, Some(s) if s.strategy == "cef") && cef_installed;
+    let cef_first = should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed);
 
     if cef_first {
         match crate::cef::render(url).await {
@@ -336,14 +343,50 @@ pub async fn fetch_html(
     let escalated_from = if cef_first { Some("cef") } else { None };
     let resp = client.get(url).await?;
     let timing_ms = start.elapsed().as_millis() as u64;
-    let ok = resp.status < 400;
+    let blocked = matches!(resp.status, 403 | 503);
 
+    // Cronet got blocked but CEF is available — escalate, mirroring fetch().
+    // Without this, crawl/map silently fail on JS-heavy or stealth-required
+    // sites the first time they're encountered (no cache entry yet).
+    if blocked && cef_installed && escalated_from.is_none() {
+        analytics::report_fetch(FetchEvent {
+            host, strategy: "cronet-blocked", escalated_from: None,
+            ok: false, status: resp.status, timing_ms,
+        });
+        match crate::cef::render(url).await {
+            Ok(html) => {
+                let timing_ms = start.elapsed().as_millis() as u64;
+                site_cache::record(host, "cef", false, timing_ms);
+                analytics::report_fetch(FetchEvent {
+                    host, strategy: "cef-after-cronet",
+                    escalated_from: Some("cronet"),
+                    ok: true, status: 200, timing_ms,
+                });
+                return Ok(FetchHtmlResult {
+                    html, url: url.to_string(), status_code: 200,
+                });
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "fetch_html {} returned HTTP {} and CEF fallback failed: {}",
+                    host, resp.status, e,
+                );
+                // Fall through to return the original blocked response.
+            }
+        }
+    }
+
+    let ok = !blocked && resp.status < 400;
     if ok {
         site_cache::record(host, "cronet", false, timing_ms);
     }
     analytics::report_fetch(FetchEvent {
-        host, strategy: "cronet", escalated_from,
-        ok, status: resp.status, timing_ms,
+        host,
+        strategy: if blocked { "cronet-blocked" } else { "cronet" },
+        escalated_from,
+        ok,
+        status: resp.status,
+        timing_ms,
     });
 
     if !ok {
@@ -367,4 +410,49 @@ fn is_challenge(body: &str) -> bool {
     ]
     .iter()
     .any(|sig| lower.contains(sig))
+}
+
+/// Decide whether to try CEF first based on the cached strategy and CEF
+/// availability. Pure function so the strategy-selection rule is easy
+/// to unit-test without spinning up a fetch pipeline.
+fn should_use_cef_first(cached_strategy: Option<&str>, cef_installed: bool) -> bool {
+    cef_installed && matches!(cached_strategy, Some("cef"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cef_first_only_when_cache_says_cef_and_installed() {
+        assert!(should_use_cef_first(Some("cef"), true));
+    }
+
+    #[test]
+    fn cef_first_false_when_cef_not_installed() {
+        assert!(!should_use_cef_first(Some("cef"), false));
+    }
+
+    #[test]
+    fn cef_first_false_for_cronet_cache_entry() {
+        assert!(!should_use_cef_first(Some("cronet"), true));
+    }
+
+    #[test]
+    fn cef_first_false_for_no_cache_entry() {
+        // Default is Cronet-first. CEF is only used when later escalation
+        // logic selects it.
+        assert!(!should_use_cef_first(None, true));
+        assert!(!should_use_cef_first(None, false));
+    }
+
+    #[test]
+    fn cef_first_false_for_unknown_strategy() {
+        // Anything outside the documented set falls through to the default
+        // (Cronet-first). Forward-compatible with future cache-value
+        // changes — won't accidentally route everything through CEF.
+        assert!(!should_use_cef_first(Some("captcha-auto"), true));
+        assert!(!should_use_cef_first(Some("cef_timeout"), true));
+        assert!(!should_use_cef_first(Some(""), true));
+    }
 }
