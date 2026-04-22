@@ -636,9 +636,11 @@ Options:
 <h3>How to opt out</h3>
 <p>Set an env var:</p>
 <pre><code>export WICK_TELEMETRY=0</code></pre>
-<p>Or create a marker file:</p>
-<pre><code>touch ~/.wick/no-telemetry</code></pre>
-<p>Either disables all telemetry — per-fetch reports, daily usage pings, and failure reports.</p>
+<p>Or create a marker file. Wick checks <code>~/.wick/no-telemetry</code>, and when <code>HOME</code> is unset it falls back to <code>/tmp/.wick/no-telemetry</code>:</p>
+<pre><code>touch ~/.wick/no-telemetry
+# or, in services/containers without HOME:
+touch /tmp/.wick/no-telemetry</code></pre>
+<p>Either the env var or either marker file disables all telemetry — per-fetch reports, daily usage pings, and failure reports.</p>
 
 <h3>Retention</h3>
 <p>Event records are kept for 92 days (Cloudflare Analytics Engine default), then deleted.</p>

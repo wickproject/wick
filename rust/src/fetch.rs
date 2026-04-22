@@ -103,8 +103,12 @@ pub async fn fetch(
                 });
             }
             Err(e) => {
+                let timing_ms = start.elapsed().as_millis() as u64;
                 tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
                 analytics::report_failure(host, 0, "cef_failed");
+                // Mark this host as cef_timeout so the next fetch won't pay
+                // the CEF-first cost again until cef succeeds and overwrites it.
+                site_cache::record(host, "cef_timeout", false, timing_ms);
                 // Fall through to Cronet.
             }
         }
@@ -112,7 +116,17 @@ pub async fn fetch(
 
     // Cronet path (either by choice or as fallback from CEF).
     let escalated_from = if cef_first { Some("cef") } else { None };
-    let resp = client.get(url).await?;
+    let resp = match client.get(url).await {
+        Ok(r) => r,
+        Err(e) => {
+            let timing_ms = start.elapsed().as_millis() as u64;
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "cronet-transport-error", escalated_from,
+                ok: false, status: 0, timing_ms,
+            });
+            return Err(e);
+        }
+    };
     let status = resp.status;
     let body = resp.body;
 
@@ -124,7 +138,18 @@ pub async fn fetch(
                 tracing::info!("CAPTCHA detected on {}. Trying auto-solve via CapSolver...", host);
                 match crate::captcha_auto::solve(&cap_key, url, &detected).await {
                     Ok(_token) => {
-                        let retry = client.get(url).await?;
+                        let retry = match client.get(url).await {
+                            Ok(r) => r,
+                            Err(e) => {
+                                let timing_ms = start.elapsed().as_millis() as u64;
+                                analytics::report_fetch(FetchEvent {
+                                    host, strategy: "captcha-auto",
+                                    escalated_from: Some("cronet"),
+                                    ok: false, status: 0, timing_ms,
+                                });
+                                return Err(e);
+                            }
+                        };
                         if retry.status < 400 {
                             let extracted = extract::extract(&retry.body, &parsed, format)?;
                             let timing_ms = start.elapsed().as_millis() as u64;
@@ -157,7 +182,18 @@ pub async fn fetch(
             match captcha::solve(url).await {
                 Ok(cookies) => {
                     tracing::info!("CAPTCHA solved! Got {} cookies. Retrying request...", cookies.len());
-                    let retry = client.get(url).await?;
+                    let retry = match client.get(url).await {
+                        Ok(r) => r,
+                        Err(e) => {
+                            let timing_ms = start.elapsed().as_millis() as u64;
+                            analytics::report_fetch(FetchEvent {
+                                host, strategy: "captcha-interactive",
+                                escalated_from: Some("cronet"),
+                                ok: false, status: 0, timing_ms,
+                            });
+                            return Err(e);
+                        }
+                    };
                     let timing_ms = start.elapsed().as_millis() as u64;
                     if retry.status < 400 {
                         let extracted = extract::extract(&retry.body, &parsed, format)?;
@@ -190,10 +226,14 @@ pub async fn fetch(
             }
         }
 
-        // CAPTCHA with no solver available.
+        // CAPTCHA with no solver available. The challenge was hit on the
+        // Cronet transport, so we tag escalated_from accordingly to match
+        // the captcha-auto / captcha-interactive branches above (the
+        // `captcha-*` strategy is an enrichment of the cronet attempt, not
+        // a transport switch).
         let timing_ms = start.elapsed().as_millis() as u64;
         analytics::report_fetch(FetchEvent {
-            host, strategy: "captcha-blocked", escalated_from,
+            host, strategy: "captcha-blocked", escalated_from: Some("cronet"),
             ok: false, status, timing_ms,
         });
         return Ok(FetchResult {
@@ -335,13 +375,25 @@ pub async fn fetch_html(
                 });
             }
             Err(e) => {
+                let timing_ms = start.elapsed().as_millis() as u64;
                 tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
+                site_cache::record(host, "cef_timeout", false, timing_ms);
             }
         }
     }
 
     let escalated_from = if cef_first { Some("cef") } else { None };
-    let resp = client.get(url).await?;
+    let resp = match client.get(url).await {
+        Ok(r) => r,
+        Err(e) => {
+            let timing_ms = start.elapsed().as_millis() as u64;
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "cronet-transport-error", escalated_from,
+                ok: false, status: 0, timing_ms,
+            });
+            return Err(e);
+        }
+    };
     let timing_ms = start.elapsed().as_millis() as u64;
     let blocked = matches!(resp.status, 403 | 503);
 

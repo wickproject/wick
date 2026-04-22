@@ -52,40 +52,50 @@ enum Job {
     PostJson(&'static str, String), // (url, JSON body)
 }
 
-fn worker_sender() -> &'static SyncSender<Job> {
-    static SENDER: OnceLock<SyncSender<Job>> = OnceLock::new();
-    SENDER.get_or_init(|| {
-        let (tx, rx) = sync_channel::<Job>(QUEUE_CAP);
-        std::thread::Builder::new()
-            .name("wick-analytics".into())
-            .spawn(move || {
-                // One reused client for the lifetime of the worker.
-                let client = reqwest::blocking::Client::builder()
-                    .timeout(HTTP_TIMEOUT)
-                    .build()
-                    .ok();
-                while let Ok(job) = rx.recv() {
-                    match (&client, job) {
-                        (Some(c), Job::PostJson(url, body)) => {
-                            let _ = c
-                                .post(url)
-                                .header("Content-Type", "application/json")
-                                .body(body)
-                                .send();
+/// Returns the worker's sender, or `None` if the worker thread couldn't be
+/// spawned (e.g. resource limits, unusual platforms). Telemetry must never
+/// fail loudly, so a spawn error simply disables telemetry for the process.
+fn worker_sender() -> Option<&'static SyncSender<Job>> {
+    static SENDER: OnceLock<Option<SyncSender<Job>>> = OnceLock::new();
+    SENDER
+        .get_or_init(|| {
+            let (tx, rx) = sync_channel::<Job>(QUEUE_CAP);
+            let spawn_result = std::thread::Builder::new()
+                .name("wick-analytics".into())
+                .spawn(move || {
+                    // One reused client for the lifetime of the worker.
+                    let client = reqwest::blocking::Client::builder()
+                        .timeout(HTTP_TIMEOUT)
+                        .build()
+                        .ok();
+                    while let Ok(job) = rx.recv() {
+                        match (&client, job) {
+                            (Some(c), Job::PostJson(url, body)) => {
+                                let _ = c
+                                    .post(url)
+                                    .header("Content-Type", "application/json")
+                                    .body(body)
+                                    .send();
+                            }
+                            (None, _) => { /* client failed to build; drop silently */ }
                         }
-                        (None, _) => { /* client failed to build; drop silently */ }
                     }
-                }
-            })
-            .expect("spawn wick-analytics thread");
-        tx
-    })
+                });
+            match spawn_result {
+                Ok(_handle) => Some(tx),
+                Err(_) => None,
+            }
+        })
+        .as_ref()
 }
 
-/// Enqueue a JSON post. Returns immediately; on a full queue the event is
-/// dropped (telemetry never applies backpressure).
+/// Enqueue a JSON post. Returns immediately; on a full queue or if the
+/// worker thread couldn't be spawned, the event is dropped silently
+/// (telemetry never applies backpressure or fails loudly).
 fn enqueue(url: &'static str, body: String) {
-    let _ = worker_sender().try_send(Job::PostJson(url, body));
+    if let Some(s) = worker_sender() {
+        let _ = s.try_send(Job::PostJson(url, body));
+    }
 }
 
 /// Report a per-fetch outcome. Fire-and-forget.
