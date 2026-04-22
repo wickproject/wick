@@ -11,6 +11,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://getwick.dev/stats.html</loc>
+    <lastmod>2026-04-21</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://getwick.dev/blog/</loc>
     <lastmod>2026-03-26</lastmod>
     <priority>0.7</priority>
@@ -38,6 +43,11 @@
   <url>
     <loc>https://getwick.dev/blog/wick-0-7-http-api.html</loc>
     <lastmod>2026-03-26</lastmod>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://getwick.dev/blog/live-stats.html</loc>
+    <lastmod>2026-04-21</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
