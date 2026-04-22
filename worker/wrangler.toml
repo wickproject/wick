@@ -1,0 +1,29 @@
+name = "wick-releases"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = false
+
+# Custom domain: releases.getwick.dev
+routes = [{ pattern = "releases.getwick.dev/*", zone_name = "getwick.dev" }]
+
+# R2 bucket for storing release tarballs
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "wick-releases"
+
+# KV used for telemetry counters + (legacy) subscription records.
+# Binding name is kept as SUBSCRIPTIONS for continuity with existing
+# KV entries; prefixes are `ping:`, `evt:`, `errors:`, `errorlog:`,
+# `stats:`, and `key:`/`session:` for any remaining legacy records.
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "cc2ea7f5a022431dbb5361c3741786d1"
+
+# API keys for the protected endpoints (/solve, /proxy, /analytics,
+# /releases) are a JSON object in a secret:
+# { "key1": { "customer": "Acme Corp", "active": true }, ... }
+# Set with: npx wrangler secret put API_KEYS
+
+# Per-fetch telemetry is stored in the same SUBSCRIPTIONS KV namespace
+# under the `evt:` prefix. No additional binding required — keeping this
+# on Workers Free avoids pulling in the Analytics Engine paid tier.
