@@ -71,8 +71,7 @@ pub fn record(host: &str, strategy: &str, needs_residential: bool, time_ms: u64)
 }
 
 fn cache_path() -> PathBuf {
-    let home = std::env::var_os("HOME").unwrap_or_else(|| "/tmp".into());
-    PathBuf::from(home).join(".wick").join("site-cache.json")
+    crate::analytics::wick_home().join("site-cache.json")
 }
 
 fn load_cache() -> HashMap<String, SiteStrategy> {
