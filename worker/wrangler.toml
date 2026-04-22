@@ -11,12 +11,16 @@ routes = [{ pattern = "releases.getwick.dev/*", zone_name = "getwick.dev" }]
 binding = "RELEASES"
 bucket_name = "wick-releases"
 
-# KV for Pro subscriptions (email → key → status)
+# KV used for telemetry counters + (legacy) subscription records.
+# Binding name is kept as SUBSCRIPTIONS for continuity with existing
+# KV entries; prefixes are `ping:`, `evt:`, `errors:`, `errorlog:`,
+# `stats:`, and `key:`/`session:` for any remaining legacy records.
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
 id = "cc2ea7f5a022431dbb5361c3741786d1"
 
-# API keys stored as a JSON object in a secret:
+# API keys for the protected endpoints (/solve, /proxy, /analytics,
+# /releases) are a JSON object in a secret:
 # { "key1": { "customer": "Acme Corp", "active": true }, ... }
 # Set with: npx wrangler secret put API_KEYS
 
