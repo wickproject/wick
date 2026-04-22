@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wick Stats — Live Success Rates by Site</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="description" content="Live per-site success rates and strategy breakdown for Wick. Updated every 5 minutes from real user telemetry.">
+<meta name="keywords" content="wick stats, wick success rates, scraping success rate, mcp server analytics, wick telemetry">
+<meta property="og:title" content="Wick Stats — Live Success Rates by Site">
+<meta property="og:description" content="Which sites work with Cronet, which need CEF, which are currently broken — updated from real user telemetry.">
+<meta property="og:url" content="https://getwick.dev/stats.html">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://getwick.dev/og-image.png">
+<link rel="canonical" href="https://getwick.dev/stats.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --flame: #E8913A;
+  --flame-bright: #F5B74C;
+  --flame-hot: #FF6B2B;
+  --ember: #C45A1A;
+  --ash: #1A1714;
+  --smoke: #2A2520;
+  --smoke-light: #3D3630;
+  --warm-white: #F0E6D8;
+  --warm-gray: #9E958A;
+  --cool-gray: #6B635A;
+  --black: #0D0B09;
+  --good: #7DB86F;
+  --mid: #E8913A;
+  --bad: #D95D5D;
+  --font-display: 'Outfit', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--black);
+  color: var(--warm-white);
+  font-family: var(--font-display);
+  font-weight: 300;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--flame); color: var(--black); }
+
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  height: 3.5rem; padding: 0 2rem;
+  display: flex; align-items: center;
+  background: rgba(13,11,9,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(232,145,58,0.06);
+}
+.topbar-logo {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 0.95rem; color: var(--warm-white);
+  text-decoration: none; letter-spacing: 0.06em;
+}
+.topbar-logo span { color: var(--flame); font-weight: 300; margin-left: 0.5rem; font-size: 0.8rem; }
+.topbar-links { margin-left: auto; display: flex; gap: 1.5rem; }
+.topbar-links a {
+  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
+  letter-spacing: 0.04em; transition: color 0.2s;
+}
+.topbar-links a:hover { color: var(--warm-white); }
+
+.container { max-width: 1000px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+h1 {
+  font-family: var(--font-serif);
+  font-size: 2.6rem; font-weight: 400; font-style: italic;
+  color: var(--warm-white); margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+.subtitle {
+  color: var(--warm-gray); font-size: 1rem; max-width: 640px;
+  margin-bottom: 0.5rem;
+}
+.generated {
+  color: var(--cool-gray); font-size: 0.75rem; font-family: var(--font-mono);
+  margin-bottom: 3rem;
+}
+.generated.live::before {
+  content: "●"; color: var(--good); margin-right: 0.4rem;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.35; }
+}
+
+section { margin-bottom: 4rem; }
+section h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem; font-weight: 600;
+  color: var(--warm-white); margin-bottom: 0.35rem;
+  letter-spacing: 0.01em;
+}
+section .hint {
+  font-size: 0.85rem; color: var(--warm-gray); margin-bottom: 1.25rem;
+}
+
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.85rem;
+}
+th {
+  text-align: left; padding: 0.6rem 0.75rem;
+  background: var(--smoke); color: var(--warm-gray);
+  font-weight: 500; font-size: 0.7rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border-bottom: 1px solid var(--smoke-light);
+}
+td {
+  padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--smoke);
+  vertical-align: middle; color: var(--warm-gray);
+}
+td.host { color: var(--warm-white); font-family: var(--font-mono); font-size: 0.82rem; }
+td.strategy { font-family: var(--font-mono); font-size: 0.78rem; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--warm-white); }
+td.bar { width: 12rem; padding: 0.4rem 0.75rem; }
+.bar-wrap { background: var(--smoke); border-radius: 2px; height: 8px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; transition: width 0.4s; }
+.bar-fill.good { background: var(--good); }
+.bar-fill.mid  { background: var(--mid); }
+.bar-fill.bad  { background: var(--bad); }
+
+.empty, .error {
+  background: var(--smoke);
+  border: 1px solid var(--smoke-light);
+  padding: 2rem 1.5rem;
+  border-radius: 6px;
+  text-align: center;
+  color: var(--warm-gray);
+  font-size: 0.9rem;
+}
+.error { color: var(--bad); border-color: rgba(217, 93, 93, 0.25); }
+
+.footer {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 1px solid var(--smoke-light);
+  color: var(--cool-gray); font-size: 0.8rem;
+}
+.footer a { color: var(--flame); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+.chip {
+  display: inline-block; font-family: var(--font-mono);
+  font-size: 0.65rem; letter-spacing: 0.04em;
+  padding: 0.1rem 0.4rem; border-radius: 3px;
+  background: var(--smoke); color: var(--warm-gray);
+  border: 1px solid var(--smoke-light);
+  margin-right: 0.3rem;
+}
+.chip.cef   { border-color: rgba(232,145,58,0.3); color: var(--flame); }
+.chip.cronet { border-color: rgba(125,184,111,0.25); color: var(--good); }
+.chip.captcha-auto, .chip.captcha-interactive { border-color: rgba(245,183,76,0.3); color: var(--flame-bright); }
+.chip.cronet-blocked, .chip.cronet-error, .chip.captcha-blocked { border-color: rgba(217,93,93,0.3); color: var(--bad); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/" class="topbar-logo">Wick <span>Stats</span></a>
+  <div class="topbar-links">
+    <a href="/">Home</a>
+    <a href="/docs.html">Docs</a>
+    <a href="/blog/">Blog</a>
+    <a href="https://github.com/wickproject/wick">GitHub</a>
+  </div>
+</div>
+
+<div class="container">
+
+<h1>Live stats</h1>
+<p class="subtitle">Which sites Wick works on, which strategy won, and where it's still losing — from real per-fetch telemetry.</p>
+<p id="generated" class="generated">Loading…</p>
+
+<section>
+  <h2>Top hosts by fetch volume (last 7d)</h2>
+  <p class="hint">Sorted by how many times Wick has been asked to fetch the site. Success rate is the share of those fetches that returned a real page.</p>
+  <div id="top-hosts">
+    <div class="empty">Waiting for data…</div>
+  </div>
+</section>
+
+<section>
+  <h2>Hosts that need CEF</h2>
+  <p class="hint">Wick learned to escalate these sites to the CEF renderer because the lightweight Cronet path failed on them. Good candidates to benchmark against competitors.</p>
+  <div id="cef-required">
+    <div class="empty">Waiting for data…</div>
+  </div>
+</section>
+
+<section>
+  <h2>Current failures</h2>
+  <p class="hint">Hosts where no Wick strategy returned a real page in the last 7 days. These are our active work queue.</p>
+  <div id="failures">
+    <div class="empty">Waiting for data…</div>
+  </div>
+</section>
+
+<div class="footer">
+  <p>Backend data is refreshed every 5 minutes; reload this page to see the latest updates. Nothing here identifies individual users or includes URL paths — see the <a href="/docs.html#telemetry">telemetry docs</a> for exactly what's collected and how to opt out.</p>
+</div>
+
+</div>
+
+<script>
+/**
+ * Telemetry data from the backend is structured JSON, but hostnames are
+ * user-provided. All text that flows into the DOM uses textContent or
+ * attribute setters — no innerHTML with interpolated strings.
+ */
+const ENDPOINT = "https://releases.getwick.dev/v1/stats/summary";
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "className") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else if (k.startsWith("data-")) node.setAttribute(k, v);
+    else if (k === "style") node.setAttribute("style", v);
+    else node[k] = v;
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    if (typeof c === "string") node.appendChild(document.createTextNode(c));
+    else node.appendChild(c);
+  }
+  return node;
+}
+
+function replace(parent, child) {
+  while (parent.firstChild) parent.removeChild(parent.firstChild);
+  parent.appendChild(child);
+}
+
+function pct(n) { return (n * 100).toFixed(0) + "%"; }
+function fmt(n) { return new Intl.NumberFormat().format(n); }
+
+function strategyClass(s) {
+  return "chip " + (s || "").replace(/[^a-z-]/gi, "").toLowerCase();
+}
+
+function bar(rate) {
+  const cls = rate >= 0.9 ? "good" : rate >= 0.5 ? "mid" : "bad";
+  const wrap = el("div", { className: "bar-wrap" });
+  const fill = el("div", { className: "bar-fill " + cls, style: "width:" + Math.round(rate * 100) + "%" });
+  wrap.appendChild(fill);
+  return wrap;
+}
+
+function mkTable(head, rowBuilders) {
+  const table = el("table");
+  const thead = el("thead");
+  const thr = el("tr");
+  for (const h of head) thr.appendChild(el("th", { text: h }));
+  thead.appendChild(thr);
+  table.appendChild(thead);
+  const tbody = el("tbody");
+  for (const b of rowBuilders) {
+    const tr = el("tr");
+    for (const c of b) tr.appendChild(c);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  return table;
+}
+
+function emptyBox(text) { return el("div", { className: "empty", text }); }
+function errorBox(text) { return el("div", { className: "error", text }); }
+
+function renderTopHosts(rows) {
+  const byHost = new Map();
+  for (const r of rows) {
+    if (!byHost.has(r.host)) byHost.set(r.host, { host: r.host, total: 0, ok: 0, strategies: new Map() });
+    const e = byHost.get(r.host);
+    e.total += r.fetches;
+    e.ok += r.successes;
+    const s = e.strategies.get(r.strategy) || { fetches: 0, successes: 0, p50: 0 };
+    s.fetches += r.fetches; s.successes += r.successes; s.p50 = r.p50_ms;
+    e.strategies.set(r.strategy, s);
+  }
+  const hosts = [...byHost.values()].sort((a, b) => b.total - a.total).slice(0, 30);
+  if (!hosts.length) return emptyBox("No fetches recorded yet.");
+
+  const builders = hosts.map(h => {
+    const rate = h.total ? h.ok / h.total : 0;
+    // Fetch-weighted p50 across strategies. The unweighted mean skews
+    // toward rare strategies (e.g. a single slow `captcha-*` fetch
+    // dominates a host with thousands of fast `cronet` fetches).
+    const p50Stats = [...h.strategies.values()].filter(s => s.p50 > 0 && s.fetches > 0);
+    const weightedFetches = p50Stats.reduce((sum, s) => sum + s.fetches, 0);
+    const weightedP50 = p50Stats.reduce((sum, s) => sum + s.p50 * s.fetches, 0);
+    const p50 = weightedFetches ? Math.round(weightedP50 / weightedFetches) : 0;
+    const chips = [...h.strategies.keys()].sort().map(s => el("span", { className: strategyClass(s), text: s }));
+    const stratCell = el("td", { className: "strategy" });
+    chips.forEach(c => stratCell.appendChild(c));
+    return [
+      el("td", { className: "host", text: h.host }),
+      stratCell,
+      el("td", { className: "num", text: fmt(h.total) }),
+      el("td", { className: "num", text: pct(rate) }),
+      el("td", { className: "bar" }, bar(rate)),
+      el("td", { className: "num", text: p50 ? fmt(p50) + "ms" : "—" }),
+    ];
+  });
+
+  return mkTable(["Host", "Strategies seen", "Fetches", "OK", "OK bar", "p50"], builders);
+}
+
+// Cronet-family strategies are all Cronet-transport outcomes: the plain
+// happy path, the blocked/error branches, transport errors, and the
+// captcha-* branches (which are enrichments of a Cronet attempt rather
+// than a transport switch). When comparing CEF to "did Cronet work?",
+// we need to aggregate all of these — counting only raw `"cronet"` rows
+// dramatically understates Cronet volume on hosts that see a lot of
+// blocks or challenges, and makes the Cronet-OK column misleading.
+function isCronetFamilyStrategy(strategy) {
+  return strategy === "cronet" ||
+         strategy.startsWith("cronet-") ||
+         strategy.startsWith("captcha-");
+}
+
+function mergeCronetBaseline(current, row) {
+  const fetches = (current ? current.fetches : 0) + (row.fetches || 0);
+  const successes = (current ? current.successes : 0) + (row.successes || 0);
+  return {
+    fetches,
+    successes,
+    success_rate: fetches > 0 ? successes / fetches : 0,
+  };
+}
+
+function renderCefRequired(rows) {
+  const perHost = new Map();
+  for (const r of rows) {
+    if (!perHost.has(r.host)) perHost.set(r.host, { cronet: null, cef: null });
+    const e = perHost.get(r.host);
+    if (isCronetFamilyStrategy(r.strategy)) {
+      e.cronet = mergeCronetBaseline(e.cronet, r);
+    } else if (r.strategy === "cef" || r.strategy === "cef-after-cronet") {
+      if (!e.cef || r.fetches > e.cef.fetches) e.cef = r;
+    }
+  }
+  const picks = [];
+  for (const [host, v] of perHost) {
+    if (v.cef && v.cef.successes > 0 && (!v.cronet || v.cronet.success_rate < 0.5)) {
+      picks.push({ host, cef: v.cef, cronet: v.cronet });
+    }
+  }
+  picks.sort((a, b) => b.cef.fetches - a.cef.fetches);
+  const top = picks.slice(0, 20);
+  if (!top.length) return emptyBox("No CEF-escalated hosts in the window.");
+
+  const builders = top.map(r => [
+    el("td", { className: "host", text: r.host }),
+    el("td", { className: "num", text: fmt(r.cef.fetches) }),
+    el("td", { className: "num", text: pct(r.cef.success_rate) }),
+    el("td", { className: "num", text: r.cronet ? pct(r.cronet.success_rate) : "—" }),
+    el("td", { className: "num", text: fmt(Math.round(r.cef.p50_ms)) + "ms" }),
+  ]);
+
+  return mkTable(["Host", "CEF fetches", "CEF OK", "Cronet OK", "CEF p50"], builders);
+}
+
+function renderFailures(rows) {
+  const perHost = new Map();
+  for (const r of rows) {
+    if (!perHost.has(r.host)) perHost.set(r.host, { total: 0, ok: 0 });
+    const e = perHost.get(r.host);
+    e.total += r.fetches;
+    e.ok += r.successes;
+  }
+  const failing = [...perHost.entries()]
+    .filter(([_, v]) => v.total >= 10 && v.ok === 0)
+    .map(([host, v]) => ({ host, total: v.total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 20);
+  if (!failing.length) return emptyBox("No hosts are currently failing across every strategy.");
+
+  const builders = failing.map(r => [
+    el("td", { className: "host", text: r.host }),
+    el("td", { className: "num", text: fmt(r.total) }),
+  ]);
+
+  return mkTable(["Host", "Attempts"], builders);
+}
+
+// Paint the same error state across every section, so the page
+// never looks "partially loaded" with some sections stuck on
+// "Waiting for data…". Called from both the non-OK response path
+// and the catch path.
+function renderAllError(message) {
+  for (const id of ["top-hosts", "cef-required", "failures"]) {
+    replace(document.getElementById(id), errorBox(message));
+  }
+}
+
+async function load() {
+  const gen = document.getElementById("generated");
+  try {
+    const resp = await fetch(ENDPOINT);
+    if (!resp.ok) {
+      gen.textContent = "Stats backend not available yet.";
+      gen.classList.remove("live");
+      renderAllError("Stats endpoint returned HTTP " + resp.status + ". Check back shortly.");
+      return;
+    }
+    const data = await resp.json();
+    const when = new Date(data.generated_at).toLocaleString();
+    gen.textContent = "Generated " + when + " · " +
+      (data.rows || []).length + " (host, strategy) pairs in last " + data.window_days + "d";
+    gen.classList.add("live");
+
+    replace(document.getElementById("top-hosts"), renderTopHosts(data.rows || []));
+    replace(document.getElementById("cef-required"), renderCefRequired(data.rows || []));
+    replace(document.getElementById("failures"), renderFailures(data.rows || []));
+  } catch (e) {
+    gen.textContent = "Couldn't load stats.";
+    renderAllError(String(e));
+  }
+}
+
+load();
+</script>
+
+</body>
+</html>
