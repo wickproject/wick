@@ -15,169 +15,115 @@
 <link rel="canonical" href="https://getwick.dev/stats.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
 <style>
-:root {
-  --flame: #E8913A;
-  --flame-bright: #F5B74C;
-  --flame-hot: #FF6B2B;
-  --ember: #C45A1A;
-  --ash: #1A1714;
-  --smoke: #2A2520;
-  --smoke-light: #3D3630;
-  --warm-white: #F0E6D8;
-  --warm-gray: #9E958A;
-  --cool-gray: #6B635A;
-  --black: #0D0B09;
-  --good: #7DB86F;
-  --mid: #E8913A;
-  --bad: #D95D5D;
-  --font-display: 'Outfit', sans-serif;
-  --font-serif: 'Instrument Serif', serif;
-  --font-mono: 'JetBrains Mono', monospace;
+.page--stats{max-width:1100px;}
+.page--stats > .lede{font-size:17px;color:var(--bone-dim);max-width:640px;margin-bottom:14px;line-height:1.6;}
+.page--stats .generated{
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--mute);margin-bottom:48px;display:inline-block;
+}
+.page--stats .generated.live::before{
+  content:"●";color:var(--cyan);margin-right:8px;
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.page--stats section{margin-bottom:64px;}
+.page--stats section h2{
+  font-family:var(--f-display);font-style:italic;font-weight:400;
+  font-size:clamp(20px, 2.2vw, 26px);line-height:1.2;
+  color:var(--bone);
+  margin:0 0 6px;border-top:none;padding-top:0;
+}
+.page--stats section .hint{
+  font-size:14px;color:var(--bone-dim);margin-bottom:1.25rem;line-height:1.6;
 }
 
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  background: var(--black);
-  color: var(--warm-white);
-  font-family: var(--font-display);
-  font-weight: 300;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+.page--stats table{
+  width:100%;border-collapse:collapse;font-size:13.5px;margin:0;
 }
-::selection { background: var(--flame); color: var(--black); }
+.page--stats th{
+  text-align:left;padding:0.6rem 0.75rem;
+  background:rgba(111,227,255,.04);
+  color:var(--bone-dim);
+  font-family:var(--f-mono);font-weight:500;font-size:10.5px;
+  letter-spacing:.16em;text-transform:uppercase;
+  border-bottom:1px solid var(--line-2);
+}
+.page--stats td{
+  padding:0.55rem 0.75rem;border-bottom:1px solid var(--line);
+  vertical-align:middle;color:var(--bone-dim);
+}
+.page--stats td.host{color:var(--bone);font-family:var(--f-mono);font-size:13px;}
+.page--stats td.strategy{font-family:var(--f-mono);font-size:12px;}
+.page--stats td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--bone);}
+.page--stats td.bar{width:12rem;padding:0.4rem 0.75rem;}
+.bar-wrap{background:var(--ink-3);border-radius:2px;height:8px;overflow:hidden;position:relative;}
+.bar-fill{height:100%;transition:width .4s;}
+.bar-fill.good{background:var(--good);}
+.bar-fill.mid {background:var(--amber);}
+.bar-fill.bad {background:var(--red);}
 
-.topbar {
-  position: sticky; top: 0; z-index: 10;
-  height: 3.5rem; padding: 0 2rem;
-  display: flex; align-items: center;
-  background: rgba(13,11,9,0.92); backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(232,145,58,0.06);
+.page--stats .empty, .page--stats .error{
+  background:rgba(10,14,20,.6);
+  border:1px solid var(--line);
+  padding:2rem 1.5rem;border-radius:6px;
+  text-align:center;color:var(--fog);font-size:14px;
 }
-.topbar-logo {
-  font-family: var(--font-display); font-weight: 700;
-  font-size: 0.95rem; color: var(--warm-white);
-  text-decoration: none; letter-spacing: 0.06em;
-}
-.topbar-logo span { color: var(--flame); font-weight: 300; margin-left: 0.5rem; font-size: 0.8rem; }
-.topbar-links { margin-left: auto; display: flex; gap: 1.5rem; }
-.topbar-links a {
-  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
-  letter-spacing: 0.04em; transition: color 0.2s;
-}
-.topbar-links a:hover { color: var(--warm-white); }
+.page--stats .error{color:var(--red);border-color:rgba(255,107,107,.25);}
 
-.container { max-width: 1000px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+.chip{
+  display:inline-block;font-family:var(--f-mono);
+  font-size:10px;letter-spacing:.06em;
+  padding:2px 8px;border-radius:2px;
+  background:rgba(180,210,235,.04);color:var(--bone-dim);
+  border:1px solid var(--line-2);margin-right:0.3rem;
+}
+.chip.cef{border-color:rgba(255,181,89,.35);color:var(--amber);}
+.chip.cronet{border-color:rgba(126,221,195,.3);color:var(--good);}
+.chip.cefaftercronet, .chip.cef-after-cronet{border-color:rgba(181,156,255,.3);color:var(--violet);}
+.chip.captcha-auto, .chip.captcha-interactive, .chip.captchaauto, .chip.captchainteractive{border-color:rgba(255,208,138,.35);color:var(--amber-hot);}
+.chip.cronet-blocked, .chip.cronet-error, .chip.captcha-blocked, .chip.cronetblocked, .chip.cronet-transport-error{border-color:rgba(255,107,107,.35);color:var(--red);}
 
-h1 {
-  font-family: var(--font-serif);
-  font-size: 2.6rem; font-weight: 400; font-style: italic;
-  color: var(--warm-white); margin-bottom: 0.75rem;
-  letter-spacing: -0.01em;
+.page--stats .stats-foot{
+  margin-top:64px;padding-top:24px;
+  border-top:1px solid var(--line);
+  font-size:13px;color:var(--fog);line-height:1.7;
 }
-.subtitle {
-  color: var(--warm-gray); font-size: 1rem; max-width: 640px;
-  margin-bottom: 0.5rem;
-}
-.generated {
-  color: var(--cool-gray); font-size: 0.75rem; font-family: var(--font-mono);
-  margin-bottom: 3rem;
-}
-.generated.live::before {
-  content: "●"; color: var(--good); margin-right: 0.4rem;
-  animation: pulse 2s infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; } 50% { opacity: 0.35; }
-}
-
-section { margin-bottom: 4rem; }
-section h2 {
-  font-family: var(--font-display);
-  font-size: 1.15rem; font-weight: 600;
-  color: var(--warm-white); margin-bottom: 0.35rem;
-  letter-spacing: 0.01em;
-}
-section .hint {
-  font-size: 0.85rem; color: var(--warm-gray); margin-bottom: 1.25rem;
-}
-
-table {
-  width: 100%; border-collapse: collapse;
-  font-size: 0.85rem;
-}
-th {
-  text-align: left; padding: 0.6rem 0.75rem;
-  background: var(--smoke); color: var(--warm-gray);
-  font-weight: 500; font-size: 0.7rem;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  border-bottom: 1px solid var(--smoke-light);
-}
-td {
-  padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--smoke);
-  vertical-align: middle; color: var(--warm-gray);
-}
-td.host { color: var(--warm-white); font-family: var(--font-mono); font-size: 0.82rem; }
-td.strategy { font-family: var(--font-mono); font-size: 0.78rem; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--warm-white); }
-td.bar { width: 12rem; padding: 0.4rem 0.75rem; }
-.bar-wrap { background: var(--smoke); border-radius: 2px; height: 8px; overflow: hidden; position: relative; }
-.bar-fill { height: 100%; transition: width 0.4s; }
-.bar-fill.good { background: var(--good); }
-.bar-fill.mid  { background: var(--mid); }
-.bar-fill.bad  { background: var(--bad); }
-
-.empty, .error {
-  background: var(--smoke);
-  border: 1px solid var(--smoke-light);
-  padding: 2rem 1.5rem;
-  border-radius: 6px;
-  text-align: center;
-  color: var(--warm-gray);
-  font-size: 0.9rem;
-}
-.error { color: var(--bad); border-color: rgba(217, 93, 93, 0.25); }
-
-.footer {
-  margin-top: 5rem; padding-top: 2rem;
-  border-top: 1px solid var(--smoke-light);
-  color: var(--cool-gray); font-size: 0.8rem;
-}
-.footer a { color: var(--flame); text-decoration: none; }
-.footer a:hover { text-decoration: underline; }
-
-.chip {
-  display: inline-block; font-family: var(--font-mono);
-  font-size: 0.65rem; letter-spacing: 0.04em;
-  padding: 0.1rem 0.4rem; border-radius: 3px;
-  background: var(--smoke); color: var(--warm-gray);
-  border: 1px solid var(--smoke-light);
-  margin-right: 0.3rem;
-}
-.chip.cef   { border-color: rgba(232,145,58,0.3); color: var(--flame); }
-.chip.cronet { border-color: rgba(125,184,111,0.25); color: var(--good); }
-.chip.captcha-auto, .chip.captcha-interactive { border-color: rgba(245,183,76,0.3); color: var(--flame-bright); }
-.chip.cronet-blocked, .chip.cronet-error, .chip.captcha-blocked { border-color: rgba(217,93,93,0.3); color: var(--bad); }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <a href="/" class="topbar-logo">Wick <span>Stats</span></a>
-  <div class="topbar-links">
-    <a href="/">Home</a>
-    <a href="/docs.html">Docs</a>
-    <a href="/blog/">Blog</a>
-    <a href="https://github.com/wickproject/wick">GitHub</a>
-  </div>
-</div>
+<div id="atmos"></div>
 
-<div class="container">
+<nav class="site-nav" id="nav">
+  <a href="/" class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 28 28" fill="none">
+        <circle class="ring" cx="14" cy="14" r="12" stroke="#6fe3ff" stroke-dasharray="2 4" opacity=".6"/>
+        <circle class="ring-2" cx="14" cy="14" r="8" stroke="#6fe3ff" stroke-dasharray="1 2" opacity=".8"/>
+        <circle cx="14" cy="14" r="2.5" fill="#6fe3ff"/>
+        <circle cx="14" cy="14" r="4" stroke="#6fe3ff" opacity=".35"/>
+      </svg>
+    </span>
+    <span class="brand-text">W<b>/</b>I<b>/</b>C<b>/</b>K <span class="brand-sub">unveil_protocol</span></span>
+  </a>
+  <button class="menu-toggle" onclick="document.getElementById('nav-links').classList.toggle('mobile-open')">☰</button>
+  <ul class="nav-links" id="nav-links">
+    <li><a href="/docs.html">Docs</a></li>
+    <li><a href="/blog/">Blog</a></li>
+    <li><a href="/stats.html" class="current">Stats</a></li>
+    <li><a href="https://github.com/wickproject/wick" class="nav-cta">GitHub ↗</a></li>
+  </ul>
+</nav>
 
-<h1>Live stats</h1>
-<p class="subtitle">Which sites Wick works on, which strategy won, and where it's still losing — from real per-fetch telemetry.</p>
+<main class="page page--wide page--stats">
+
+<div class="eyebrow">live telemetry</div>
+<h1>Live <em>stats</em></h1>
+<p class="lede">Which sites Wick works on, which strategy won, and where it's still losing — from real per-fetch telemetry.</p>
 <p id="generated" class="generated">Loading…</p>
 
 <section>
@@ -204,11 +150,11 @@ td.bar { width: 12rem; padding: 0.4rem 0.75rem; }
   </div>
 </section>
 
-<div class="footer">
+<div class="stats-foot">
   <p>Backend data is refreshed every 5 minutes; reload this page to see the latest updates. Nothing here identifies individual users or includes URL paths — see the <a href="/docs.html#telemetry">telemetry docs</a> for exactly what's collected and how to opt out.</p>
 </div>
 
-</div>
+</main>
 
 <script>
 /**
@@ -429,6 +375,19 @@ async function load() {
 
 load();
 </script>
+
+<footer class="site-foot">
+  <div class="foot-inner">
+    <div class="foot-brand">W<b>/</b>I<b>/</b>C<b>/</b>K · open source · MIT · <span style="color:var(--cyan)">●</span> operational</div>
+    <ul class="foot-links">
+      <li><a href="/docs.html">Docs</a></li>
+      <li><a href="/blog/">Blog</a></li>
+      <li><a href="/stats.html">Live stats</a></li>
+      <li><a href="https://github.com/wickproject/wick">GitHub</a></li>
+      <li><a href="/terms.html">Terms</a></li>
+    </ul>
+  </div>
+</footer>
 
 </body>
 </html>

@@ -10,194 +10,162 @@
 <link rel="canonical" href="https://getwick.dev/docs.html">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
 <style>
-:root {
-  --flame: #E8913A;
-  --flame-bright: #F5B74C;
-  --flame-hot: #FF6B2B;
-  --ember: #C45A1A;
-  --ash: #1A1714;
-  --smoke: #2A2520;
-  --smoke-light: #3D3630;
-  --warm-white: #F0E6D8;
-  --warm-gray: #9E958A;
-  --cool-gray: #6B635A;
-  --black: #0D0B09;
-  --font-display: 'Outfit', sans-serif;
-  --font-serif: 'Instrument Serif', serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --sidebar-w: 240px;
+/* Docs-specific: sidebar layout + content typography. Uses tokens
+   from styles.css; only the layout-specific rules live here. */
+:root{--sidebar-w:240px;}
+
+.layout{display:flex;margin-top:3.5rem;min-height:calc(100vh - 3.5rem);}
+
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  position:fixed;top:3.5rem;bottom:0;left:0;
+  overflow-y:auto;padding:2rem 1.5rem;
+  border-right:1px solid var(--line);
+  background:rgba(5,7,11,.6);backdrop-filter:blur(8px);
+  scrollbar-width:thin;z-index:50;
+}
+.sidebar-section{margin-bottom:1.6rem;}
+.sidebar-label{
+  font-family:var(--f-mono);font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--mute);
+  margin-bottom:0.55rem;font-weight:500;
+}
+.sidebar a{
+  display:block;padding:0.3rem 0.75rem;margin:0.1rem 0;
+  font-family:var(--f-sans);font-size:13px;
+  color:var(--bone-dim);text-decoration:none;
+  border-radius:3px;border-left:2px solid transparent;
+  transition:color .2s, background .2s, border-color .2s;
+}
+.sidebar a:hover{color:var(--bone);background:rgba(111,227,255,.04);}
+.sidebar a.active{
+  color:var(--cyan);border-left-color:var(--cyan);
+  background:rgba(111,227,255,.06);
 }
 
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
-body {
-  background: var(--black);
-  color: var(--warm-white);
-  font-family: var(--font-display);
-  font-weight: 300;
-  line-height: 1.7;
-  -webkit-font-smoothing: antialiased;
-}
-::selection { background: var(--flame); color: var(--black); }
-
-/* ── Top bar ───────────────────────────────── */
-.topbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: 3.5rem;
-  background: rgba(13,11,9,0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(232,145,58,0.06);
-  display: flex; align-items: center; padding: 0 2rem;
-}
-.topbar-logo {
-  font-family: var(--font-display); font-weight: 700;
-  font-size: 0.95rem; color: var(--warm-white);
-  text-decoration: none; letter-spacing: 0.06em;
-}
-.topbar-logo span { color: var(--flame); font-weight: 300; margin-left: 0.5rem; font-size: 0.8rem; }
-.topbar-links { margin-left: auto; display: flex; gap: 1.5rem; }
-.topbar-links a {
-  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
-  letter-spacing: 0.04em; transition: color 0.2s;
-}
-.topbar-links a:hover { color: var(--warm-white); }
-
-/* ── Layout ────────────────────────────────── */
-.layout { display: flex; margin-top: 3.5rem; min-height: calc(100vh - 3.5rem); }
-
-/* ── Sidebar ───────────────────────────────── */
-.sidebar {
-  width: var(--sidebar-w); flex-shrink: 0;
-  position: fixed; top: 3.5rem; bottom: 0; left: 0;
-  overflow-y: auto; padding: 2rem 1.5rem;
-  border-right: 1px solid var(--smoke-light);
-  background: var(--black);
-  scrollbar-width: thin;
-}
-.sidebar-section { margin-bottom: 1.5rem; }
-.sidebar-label {
-  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--cool-gray); margin-bottom: 0.5rem; font-weight: 500;
-}
-.sidebar a {
-  display: block; padding: 0.25rem 0.75rem; margin: 0.1rem 0;
-  font-size: 0.78rem; color: var(--warm-gray); text-decoration: none;
-  border-radius: 4px; transition: all 0.15s; border-left: 2px solid transparent;
-}
-.sidebar a:hover { color: var(--warm-white); background: var(--smoke); }
-.sidebar a.active {
-  color: var(--flame); border-left-color: var(--flame);
-  background: rgba(232,145,58,0.06);
+.content{
+  margin-left:var(--sidebar-w);flex:1;
+  max-width:820px;padding:7rem 3rem 6rem;
+  position:relative;z-index:5;
 }
 
-/* ── Content ───────────────────────────────── */
-.content {
-  margin-left: var(--sidebar-w); flex: 1;
-  max-width: 780px; padding: 3rem 3rem 6rem;
+.content h1{
+  font-family:var(--f-display);font-style:italic;font-weight:300;
+  font-size:clamp(36px, 4vw, 52px);
+  line-height:1.05;letter-spacing:-0.02em;
+  color:var(--bone);margin-bottom:12px;
 }
+.content h1 + p{
+  color:var(--bone-dim);font-size:16px;margin-bottom:48px;
+  font-weight:300;
+}
+.content h2{
+  font-family:var(--f-display);font-style:italic;font-weight:400;
+  font-size:clamp(22px, 2.4vw, 28px);line-height:1.2;
+  color:var(--bone);
+  margin:64px 0 14px;letter-spacing:-0.01em;
+  padding-top:1.5rem;border-top:1px solid var(--line);
+}
+.content h2:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+.content h3{
+  font-family:var(--f-mono);font-weight:500;font-size:13px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--cyan);
+  margin:36px 0 12px;
+}
+.content p{margin-bottom:1rem;font-size:15px;color:var(--bone-dim);line-height:1.75;}
+.content strong{color:var(--bone);font-weight:500;}
+.content em{font-family:var(--f-display);font-style:italic;color:var(--bone);}
+.content ul, .content ol{
+  margin:0 0 1rem 1.4rem;font-size:15px;color:var(--bone-dim);line-height:1.75;
+}
+.content li{margin-bottom:0.35rem;}
+.content a{color:var(--cyan);text-decoration:none;border-bottom:1px solid rgba(111,227,255,.25);transition:border-color .25s, color .25s;}
+.content a:hover{color:var(--cyan-hot);border-bottom-color:var(--cyan-hot);}
 
-.content h1 {
-  font-family: var(--font-serif); font-size: 2.2rem;
-  font-weight: 400; margin-bottom: 0.5rem; color: var(--warm-white);
+.content code{
+  font-family:var(--f-mono);font-size:13px;
+  background:rgba(111,227,255,.06);
+  border:1px solid var(--line);
+  padding:1px 6px;border-radius:3px;color:var(--amber-hot);
 }
-.content h1 + p { color: var(--warm-gray); font-size: 1rem; margin-bottom: 3rem; }
+.content pre{
+  background:var(--ink-2);border:1px solid var(--line-2);
+  border-radius:6px;padding:1.1rem 1.4rem;
+  overflow-x:auto;margin:1rem 0 1.5rem;
+  position:relative;
+}
+.content pre::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:linear-gradient(to bottom, var(--cyan), transparent);
+  opacity:.5;
+}
+.content pre code{background:none;border:none;padding:0;font-size:13px;color:var(--bone);line-height:1.75;}
+.content pre .comment{color:var(--mute);}
+.content pre .cmd{color:var(--cyan);}
+.content pre .str{color:var(--amber);}
+.content pre .flag{color:var(--violet);}
 
-.content h2 {
-  font-family: var(--font-display); font-weight: 700; font-size: 1.35rem;
-  margin-top: 4rem; margin-bottom: 1rem; color: var(--warm-white);
-  padding-top: 1.5rem; border-top: 1px solid var(--smoke-light);
+.content table{width:100%;border-collapse:collapse;margin:1rem 0 1.5rem;font-size:14px;}
+.content th{
+  text-align:left;padding:0.65rem 0.85rem;
+  background:rgba(111,227,255,.04);
+  color:var(--bone-dim);
+  font-family:var(--f-mono);font-weight:500;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;
+  border-bottom:1px solid var(--line-2);
 }
-.content h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.content td{padding:0.65rem 0.85rem;border-bottom:1px solid var(--line);color:var(--bone-dim);vertical-align:top;}
+.content td code{font-size:12.5px;}
 
-.content h3 {
-  font-family: var(--font-mono); font-weight: 500; font-size: 0.95rem;
-  margin-top: 2.5rem; margin-bottom: 0.75rem; color: var(--flame);
+.callout{
+  background:rgba(111,227,255,.04);
+  border-left:2px solid var(--cyan);
+  padding:1rem 1.25rem;margin:1rem 0 1.5rem;
+  border-radius:0 4px 4px 0;font-size:14.5px;color:var(--bone-dim);
 }
+.callout strong{color:var(--cyan);}
 
-.content p { margin-bottom: 1rem; font-size: 0.9rem; color: var(--warm-gray); }
-.content strong { color: var(--warm-white); font-weight: 500; }
-
-.content ul, .content ol {
-  margin-bottom: 1rem; padding-left: 1.5rem; font-size: 0.9rem; color: var(--warm-gray);
+.docs-menu-toggle{
+  display:none;background:none;border:none;color:var(--bone);
+  font-size:18px;cursor:pointer;padding:6px 10px;margin-right:8px;
 }
-.content li { margin-bottom: 0.3rem; }
-
-/* Code */
-.content code {
-  font-family: var(--font-mono); font-size: 0.82rem;
-  background: var(--smoke); padding: 0.15rem 0.4rem;
-  border-radius: 3px; color: var(--flame-bright);
-}
-.content pre {
-  background: var(--ash); border: 1px solid var(--smoke-light);
-  border-radius: 6px; padding: 1.25rem 1.5rem;
-  overflow-x: auto; margin-bottom: 1.5rem; line-height: 1.8;
-}
-.content pre code {
-  background: none; padding: 0; font-size: 0.8rem;
-  color: var(--warm-white);
-}
-.content pre .comment { color: var(--cool-gray); }
-.content pre .cmd { color: var(--flame); }
-.content pre .str { color: var(--flame-bright); }
-.content pre .flag { color: var(--warm-gray); }
-
-/* Tables */
-.content table {
-  width: 100%; border-collapse: collapse; margin-bottom: 1.5rem;
-  font-size: 0.82rem;
-}
-.content th {
-  text-align: left; padding: 0.6rem 0.75rem;
-  background: var(--smoke); color: var(--warm-gray);
-  font-weight: 500; font-size: 0.72rem;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  border-bottom: 1px solid var(--smoke-light);
-}
-.content td {
-  padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--smoke-light);
-  color: var(--warm-gray); vertical-align: top;
-}
-.content td code { font-size: 0.78rem; }
-
-/* Callouts */
-.callout {
-  background: rgba(232,145,58,0.06); border-left: 3px solid var(--flame);
-  padding: 1rem 1.25rem; margin-bottom: 1.5rem; border-radius: 0 6px 6px 0;
-  font-size: 0.85rem; color: var(--warm-gray);
-}
-.callout strong { color: var(--flame); }
-
-/* ── Mobile ────────────────────────────────── */
-.menu-toggle { display: none; }
 
 @media (max-width: 860px) {
-  .sidebar {
-    transform: translateX(-100%); transition: transform 0.3s;
-    z-index: 90; width: 260px;
-  }
-  .sidebar.open { transform: translateX(0); }
-  .content { margin-left: 0; padding: 2rem 1.5rem 4rem; }
-  .menu-toggle {
-    display: block; background: none; border: none; color: var(--warm-white);
-    font-size: 1.2rem; cursor: pointer; margin-right: 1rem;
-  }
+  .sidebar{transform:translateX(-100%);transition:transform 0.3s;z-index:90;width:260px;}
+  .sidebar.open{transform:translateX(0);}
+  .content{margin-left:0;padding:6rem 1.5rem 4rem;}
+  .docs-menu-toggle{display:inline-block;}
 }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
-  <a href="/" class="topbar-logo">Wick <span>Docs</span></a>
-  <div class="topbar-links">
-    <a href="/">Home</a>
-    <a href="https://github.com/wickproject/wick">GitHub</a>
-    <a href="mailto:hello@getwick.dev">Contact</a>
-  </div>
-</div>
+<div id="atmos"></div>
+
+<nav class="site-nav" id="nav">
+  <a href="/" class="brand">
+    <button class="docs-menu-toggle" onclick="event.preventDefault();event.stopPropagation();document.querySelector('.sidebar').classList.toggle('open')" aria-label="Toggle docs sidebar">☰</button>
+    <span class="brand-mark">
+      <svg viewBox="0 0 28 28" fill="none">
+        <circle class="ring" cx="14" cy="14" r="12" stroke="#6fe3ff" stroke-dasharray="2 4" opacity=".6"/>
+        <circle class="ring-2" cx="14" cy="14" r="8" stroke="#6fe3ff" stroke-dasharray="1 2" opacity=".8"/>
+        <circle cx="14" cy="14" r="2.5" fill="#6fe3ff"/>
+        <circle cx="14" cy="14" r="4" stroke="#6fe3ff" opacity=".35"/>
+      </svg>
+    </span>
+    <span class="brand-text">W<b>/</b>I<b>/</b>C<b>/</b>K <span class="brand-sub">unveil_protocol</span></span>
+  </a>
+  <button class="menu-toggle" onclick="document.getElementById('nav-links').classList.toggle('mobile-open')">☰</button>
+  <ul class="nav-links" id="nav-links">
+    <li><a href="/docs.html" class="current">Docs</a></li>
+    <li><a href="/blog/">Blog</a></li>
+    <li><a href="/stats.html">Stats</a></li>
+    <li><a href="https://github.com/wickproject/wick" class="nav-cta">GitHub ↗</a></li>
+  </ul>
+</nav>
 
 <div class="layout">
 
@@ -268,7 +236,7 @@ body {
 
 <div class="callout">
   <strong>Tip:</strong> If your agent still uses its built-in fetch, add instructions to prefer Wick.
-  See <a href="#agent-config" style="color:var(--flame);">Agent Configuration</a> below.
+  See <a href="#agent-config" style="color:var(--cyan);">Agent Configuration</a> below.
 </div>
 
 <!-- ═══════════════════════════════════════════ -->
@@ -432,15 +400,15 @@ performance, type safety, and concurrency...</code></pre>
 <pre><code><span class="cmd">wick search</span> <span class="str">"rust async runtime"</span> <span class="flag">--num 3</span>
 
 <span class="comment"># Output:</span>
-1. <a style="color:var(--flame-bright);text-decoration:none;">Tokio - An asynchronous Rust runtime</a>
+1. <a style="color:var(--amber);text-decoration:none;">Tokio - An asynchronous Rust runtime</a>
    The Tokio project provides the building blocks needed
    for writing reliable, high-performance async apps...
 
-2. <a style="color:var(--flame-bright);text-decoration:none;">Async in Rust - The Rust Programming Language</a>
+2. <a style="color:var(--amber);text-decoration:none;">Async in Rust - The Rust Programming Language</a>
    Rust's async/await syntax makes writing asynchronous
    code feel almost like writing synchronous code...
 
-3. <a style="color:var(--flame-bright);text-decoration:none;">async-std - Async version of the Rust standard library</a>
+3. <a style="color:var(--amber);text-decoration:none;">async-std - Async version of the Rust standard library</a>
    async-std provides an async version of std, making
    async programming easy and portable...</code></pre>
 
@@ -655,7 +623,7 @@ touch /tmp/.wick/no-telemetry</code></pre>
 <p>If your agent is still getting blocked, it may be using its built-in fetch instead of Wick. Check:</p>
 <ol>
   <li>Run <code>wick fetch &lt;url&gt;</code> from your terminal — if this works, the issue is agent configuration</li>
-  <li>Add instructions to <code>CLAUDE.md</code> or <code>.cursorrules</code> to prefer <code>wick_fetch</code> (see <a href="#agent-config" style="color:var(--flame);">Agent Configuration</a>)</li>
+  <li>Add instructions to <code>CLAUDE.md</code> or <code>.cursorrules</code> to prefer <code>wick_fetch</code> (see <a href="#agent-config" style="color:var(--cyan);">Agent Configuration</a>)</li>
   <li>Some sites block based on IP reputation — try from a different network</li>
 </ol>
 
@@ -670,7 +638,7 @@ touch /tmp/.wick/no-telemetry</code></pre>
 <span class="cmd">./rust/target/release/wick</span> version</code></pre>
 
 <h3>wick setup didn't detect my client</h3>
-<p>You can configure manually. See <a href="#agent-config" style="color:var(--flame);">Manual MCP Config</a> above.</p>
+<p>You can configure manually. See <a href="#agent-config" style="color:var(--cyan);">Manual MCP Config</a> above.</p>
 
 <h3>Slow responses</h3>
 <p>First fetches may be slower while the connection pool warms up. Subsequent fetches to the same domain are faster. If consistently slow:</p>
@@ -710,5 +678,22 @@ document.querySelectorAll('.sidebar a').forEach(a => {
   });
 });
 </script>
+
+<footer class="site-foot" style="margin-left:var(--sidebar-w);">
+  <div class="foot-inner">
+    <div class="foot-brand">W<b>/</b>I<b>/</b>C<b>/</b>K · open source · MIT · <span style="color:var(--cyan)">●</span> operational</div>
+    <ul class="foot-links">
+      <li><a href="/docs.html">Docs</a></li>
+      <li><a href="/blog/">Blog</a></li>
+      <li><a href="/stats.html">Live stats</a></li>
+      <li><a href="https://github.com/wickproject/wick">GitHub</a></li>
+      <li><a href="/terms.html">Terms</a></li>
+    </ul>
+  </div>
+</footer>
+<style>
+@media (max-width: 860px) { .site-foot[style*="sidebar-w"] { margin-left: 0 !important; } }
+</style>
+
 </body>
 </html>

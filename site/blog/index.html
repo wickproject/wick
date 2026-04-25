@@ -18,98 +18,169 @@
 <link rel="canonical" href="https://getwick.dev/blog/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
 <style>
-:root{--flame:#E8913A;--ash:#1A1714;--smoke:#2A2520;--smoke-light:#3D3630;--warm-white:#F0E6D8;--warm-gray:#9E958A;--cool-gray:#6B635A;--black:#0D0B09;--font-display:'Outfit',sans-serif;--font-mono:'JetBrains Mono',monospace}
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--black);color:var(--warm-gray);font-family:var(--font-display);font-weight:300;line-height:1.8;-webkit-font-smoothing:antialiased}
-::selection{background:var(--flame);color:var(--black)}
-.container{max-width:680px;margin:0 auto;padding:3rem 2rem 6rem}
-.back{display:inline-block;font-size:0.8rem;color:var(--flame);text-decoration:none;margin-bottom:2rem}
-.back:hover{text-decoration:underline}
-h1{font-size:2rem;font-weight:700;color:var(--warm-white);margin-bottom:0.5rem}
-.subtitle{color:var(--cool-gray);font-size:0.9rem;margin-bottom:3rem}
-a{color:var(--flame);text-decoration:none}
-a:hover{text-decoration:underline}
-.post{display:block;padding:1.5rem 0;border-bottom:1px solid var(--smoke-light);text-decoration:none}
-.post:hover{text-decoration:none}
-.post:hover .post-title{color:var(--flame)}
-.post-date{font-size:0.75rem;color:var(--cool-gray);font-family:var(--font-mono)}
-.post-title{font-size:1.1rem;font-weight:600;color:var(--warm-white);margin:0.3rem 0;transition:color 0.15s}
-.post-summary{font-size:0.88rem;color:var(--warm-gray);line-height:1.6}
-.post-tag{display:inline-block;font-size:0.7rem;font-family:var(--font-mono);color:var(--cool-gray);background:var(--smoke);padding:0.15rem 0.5rem;border-radius:3px;margin-top:0.5rem}
+.post{
+  display:grid;grid-template-columns:140px 1fr;gap:32px;
+  padding:28px 0;border-bottom:1px solid var(--line);
+  text-decoration:none;border-bottom-color:var(--line);
+  transition:background .25s;
+}
+.post:hover{background:rgba(111,227,255,.02);border-bottom-color:var(--line-2);}
+.post:hover .post-title{color:var(--cyan);}
+.post-date{
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--mute);padding-top:4px;
+}
+.post-body{}
+.post-title{
+  font-family:var(--f-display);font-style:italic;font-weight:400;
+  font-size:24px;line-height:1.2;color:var(--bone);
+  margin-bottom:8px;transition:color .25s;letter-spacing:-0.01em;
+}
+.post-summary{font-size:14.5px;color:var(--bone-dim);line-height:1.65;margin-bottom:10px;}
+.post-tag{
+  display:inline-block;font-family:var(--f-mono);font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--cyan);background:rgba(111,227,255,.06);
+  padding:3px 10px;border:1px solid rgba(111,227,255,.2);border-radius:2px;
+}
+.post-tag.release{color:var(--amber);background:rgba(255,181,89,.06);border-color:rgba(255,181,89,.2);}
+.post-tag.deep-dive{color:var(--violet);background:rgba(181,156,255,.06);border-color:rgba(181,156,255,.2);}
+.post-tag.guide{color:var(--good);background:rgba(126,221,195,.06);border-color:rgba(126,221,195,.25);}
+@media (max-width:640px){
+  .post{grid-template-columns:1fr;gap:8px;}
+  .post-date{padding-top:0;}
+}
 </style>
 </head>
 <body>
-<div class="container">
-<a href="/" class="back">&larr; Back to Wick</a>
 
-<h1>Wick Blog</h1>
-<p class="subtitle">Updates, guides, and deep dives from the team behind Wick.</p>
+<div id="atmos"></div>
+
+<nav class="site-nav" id="nav">
+  <a href="/" class="brand">
+    <span class="brand-mark">
+      <svg viewBox="0 0 28 28" fill="none">
+        <circle class="ring" cx="14" cy="14" r="12" stroke="#6fe3ff" stroke-dasharray="2 4" opacity=".6"/>
+        <circle class="ring-2" cx="14" cy="14" r="8" stroke="#6fe3ff" stroke-dasharray="1 2" opacity=".8"/>
+        <circle cx="14" cy="14" r="2.5" fill="#6fe3ff"/>
+        <circle cx="14" cy="14" r="4" stroke="#6fe3ff" opacity=".35"/>
+      </svg>
+    </span>
+    <span class="brand-text">W<b>/</b>I<b>/</b>C<b>/</b>K <span class="brand-sub">unveil_protocol</span></span>
+  </a>
+  <button class="menu-toggle" onclick="document.getElementById('nav-links').classList.toggle('mobile-open')">☰</button>
+  <ul class="nav-links" id="nav-links">
+    <li><a href="/docs.html">Docs</a></li>
+    <li><a href="/blog/" class="current">Blog</a></li>
+    <li><a href="/stats.html">Stats</a></li>
+    <li><a href="https://github.com/wickproject/wick" class="nav-cta">GitHub ↗</a></li>
+  </ul>
+</nav>
+
+<main class="page page--narrow">
+
+<div class="eyebrow">field reports</div>
+<h1>The <em>Blog</em></h1>
+<p class="lede">Release notes, deep dives on TLS / CEF / anti-bot mechanics, and field reports on what works in the wild.</p>
 
 <a href="live-stats.html" class="post">
-  <div class="post-date">April 21, 2026</div>
-  <div class="post-title">A Live Stats Page for Wick</div>
-  <div class="post-summary">Wick now publishes a public, always-live view of which sites work with which strategy — real per-fetch telemetry, no URL paths, no user identity. "Does Wick actually work on X?" stops being a guess.</div>
-  <span class="post-tag">announcement</span>
+  <div class="post-date">2026-04-21</div>
+  <div class="post-body">
+    <div class="post-title">A Live Stats Page for Wick</div>
+    <div class="post-summary">Wick now publishes a public, always-live view of which sites work with which strategy — real per-fetch telemetry, no URL paths, no user identity. "Does Wick actually work on X?" stops being a guess.</div>
+    <span class="post-tag">announcement</span>
+  </div>
 </a>
 
 <a href="wick-unified.html" class="post">
-  <div class="post-date">April 21, 2026</div>
-  <div class="post-title">Wick is Now Fully Open Source</div>
-  <div class="post-summary">The Free/Pro split is gone. CEF rendering, stealth patches, auto-CAPTCHA, residential tunneling — all free, MIT, in one binary with adaptive fallback.</div>
-  <span class="post-tag">announcement</span>
+  <div class="post-date">2026-04-21</div>
+  <div class="post-body">
+    <div class="post-title">Wick is Now Fully Open Source</div>
+    <div class="post-summary">The Free/Pro split is gone. CEF rendering, stealth patches, auto-CAPTCHA, residential tunneling — all free, MIT, in one binary with adaptive fallback.</div>
+    <span class="post-tag">announcement</span>
+  </div>
 </a>
 
 <a href="cef-vs-cdp.html" class="post">
-  <div class="post-date">April 2, 2026</div>
-  <div class="post-title">Why CEF Beats CDP for Anti-Detection</div>
-  <div class="post-summary">Playwright, Puppeteer, and Browserbase all control Chrome via CDP — a debug protocol that sites can detect. Wick Pro uses CEF to embed Chrome's engine directly, with no automation artifacts to fingerprint.</div>
-  <span class="post-tag">deep dive</span>
+  <div class="post-date">2026-04-02</div>
+  <div class="post-body">
+    <div class="post-title">Why CEF Beats CDP for Anti-Detection</div>
+    <div class="post-summary">Playwright, Puppeteer, and Browserbase all control Chrome via CDP — a debug protocol that sites can detect. Wick uses CEF to embed Chrome's engine directly, with no automation artifacts to fingerprint.</div>
+    <span class="post-tag deep-dive">deep dive</span>
+  </div>
 </a>
 
 <a href="wick-on-apify.html" class="post">
-  <div class="post-date">April 1, 2026</div>
-  <div class="post-title">Wick is Now on Apify</div>
-  <div class="post-summary">Wick's Chrome TLS fingerprinting is now available on the Apify marketplace. Fetch, crawl, and map websites from Apify's cloud — with scheduling, integrations, and pipeline support.</div>
-  <span class="post-tag">announcement</span>
+  <div class="post-date">2026-04-01</div>
+  <div class="post-body">
+    <div class="post-title">Wick is Now on Apify</div>
+    <div class="post-summary">Wick's Chrome TLS fingerprinting is now available on the Apify marketplace. Fetch, crawl, and map websites from Apify's cloud — with scheduling, integrations, and pipeline support.</div>
+    <span class="post-tag">announcement</span>
+  </div>
 </a>
 
 <a href="wick-0-7-http-api.html" class="post">
-  <div class="post-date">March 26, 2026</div>
-  <div class="post-title">Wick 0.7: Local HTTP API</div>
-  <div class="post-summary">One command gives every tool on your machine browser-grade web access. Python, LangChain, n8n, Jupyter, curl — anything that can make an HTTP request.</div>
-  <span class="post-tag">release</span>
+  <div class="post-date">2026-03-26</div>
+  <div class="post-body">
+    <div class="post-title">Wick 0.7: Local HTTP API</div>
+    <div class="post-summary">One command gives every tool on your machine browser-grade web access. Python, LangChain, n8n, Jupyter, curl — anything that can make an HTTP request.</div>
+    <span class="post-tag release">release</span>
+  </div>
 </a>
 
 <a href="wick-0-6-crawl-and-100-percent.html" class="post">
-  <div class="post-date">March 26, 2026</div>
-  <div class="post-title">Wick 0.6: Site Crawling, 100% Anti-Bot Success, and How We Compare</div>
-  <div class="post-summary">New wick_crawl and wick_map tools. We tested against 25 protected sites and scored 100% — matching Bright Data without any cloud infrastructure. Full comparison to nine competing MCP servers.</div>
-  <span class="post-tag">release</span>
+  <div class="post-date">2026-03-26</div>
+  <div class="post-body">
+    <div class="post-title">Wick 0.6: Site Crawling, 100% Anti-Bot Success, and How We Compare</div>
+    <div class="post-summary">New wick_crawl and wick_map tools. We tested against 25 protected sites and scored 100% — matching Bright Data without any cloud infrastructure. Full comparison to nine competing MCP servers.</div>
+    <span class="post-tag release">release</span>
+  </div>
 </a>
 
 <a href="wick-0-5-media-downloads.html" class="post">
-  <div class="post-date">March 25, 2026</div>
-  <div class="post-title">Wick 0.5: Media Downloads, Analytics, and Self-Serve Pro</div>
-  <div class="post-summary">Download video from Reddit, YouTube, Twitter. Auto-detect media in fetched pages. Self-serve Pro at $20/month via Stripe.</div>
-  <span class="post-tag">release</span>
+  <div class="post-date">2026-03-25</div>
+  <div class="post-body">
+    <div class="post-title">Wick 0.5: Media Downloads &amp; Analytics</div>
+    <div class="post-summary">Download video from Reddit, YouTube, Twitter. Auto-detect media in fetched pages.</div>
+    <span class="post-tag release">release</span>
+  </div>
 </a>
 
 <a href="how-to-fix-403-forbidden-in-claude-code.html" class="post">
-  <div class="post-date">March 24, 2026</div>
-  <div class="post-title">How to Fix 403 Forbidden in Claude Code</div>
-  <div class="post-summary">Claude Code gets 403 Forbidden when fetching web pages. Here's why it happens (TLS fingerprinting) and how to fix it in 30 seconds with Wick.</div>
-  <span class="post-tag">guide</span>
+  <div class="post-date">2026-03-24</div>
+  <div class="post-body">
+    <div class="post-title">How to Fix 403 Forbidden in Claude Code</div>
+    <div class="post-summary">Claude Code gets 403 Forbidden when fetching web pages. Here's why it happens (TLS fingerprinting) and how to fix it in 30 seconds with Wick.</div>
+    <span class="post-tag guide">guide</span>
+  </div>
 </a>
 
 <a href="why-your-ai-agent-cant-read-the-web.html" class="post">
-  <div class="post-date">March 24, 2026</div>
-  <div class="post-title">Why Your AI Agent Can't Read the Web</div>
-  <div class="post-summary">Anti-bot systems fingerprint TLS handshakes, not just headers. That's why your agent gets blocked and how browser-grade networking fixes it.</div>
-  <span class="post-tag">deep dive</span>
+  <div class="post-date">2026-03-24</div>
+  <div class="post-body">
+    <div class="post-title">Why Your AI Agent Can't Read the Web</div>
+    <div class="post-summary">Anti-bot systems fingerprint TLS handshakes, not just headers. That's why your agent gets blocked and how browser-grade networking fixes it.</div>
+    <span class="post-tag deep-dive">deep dive</span>
+  </div>
 </a>
 
-</div>
+</main>
+
+<footer class="site-foot">
+  <div class="foot-inner">
+    <div class="foot-brand">W<b>/</b>I<b>/</b>C<b>/</b>K · open source · MIT · <span style="color:var(--cyan)">●</span> operational</div>
+    <ul class="foot-links">
+      <li><a href="/docs.html">Docs</a></li>
+      <li><a href="/blog/">Blog</a></li>
+      <li><a href="/stats.html">Live stats</a></li>
+      <li><a href="https://github.com/wickproject/wick">GitHub</a></li>
+      <li><a href="/terms.html">Terms</a></li>
+    </ul>
+  </div>
+</footer>
+
 </body>
 </html>
