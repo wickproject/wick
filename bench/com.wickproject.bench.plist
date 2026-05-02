@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wickproject.bench</string>
+
+    <!-- @REPO_DIR@ is rewritten by install.sh to the absolute path of the
+         wick repo on this machine before the plist is loaded. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>@REPO_DIR@/bench/run.sh</string>
+    </array>
+
+    <!-- Run hourly. First run is at next launchd interval boundary,
+         subsequent runs every 3600s. Drift is fine for our purposes. -->
+    <key>StartInterval</key>
+    <integer>3600</integer>
+
+    <!-- Don't run on a schedule when the laptop is asleep / battery only.
+         If the user is offline, fetches fail anyway; cleaner to skip. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Single instance — if the previous sweep is still running, skip. -->
+    <key>AbandonProcessGroup</key>
+    <false/>
+
+    <!-- Logs go under ~/.wick/bench/launchd-{out,err}.log. The sweep
+         itself writes to ~/.wick/bench/sweep-*.log (rotated). -->
+    <key>StandardOutPath</key>
+    <string>@LOG_DIR@/launchd-out.log</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG_DIR@/launchd-err.log</string>
+
+    <!-- Inherit user PATH so `wick` resolves; otherwise launchd uses a
+         minimal PATH and the script's `command -v wick` returns empty. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,158 @@
+# Wick reference benchmark — site list
+#
+# One URL per line. Lines starting with # are comments.
+# Categorized by expected difficulty + the anti-bot vendor we know
+# (or strongly suspect) is in front of each site. The list is curated
+# to span the full strategy spectrum so the public stats page shows
+# real diversity (cronet, cef-after-cronet, captcha-blocked,
+# cronet-blocked, etc.) rather than only Cronet-easy hosts.
+#
+# When adding a site, prefer:
+#   - well-known to readers (TWSC, HN, Reddit /r/webscraping)
+#   - publicly accessible (no login required for the home/landing page)
+#   - distinct anti-bot vendor coverage (don't pile up the same vendor)
+
+# ── Easy: news / reference / open content ─────────────────────────
+# Expectation: Cronet wins, ~100% success rate.
+https://news.ycombinator.com/
+https://github.com/
+https://stackoverflow.com/
+https://wikipedia.org/
+https://en.wikipedia.org/wiki/Web_scraping
+https://archive.org/
+https://www.bbc.com/
+https://www.npr.org/
+https://www.reuters.com/
+https://www.theguardian.com/international
+https://apnews.com/
+https://www.axios.com/
+https://www.bloomberg.com/
+https://www.economist.com/
+https://www.theverge.com/
+https://arstechnica.com/
+https://techcrunch.com/
+https://www.wired.com/
+https://www.nature.com/
+https://www.scientificamerican.com/
+https://developer.mozilla.org/en-US/
+https://www.w3.org/
+https://www.python.org/
+https://docs.python.org/3/
+https://nodejs.org/
+
+# ── Easy: developer tooling ────────────────────────────────────────
+https://huggingface.co/
+https://pypi.org/
+https://crates.io/
+https://www.npmjs.com/
+https://hub.docker.com/
+https://www.rust-lang.org/
+https://go.dev/
+https://kubernetes.io/
+https://www.terraform.io/
+https://docs.anthropic.com/
+
+# ── Medium: e-commerce / marketplace ───────────────────────────────
+# Many of these run Akamai/PerimeterX/DataDome.
+https://www.amazon.com/
+https://www.ebay.com/
+https://www.etsy.com/
+https://www.walmart.com/
+https://www.target.com/
+https://www.bestbuy.com/
+https://www.bhphotovideo.com/
+https://www.newegg.com/
+https://www.homedepot.com/
+https://www.lowes.com/
+https://www.wayfair.com/
+https://www.zappos.com/
+https://www.macys.com/
+https://www.nordstrom.com/
+https://www.ikea.com/us/en/
+
+# ── Medium: travel / booking ───────────────────────────────────────
+# Most of these are PerimeterX / Akamai / DataDome.
+https://www.airbnb.com/
+https://www.booking.com/
+https://www.expedia.com/
+https://www.kayak.com/
+https://www.tripadvisor.com/
+https://www.hotels.com/
+https://www.priceline.com/
+https://www.skyscanner.net/
+https://www.united.com/
+https://www.delta.com/
+
+# ── Medium: social / community ─────────────────────────────────────
+https://www.reddit.com/r/webscraping
+https://www.reddit.com/r/programming
+https://medium.com/
+https://dev.to/
+https://substack.com/
+https://substack.thewebscraping.club/
+https://lobste.rs/
+https://news.slashdot.org/
+
+# ── Medium: finance / data ─────────────────────────────────────────
+https://finance.yahoo.com/
+https://www.marketwatch.com/
+https://www.sec.gov/
+https://www.investing.com/
+https://www.coinbase.com/
+https://www.morningstar.com/
+
+# ── Hard: known DataDome targets ───────────────────────────────────
+# These are the same vendor TWSC LAB #103 benchmarked.
+https://www.leroymerlin.fr/
+https://www.vinted.com/
+https://www.mediamarkt.de/
+https://www.indeed.com/
+https://www.glassdoor.com/
+https://www.fnac.com/
+https://www.rueducommerce.fr/
+https://www.bricoman.fr/
+
+# ── Hard: known Cloudflare Turnstile / Bot Management ──────────────
+https://www.cloudflare.com/
+https://discord.com/
+https://www.patreon.com/
+https://www.fiverr.com/
+https://nopecha.com/demo/cloudflare
+https://www.upwork.com/
+https://chess.com/
+
+# ── Hard: known Akamai / Bot Manager ───────────────────────────────
+https://www.linkedin.com/
+https://www.nike.com/
+https://www.adidas.com/us
+https://www.kohls.com/
+https://www.macys.com/
+
+# ── Hard: PerimeterX / HUMAN ───────────────────────────────────────
+https://www.zillow.com/
+https://www.realtor.com/
+https://www.crunchbase.com/
+https://www.ticketmaster.com/
+
+# ── Hard: misc heavy-anti-bot ──────────────────────────────────────
+https://www.tiktok.com/
+https://www.instagram.com/
+https://x.com/
+https://www.facebook.com/
+https://www.youtube.com/
+https://www.google.com/
+https://scholar.google.com/
+
+# ── International: language + geo diversity ────────────────────────
+https://www.lemonde.fr/
+https://www.lefigaro.fr/
+https://www.spiegel.de/
+https://www.sueddeutsche.de/
+https://www.zeit.de/
+https://elpais.com/
+https://www.rtve.es/
+https://www.repubblica.it/
+https://www.corriere.it/
+https://www.asahi.com/
+https://www.nikkei.com/
+https://news.ycombinator.com/from?site=jp
