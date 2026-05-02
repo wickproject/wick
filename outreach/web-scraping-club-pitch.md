@@ -1,8 +1,9 @@
 # Pitch — The Web Scraping Club
 
 **Target:** Pierluigi Vinciguerra (substack.thewebscraping.club)
+**Email:** pier@thewebscraping.club (published on the [Advertise page](https://substack.thewebscraping.club/p/advertise-on-the-web-scraping-club))
 **Goal:** A piece on Wick's positioning relative to the agentic-browser category — riding the LAB #103 framing rather than asking for a head-to-head bench.
-**Channel:** Email or Substack reply.
+**Channel:** Email.
 **Status:** Draft — not yet sent.
 
 ---
