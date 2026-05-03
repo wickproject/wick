@@ -18,11 +18,29 @@ The agentic-browser space is full of "we work on every site" claims. Public, tim
 | **Order** | Randomized per sweep so the same hosts don't always hit at :00 |
 | **Per-request timeout** | 30 s |
 | **Inter-request sleep** | 1.5 s |
-| **IP** | Single residential, no proxy rotation |
+| **IP source** | User's own residential IP by default; optional residential-pool rotation via `--provider=<name>` (see below) |
 | **Wick version** | Whatever's on `PATH` (`wick version` to check) |
 | **Robots.txt** | Bypassed for the bench (`--no-robots`); respected in normal user fetches |
 | **What's reported** | `{host, strategy, ok, status, timing_ms}` per fetch — no URL paths, no content, no IP |
 | **Where it lands** | `releases.getwick.dev/v1/events` → KV → `getwick.dev/stats.html` |
+
+### Two modes
+
+**User-IP mode** (default, no flags). Fetches go out from your machine's
+own residential IP. This is what real users see, and the most honest
+"per-site Wick success rate" data. The downside: a single IP burns
+reputation against hard targets faster than typical usage would, so the
+hard-target numbers under-report.
+
+**Proxy-pool mode** (`--provider=<name>`). Each fetch tunnels through a
+fresh session on a residential proxy provider — so each fetch from a
+different exit IP. This measures Wick's *capability ceiling* on a clean
+IP rotation, comparable to how TWSC's LAB shootouts test against the
+same provider pools (Bright Data residential FR, Geonode residential
+FR). Five providers supported: `oxylabs`, `brightdata`, `iproyal`,
+`soax`, `packetstream`. Credential conventions per provider are lifted
+verbatim from `getlantern/lantern-cloud/cmd/pinger` (so a single set of
+env vars works for both Lantern's pinger and Wick's bench).
 
 ## Site categories
 
@@ -71,6 +89,33 @@ This:
 2. Drops the plist into `~/Library/LaunchAgents/`
 3. Loads it via `launchctl`
 4. Triggers an immediate first sweep (~3–5 minutes)
+
+### Run a single sweep manually
+
+```bash
+# User's own IP (default)
+bash bench/run.sh
+
+# Through a residential proxy pool
+export OXY_USER=your_oxylabs_user
+export OXY_PASS=your_oxylabs_password
+bash bench/run.sh --provider=oxylabs --country=us
+```
+
+Required env vars per provider:
+
+| Provider | Variables |
+|---|---|
+| `oxylabs` | `OXY_USER`, `OXY_PASS` |
+| `brightdata` | `BRD_CUSTOMER_ID`, `BRD_ZONE`, `BRD_PASSWORD`, `BRD_PORT` (optional, defaults to 24000 SOCKS5) |
+| `iproyal` | `IPR_USER`, `IPR_PASSWORD` |
+| `soax` | `SOAX_PACKAGE_ID`, `SOAX_PASSWORD` |
+| `packetstream` | `PS_USER`, `PS_AUTH_KEY` |
+
+To run the proxied bench under launchd, add the env vars to the plist's
+`EnvironmentVariables` dict and bake `--provider=<name>` into
+`ProgramArguments`. Don't put credentials in the plist if your
+`~/Library/LaunchAgents/` is in iCloud or otherwise synced.
 
 ### Install (Linux)
 

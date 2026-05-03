@@ -21,6 +21,7 @@ set -u  # don't set -e: a failed fetch shouldn't kill the sweep
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SITES_FILE="$REPO_DIR/sites.txt"
+PROXY_BUILDER="$REPO_DIR/proxy-providers.sh"
 
 LOG_DIR="${WICK_BENCH_LOG_DIR:-$HOME/.wick/bench}"
 TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -28,6 +29,20 @@ LOG_FILE="$LOG_DIR/sweep-$TIMESTAMP.log"
 
 PER_REQUEST_TIMEOUT="${WICK_BENCH_FETCH_TIMEOUT:-30}"
 SLEEP_BETWEEN="${WICK_BENCH_SLEEP:-1.5}"
+
+# Optional proxy mode. When --provider=<name> is passed (or
+# WICK_BENCH_PROVIDER is set in the env), every fetch tunnels through
+# that residential provider. Otherwise the bench runs from the user's
+# own IP — the default, mirroring what real users see.
+PROVIDER="${WICK_BENCH_PROVIDER:-}"
+COUNTRY="${WICK_BENCH_COUNTRY:-us}"
+for arg in "$@"; do
+    case $arg in
+        --provider=*) PROVIDER="${arg#*=}" ;;
+        --country=*)  COUNTRY="${arg#*=}" ;;
+        *) echo "WARN: unknown arg ignored: $arg" >&2 ;;
+    esac
+done
 
 mkdir -p "$LOG_DIR"
 
@@ -42,6 +57,11 @@ if [[ ! -f "$SITES_FILE" ]]; then
     exit 1
 fi
 
+if [[ -n "$PROVIDER" && ! -x "$PROXY_BUILDER" ]]; then
+    echo "ERROR: --provider=$PROVIDER set but $PROXY_BUILDER is missing or not executable" >&2
+    exit 1
+fi
+
 # Read non-comment, non-empty lines; shuffle so batch-iness is less obvious.
 mapfile -t SITES < <(grep -v '^\s*#' "$SITES_FILE" | grep -v '^\s*$')
 shuffled=()
@@ -49,16 +69,34 @@ while IFS= read -r line; do
     shuffled+=("$line")
 done < <(printf '%s\n' "${SITES[@]}" | awk 'BEGIN{srand()} {print rand() "\t" $0}' | sort -k1,1n | cut -f2-)
 
-echo "[$TIMESTAMP] sweep starting · ${#shuffled[@]} sites · timeout=${PER_REQUEST_TIMEOUT}s · sleep=${SLEEP_BETWEEN}s" | tee -a "$LOG_FILE"
+mode_label="user-IP"
+if [[ -n "$PROVIDER" ]]; then
+    mode_label="proxy=$PROVIDER cc=$COUNTRY"
+fi
+
+echo "[$TIMESTAMP] sweep starting · ${#shuffled[@]} sites · ${mode_label} · timeout=${PER_REQUEST_TIMEOUT}s · sleep=${SLEEP_BETWEEN}s" | tee -a "$LOG_FILE"
 
 ok=0
 fail=0
 
 for url in "${shuffled[@]}"; do
+    # Build a fresh proxy URL per fetch when in proxy mode — each call
+    # generates a new session ID, which prompts most providers to give us
+    # a different exit IP. That's deliberate: the bench measures per-host
+    # success across many residential IPs, not the same one repeated.
+    proxy_args=()
+    if [[ -n "$PROVIDER" ]]; then
+        if proxy_url="$("$PROXY_BUILDER" --provider="$PROVIDER" --country="$COUNTRY" 2>>"$LOG_FILE")"; then
+            proxy_args=(--proxy "$proxy_url")
+        else
+            echo "  ! could not build proxy URL — falling back to user IP for this fetch" | tee -a "$LOG_FILE"
+        fi
+    fi
+
     start=$(date +%s)
     # Discard stdout (the page content); we only want exit code + elapsed.
     # Telemetry is posted by wick itself in the background regardless.
-    if timeout "$PER_REQUEST_TIMEOUT" "$WICK_BIN" fetch --no-robots "$url" >/dev/null 2>&1; then
+    if timeout "$PER_REQUEST_TIMEOUT" "$WICK_BIN" fetch --no-robots "${proxy_args[@]}" "$url" >/dev/null 2>&1; then
         rc=0
     else
         rc=$?
