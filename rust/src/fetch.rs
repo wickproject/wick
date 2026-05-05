@@ -23,6 +23,15 @@ pub struct FetchHtmlResult {
     pub status_code: u16,
 }
 
+/// Raw bytes fetch result. Returned by `fetch_raw` for binary content
+/// (PDFs, archives, images). No extraction, no UTF-8 decoding.
+pub struct FetchRawResult {
+    pub bytes: Vec<u8>,
+    pub url: String,
+    pub status_code: u16,
+    pub timing_ms: u64,
+}
+
 /// Full fetch pipeline: validate → robots.txt → fetch → CAPTCHA → extract.
 ///
 /// Strategy selection:
@@ -457,6 +466,75 @@ pub async fn fetch_html(
 
     Ok(FetchHtmlResult {
         html: resp.body, url: url.to_string(), status_code: resp.status,
+    })
+}
+
+/// Fetch raw response bytes. Cronet only — no CEF, no CAPTCHA detection,
+/// no extraction. Used by `--format raw` for binary content (PDFs,
+/// archives, images, anything that isn't text).
+///
+/// CEF doesn't fit this path: its renderer returns rendered HTML for any
+/// URL — including PDFs (it'd return Chromium's PDF-viewer chrome, not the
+/// PDF bytes). And CAPTCHA detection is string-based, so it wouldn't
+/// fire on binary content anyway. Keeping this lean is the right call.
+///
+/// Telemetry tags the strategy as `cronet-raw` so the public stats page
+/// can distinguish raw-byte fetches from text fetches.
+pub async fn fetch_raw(
+    client: &Client,
+    url: &str,
+    respect_robots: bool,
+) -> Result<FetchRawResult> {
+    let start = Instant::now();
+    let parsed = url::Url::parse(url)
+        .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
+
+    match parsed.scheme() {
+        "http" | "https" => {}
+        s => anyhow::bail!("unsupported scheme {:?} (only http and https)", s),
+    }
+
+    let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("missing host"))?;
+
+    if respect_robots && !robots::check(client, url).await {
+        // robots.txt block on a raw fetch — return empty bytes with a
+        // sentinel status so the caller can detect it without us
+        // having to invent a bytes-shaped error type.
+        return Ok(FetchRawResult {
+            bytes: Vec::new(),
+            url: url.to_string(),
+            status_code: 0,
+            timing_ms: start.elapsed().as_millis() as u64,
+        });
+    }
+
+    let resp = match client.get_bytes(url).await {
+        Ok(r) => r,
+        Err(e) => {
+            let timing_ms = start.elapsed().as_millis() as u64;
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "cronet-raw-transport-error", escalated_from: None,
+                ok: false, status: 0, timing_ms,
+            });
+            return Err(e);
+        }
+    };
+
+    let timing_ms = start.elapsed().as_millis() as u64;
+    let ok = resp.status >= 200 && resp.status < 400;
+    if ok {
+        site_cache::record(host, "cronet", false, timing_ms);
+    }
+    analytics::report_fetch(FetchEvent {
+        host, strategy: "cronet-raw", escalated_from: None,
+        ok, status: resp.status, timing_ms,
+    });
+
+    Ok(FetchRawResult {
+        bytes: resp.body,
+        url: url.to_string(),
+        status_code: resp.status,
+        timing_ms,
     })
 }
 

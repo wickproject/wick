@@ -1,10 +1,15 @@
 use anyhow::Result;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Markdown,
     Html,
     Text,
+    /// Raw response bytes — no extraction, no transcoding. Used for binary
+    /// content (PDFs, archives, images). Callers must take the raw-bytes
+    /// path through `fetch::fetch_raw`; calling `extract()` with `Raw`
+    /// is a programming error and panics.
+    Raw,
 }
 
 impl Format {
@@ -12,6 +17,7 @@ impl Format {
         match s {
             "html" => Self::Html,
             "text" => Self::Text,
+            "raw" => Self::Raw,
             _ => Self::Markdown,
         }
     }
@@ -44,6 +50,9 @@ pub fn extract(html: &str, _url: &url::Url, format: Format) -> Result<Extracted>
             };
             Ok(Extracted { content, title })
         }
+        Format::Raw => unreachable!(
+            "Format::Raw must be handled via fetch::fetch_raw, not extract::extract"
+        ),
     }
 }
 

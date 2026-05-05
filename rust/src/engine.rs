@@ -63,11 +63,38 @@ impl Client {
             Ok(HttpResponse { status, body })
         }
     }
+
+    /// Same as `get`, but returns the raw response bytes without any
+    /// UTF-8 decoding or extraction. Used by the `--format raw` path
+    /// for binary content (PDFs, archives, images, etc.).
+    pub async fn get_bytes(&self, url: &str) -> Result<RawResponse> {
+        #[cfg(feature = "cronet")]
+        {
+            let headers = chrome_header_pairs();
+            let resp = self.engine.get(url, &headers).await?;
+            Ok(RawResponse {
+                status: resp.status_code,
+                body: resp.body,
+            })
+        }
+        #[cfg(not(feature = "cronet"))]
+        {
+            let resp = self.inner.get(url).send().await?;
+            let status = resp.status().as_u16();
+            let body = resp.bytes().await?.to_vec();
+            Ok(RawResponse { status, body })
+        }
+    }
 }
 
 pub struct HttpResponse {
     pub status: u16,
     pub body: String,
+}
+
+pub struct RawResponse {
+    pub status: u16,
+    pub body: Vec<u8>,
 }
 
 fn storage_path() -> Result<PathBuf> {

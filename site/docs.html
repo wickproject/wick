@@ -292,7 +292,7 @@ the wick_search tool.</code></pre>
   <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>url</code></td><td>string</td><td>required</td><td>The URL to fetch</td></tr>
-    <tr><td><code>format</code></td><td>string</td><td><code>"markdown"</code></td><td>Output format: <code>markdown</code>, <code>html</code>, or <code>text</code></td></tr>
+    <tr><td><code>format</code></td><td>string</td><td><code>"markdown"</code></td><td>Output format: <code>markdown</code>, <code>html</code>, <code>text</code>, or <code>raw</code> (binary passthrough — see below)</td></tr>
     <tr><td><code>respect_robots</code></td><td>boolean</td><td><code>true</code></td><td>Whether to respect robots.txt restrictions</td></tr>
   </tbody>
 </table>
@@ -316,6 +316,18 @@ performance, type safety, and concurrency...</code></pre>
 <pre><code><span class="cmd">wick fetch</span> https://example.com <span class="flag">--format text</span>
 
 <span class="comment"># Returns visible text content, no formatting</span></code></pre>
+
+<h3>Example: Raw bytes (PDFs, images, archives)</h3>
+<p><code>--format raw</code> writes the unmodified response body to stdout — no UTF-8 decoding, no extraction. Use it for binary content where any text conversion would corrupt the payload.</p>
+<pre><code><span class="comment"># Save a PDF</span>
+<span class="cmd">wick fetch</span> <span class="flag">--format raw</span> https://example.com/paper.pdf <span class="cmd">&gt;</span> paper.pdf
+
+<span class="comment"># Pipe an image into another tool</span>
+<span class="cmd">wick fetch</span> <span class="flag">--format raw</span> https://example.com/logo.png <span class="cmd">|</span> <span class="cmd">imagemagick</span> identify -
+
+<span class="comment"># Download a tarball</span>
+<span class="cmd">wick fetch</span> <span class="flag">--format raw</span> https://example.com/release.tar.gz <span class="cmd">&gt;</span> release.tar.gz</code></pre>
+<p>Raw mode skips the CEF / CAPTCHA escalation logic — it's a single Cronet fetch with no string-based content inspection. Wick will refuse to write raw bytes directly to a terminal (would mangle output); always redirect to a file or pipe.</p>
 
 <h3>Robots.txt</h3>
 <p>By default, Wick respects <code>robots.txt</code>. To override:</p>

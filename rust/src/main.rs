@@ -54,7 +54,9 @@ enum Command {
     Fetch {
         /// The URL to fetch
         url: String,
-        /// Output format: markdown, html, text
+        /// Output format: markdown (default), html, text, or raw (binary
+        /// passthrough — for PDFs / images / archives. Refuses to write to
+        /// a TTY; redirect to a file: `wick fetch --format raw URL > out.pdf`)
         #[arg(long, default_value = "markdown")]
         format: String,
         /// Ignore robots.txt restrictions
@@ -196,10 +198,32 @@ async fn main() -> Result<()> {
             no_robots,
         } => {
             let client = engine::Client::new(proxy)?;
+            let parsed_format = extract::Format::from_str(&format);
+
+            // Raw format: skip extraction, write response bytes straight
+            // to stdout. Used for PDFs, images, archives — anything where
+            // markdown conversion would corrupt the payload.
+            if parsed_format == extract::Format::Raw {
+                use std::io::{IsTerminal, Write};
+                if std::io::stdout().is_terminal() {
+                    anyhow::bail!(
+                        "refusing to write raw bytes to a terminal (would mangle output). \
+                         Redirect to a file (`> out.pdf`) or pipe to another program."
+                    );
+                }
+                let result = fetch::fetch_raw(&client, &url, !no_robots).await?;
+                eprintln!(
+                    "Status: {} | Time: {}ms | Bytes: {}",
+                    result.status_code, result.timing_ms, result.bytes.len()
+                );
+                std::io::stdout().write_all(&result.bytes)?;
+                return Ok(());
+            }
+
             let result = fetch::fetch(
                 &client,
                 &url,
-                extract::Format::from_str(&format),
+                parsed_format,
                 !no_robots,
             )
             .await?;
