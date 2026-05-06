@@ -186,7 +186,7 @@ export default {
       // manually edited in the KV dashboard) is treated as "start
       // fresh" so we never throw during increment or write back a
       // poisoned value.
-      const existing = { fetches: 0, successes: 0, total_ms: 0 };
+      const existing = { fetches: 0, successes: 0, total_ms: 0, status_dist: {} };
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
       if (existingRaw) {
         try {
@@ -198,6 +198,19 @@ export default {
             if (Number.isFinite(f)) existing.fetches = f;
             if (Number.isFinite(s)) existing.successes = s;
             if (Number.isFinite(t)) existing.total_ms = t;
+            // status_dist is a {statusCode: count} object. Older KV
+            // values won't have it; ignore non-objects defensively.
+            if (parsed.status_dist && typeof parsed.status_dist === "object") {
+              for (const [code, count] of Object.entries(parsed.status_dist)) {
+                const n = Number(count);
+                // Validate the status-code key too — only keep 0..999
+                // ASCII digits, since the key is taken from the
+                // payload and we don't want garbage in the bucket.
+                if (Number.isFinite(n) && /^\d{1,3}$/.test(code)) {
+                  existing.status_dist[code] = n;
+                }
+              }
+            }
           }
         } catch { /* corrupt JSON — start fresh */ }
       }
@@ -209,6 +222,16 @@ export default {
       if (body.ok === true) existing.successes += 1;
       const ms = Number(body.timing_ms) || 0;
       if (ms > 0) existing.total_ms += Math.min(ms, 600000); // clamp at 10 min to avoid runaway sums
+
+      // Increment the bucket for this fetch's HTTP status. Treat unknown
+      // / missing as 0 ("transport / unknown") so the bucket stays
+      // populated even for cronet-transport-error events. Cap statuses
+      // to a sane range so a malformed payload can't spam unique keys.
+      const rawStatus = Number(body.status);
+      const statusBucket = Number.isFinite(rawStatus) && rawStatus >= 0 && rawStatus < 1000
+        ? String(Math.trunc(rawStatus))
+        : "0";
+      existing.status_dist[statusBucket] = (existing.status_dist[statusBucket] || 0) + 1;
 
       await env.SUBSCRIPTIONS.put(key, JSON.stringify(existing), {
         expirationTtl: 30 * 86400,
@@ -224,7 +247,10 @@ export default {
     // scans across the 7-day window with a single global cap of 5000
     // KV keys, so keep the cache honest.
     if (request.method === "GET" && path === "/v1/stats/summary") {
-      const cacheKey = "stats:summary:v1";
+      // v2 added per-row status_dist; bumping the key ensures the
+      // first request after deploy rebuilds the cached payload in the
+      // new shape instead of serving stale v1 JSON for up to 5 minutes.
+      const cacheKey = "stats:summary:v2";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
       if (cached) {
         return new Response(cached, {
@@ -281,7 +307,7 @@ export default {
             const strategy = rest.slice(lastColon + 1);
             const aggKey = `${host}|${strategy}`;
             const cur = agg.get(aggKey) || {
-              host, strategy, fetches: 0, successes: 0, total_ms: 0,
+              host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {},
             };
             // Coerce each field via Number() and ignore non-finite
             // values — a stringly-typed stored value (`"1"`) would
@@ -293,6 +319,16 @@ export default {
             if (Number.isFinite(fetches)) cur.fetches += fetches;
             if (Number.isFinite(successes)) cur.successes += successes;
             if (Number.isFinite(totalMs)) cur.total_ms += totalMs;
+            // Merge status_dist across days. Older daily values may
+            // not have it (pre-v2 ingest); just skip those.
+            if (v.status_dist && typeof v.status_dist === "object") {
+              for (const [code, count] of Object.entries(v.status_dist)) {
+                const n = Number(count);
+                if (Number.isFinite(n) && /^\d{1,3}$/.test(code)) {
+                  cur.status_dist[code] = (cur.status_dist[code] || 0) + n;
+                }
+              }
+            }
             agg.set(aggKey, cur);
           }
           cursor = list.list_complete ? undefined : list.cursor;
@@ -308,6 +344,10 @@ export default {
           success_rate: r.fetches > 0 ? r.successes / r.fetches : 0,
           // No real p50 without raw samples — use mean_ms as an approximation.
           p50_ms: r.fetches > 0 ? Math.round(r.total_ms / r.fetches) : 0,
+          // Per-status counts so the page can show "404×5, 502×2" instead
+          // of just a red bar. Pre-v2 events won't contribute here, so
+          // historical rows may sum to less than `fetches`.
+          status_dist: r.status_dist || {},
         }))
         .sort((a, b) => b.fetches - a.fetches)
         .slice(0, 500);

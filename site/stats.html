@@ -60,6 +60,10 @@
 .page--stats td.strategy{font-family:var(--f-mono);font-size:12px;}
 .page--stats td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--bone);}
 .page--stats td.bar{width:12rem;padding:0.4rem 0.75rem;}
+.page--stats td.statuses{
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.02em;
+  color:var(--fog);font-variant-numeric:tabular-nums;
+}
 .bar-wrap{background:var(--ink-3);border-radius:2px;height:8px;overflow:hidden;position:relative;}
 .bar-fill{height:100%;transition:width .4s;}
 .bar-fill.good{background:var(--good);}
@@ -221,16 +225,45 @@ function mkTable(head, rowBuilders) {
 function emptyBox(text) { return el("div", { className: "empty", text }); }
 function errorBox(text) { return el("div", { className: "error", text }); }
 
+// Render the top-3 HTTP status codes from a status_dist map.
+// Returns a compact string like "200×9 · 404×5 · 502×2", or "—"
+// if the data isn't there yet (older v1 events).
+function topStatuses(dist) {
+  if (!dist || typeof dist !== "object") return "—";
+  const entries = Object.entries(dist)
+    .map(([code, count]) => [String(code), Number(count) || 0])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  if (!entries.length) return "—";
+  return entries.map(([c, n]) => `${c}×${n}`).join(" · ");
+}
+
+// Merge multiple status_dist objects into one. Used when collapsing
+// across strategies for a per-host status summary.
+function mergeStatusDist(target, src) {
+  if (!src || typeof src !== "object") return target;
+  for (const [code, count] of Object.entries(src)) {
+    const n = Number(count);
+    if (!Number.isFinite(n)) continue;
+    target[code] = (target[code] || 0) + n;
+  }
+  return target;
+}
+
 function renderTopHosts(rows) {
   const byHost = new Map();
   for (const r of rows) {
-    if (!byHost.has(r.host)) byHost.set(r.host, { host: r.host, total: 0, ok: 0, strategies: new Map() });
+    if (!byHost.has(r.host)) byHost.set(r.host, {
+      host: r.host, total: 0, ok: 0, strategies: new Map(), status_dist: {}
+    });
     const e = byHost.get(r.host);
     e.total += r.fetches;
     e.ok += r.successes;
     const s = e.strategies.get(r.strategy) || { fetches: 0, successes: 0, p50: 0 };
     s.fetches += r.fetches; s.successes += r.successes; s.p50 = r.p50_ms;
     e.strategies.set(r.strategy, s);
+    mergeStatusDist(e.status_dist, r.status_dist);
   }
   const hosts = [...byHost.values()].sort((a, b) => b.total - a.total).slice(0, 30);
   if (!hosts.length) return emptyBox("No fetches recorded yet.");
@@ -254,10 +287,11 @@ function renderTopHosts(rows) {
       el("td", { className: "num", text: pct(rate) }),
       el("td", { className: "bar" }, bar(rate)),
       el("td", { className: "num", text: p50 ? fmt(p50) + "ms" : "—" }),
+      el("td", { className: "statuses", text: topStatuses(h.status_dist) }),
     ];
   });
 
-  return mkTable(["Host", "Strategies seen", "Fetches", "OK", "OK bar", "p50"], builders);
+  return mkTable(["Host", "Strategies seen", "Fetches", "OK", "OK bar", "p50", "Statuses"], builders);
 }
 
 // Cronet-family strategies are all Cronet-transport outcomes: the plain
@@ -318,14 +352,15 @@ function renderCefRequired(rows) {
 function renderFailures(rows) {
   const perHost = new Map();
   for (const r of rows) {
-    if (!perHost.has(r.host)) perHost.set(r.host, { total: 0, ok: 0 });
+    if (!perHost.has(r.host)) perHost.set(r.host, { total: 0, ok: 0, status_dist: {} });
     const e = perHost.get(r.host);
     e.total += r.fetches;
     e.ok += r.successes;
+    mergeStatusDist(e.status_dist, r.status_dist);
   }
   const failing = [...perHost.entries()]
     .filter(([_, v]) => v.total >= 10 && v.ok === 0)
-    .map(([host, v]) => ({ host, total: v.total }))
+    .map(([host, v]) => ({ host, total: v.total, status_dist: v.status_dist }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 20);
   if (!failing.length) return emptyBox("No hosts are currently failing across every strategy.");
@@ -333,9 +368,10 @@ function renderFailures(rows) {
   const builders = failing.map(r => [
     el("td", { className: "host", text: r.host }),
     el("td", { className: "num", text: fmt(r.total) }),
+    el("td", { className: "statuses", text: topStatuses(r.status_dist) }),
   ]);
 
-  return mkTable(["Host", "Attempts"], builders);
+  return mkTable(["Host", "Attempts", "Statuses"], builders);
 }
 
 // Paint the same error state across every section, so the page
