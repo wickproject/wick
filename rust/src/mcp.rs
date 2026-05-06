@@ -76,6 +76,16 @@ pub struct DownloadInput {
     pub info_only: Option<bool>,
 }
 
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct FetchToFileInput {
+    #[schemars(description = "The URL to fetch (any content type — PDFs, images, archives, etc.)")]
+    pub url: String,
+    #[schemars(description = "Local filesystem path to write the response body to. Will be created (and parent directories created) if missing. An existing file at this path will be overwritten.")]
+    pub path: String,
+    #[schemars(description = "Whether to respect robots.txt (default true)")]
+    pub respect_robots: Option<bool>,
+}
+
 // ── Server ────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -265,6 +275,55 @@ impl WickServer {
 
         let output = crate::crawl::format_map_output(&result, &host);
         Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(
+        name = "wick_fetch_to_file",
+        description = "Fetch a URL and write the raw response body to a local file. Use this for binary content that wick_fetch can't usefully return as text — PDFs, images, archives, audio, etc. Returns the saved path, byte count, status, and timing. The agent can then Read/process the file via the host filesystem (Bash, Read tool, etc.)."
+    )]
+    async fn wick_fetch_to_file(
+        &self,
+        Parameters(input): Parameters<FetchToFileInput>,
+    ) -> Result<CallToolResult, McpError> {
+        use std::path::Path;
+        let respect_robots = input.respect_robots.unwrap_or(true);
+
+        let result = fetch::fetch_raw(&self.client, &input.url, respect_robots)
+            .await
+            .map_err(|e| McpError::internal_error(format!("fetch_raw failed: {}", e), None))?;
+
+        if result.status_code == 0 {
+            return Ok(CallToolResult::success(vec![Content::text(format!(
+                "Blocked by robots.txt at {}. Pass respect_robots=false to override.",
+                input.url
+            ))]));
+        }
+
+        // Create parent directories if missing — matches the user's mental
+        // model when they specify a path like /tmp/wick-out/foo.pdf.
+        let path = Path::new(&input.path);
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    McpError::internal_error(
+                        format!("create_dir_all({}): {}", parent.display(), e),
+                        None,
+                    )
+                })?;
+            }
+        }
+        std::fs::write(path, &result.bytes).map_err(|e| {
+            McpError::internal_error(format!("write {}: {}", input.path, e), None)
+        })?;
+
+        let summary = format!(
+            "Saved {} bytes to {}\nStatus: {} | Time: {}ms",
+            result.bytes.len(),
+            input.path,
+            result.status_code,
+            result.timing_ms,
+        );
+        Ok(CallToolResult::success(vec![Content::text(summary)]))
     }
 }
 

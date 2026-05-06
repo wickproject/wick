@@ -58,6 +58,13 @@ pub struct SearchParams {
     num: Option<usize>,
 }
 
+#[derive(Deserialize)]
+pub struct FetchToFileParams {
+    url: String,
+    path: String,
+    respect_robots: Option<bool>,
+}
+
 // ── Response types ───────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -66,6 +73,15 @@ struct FetchResponse {
     status: u16,
     content: String,
     title: Option<String>,
+    timing_ms: u64,
+}
+
+#[derive(Serialize)]
+struct FetchToFileResponse {
+    url: String,
+    path: String,
+    status: u16,
+    bytes: usize,
     timing_ms: u64,
 }
 
@@ -211,6 +227,71 @@ async fn handle_search(
     }
 }
 
+/// POST /v1/fetch/file — fetch a URL and save the raw response body
+/// to the local filesystem. Body: `{"url": "...", "path": "/tmp/foo.pdf",
+/// "respect_robots": true}`. Returns `{url, path, status, bytes, timing_ms}`.
+///
+/// Path is local to the host running `wick serve --api`. The user should
+/// only run the API on localhost (which is the default); exposing it
+/// remotely would let any caller write arbitrary files.
+async fn handle_fetch_to_file(
+    State(state): State<AppState>,
+    Json(params): Json<FetchToFileParams>,
+) -> impl IntoResponse {
+    use std::path::Path;
+    let respect_robots = params.respect_robots.unwrap_or(true);
+
+    let result = match fetch::fetch_raw(&state.client, &params.url, respect_robots).await {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(ErrorResponse { error: e.to_string() }),
+            ).into_response();
+        }
+    };
+
+    if result.status_code == 0 {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: format!(
+                    "Blocked by robots.txt at {}. Set respect_robots=false to override.",
+                    params.url
+                ),
+            }),
+        ).into_response();
+    }
+
+    let path = Path::new(&params.path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: format!("create_dir_all({}): {}", parent.display(), e),
+                    }),
+                ).into_response();
+            }
+        }
+    }
+    if let Err(e) = std::fs::write(path, &result.bytes) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse { error: format!("write {}: {}", params.path, e) }),
+        ).into_response();
+    }
+
+    Json(FetchToFileResponse {
+        url: params.url,
+        path: params.path,
+        status: result.status_code,
+        bytes: result.bytes.len(),
+        timing_ms: result.timing_ms,
+    }).into_response()
+}
+
 async fn handle_health() -> impl IntoResponse {
     let cef = crate::cef::is_available();
     let suffix = if cef { " + CEF" } else { "" };
@@ -232,6 +313,7 @@ pub async fn serve(port: u16, proxy: Option<&str>) -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/v1/fetch", axum::routing::get(handle_fetch))
+        .route("/v1/fetch/file", axum::routing::post(handle_fetch_to_file))
         .route("/v1/crawl", axum::routing::get(handle_crawl))
         .route("/v1/map", axum::routing::get(handle_map))
         .route("/v1/search", axum::routing::get(handle_search))
