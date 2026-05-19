@@ -6,6 +6,13 @@
 //   Daemon:   wick-renderer (no args)
 //             → reads URLs from stdin, writes length-prefixed HTML to stdout
 //
+// Protocol version marker — bump when the stdin protocol or selector
+// semantics change. install-cef-mac.sh greps the installed binary for
+// this exact string and force-rebuilds if missing. Keep this string
+// stable and grep-friendly.
+__attribute__((used)) static const char WICK_RENDERER_PROTOCOL[] =
+    "WICK_RENDERER_PROTOCOL=v2-selector";
+//
 // Features:
 //   - Stealth patches injected at on_load_start + on_load_end fixup
 //   - Smart content polling (waits for SPA hydration)
@@ -50,6 +57,13 @@ static int g_clicked = 0;
 static char g_marker[32];
 static char g_click_prefix[48];
 static char g_cookie[2048] = {};
+// Optional CSS selector to wait for before dumping the DOM. Set per-render
+// via the daemon stdin protocol (URL\tSELECTOR\n). Empty = no selector,
+// use the smart-content-stability poller. JS-escaped quotes are the
+// caller's responsibility; we splice the value verbatim into a JS string
+// literal so use simple CSS (data-testid, classes, ids) — not selectors
+// containing single quotes or backslashes.
+static char g_selector[256] = {};
 
 static void init_marker(void) {
     FILE* f = fopen("/dev/urandom", "r");
@@ -321,6 +335,11 @@ static void render_url_smart(const char* url) {
     int poll_injected = 0;
     int last_nav = g_nav_count;
     int total_ms = 0;
+    // Selector mode needs longer outer caps than smart-stability mode: the
+    // inner JS poller's own timeout is 20s when waiting on a selector, so
+    // the post-load and absolute caps need to clear that.
+    const int post_load_cap = g_selector[0] ? 30000 : 12000;
+    const int total_cap = g_selector[0] ? 60000 : 45000;
 
     while (!g_source_done) {
         cef_do_message_loop_work();
@@ -333,7 +352,7 @@ static void render_url_smart(const char* url) {
             post_load_ms = 0;
             poll_injected = 0;
         }
-        if (total_ms >= 45000) {
+        if (total_ms >= total_cap) {
             // Absolute timeout — force dump whatever is in the DOM
             if (g_browser && !g_source_done) {
                 cef_frame_t* f = g_browser->get_main_frame(g_browser);
@@ -358,25 +377,36 @@ static void render_url_smart(const char* url) {
         if (g_load_done) {
             post_load_ms += tick_ms;
 
-            // Inject content poller
+            // Inject content poller. When g_selector is set, also gate
+            // completion on the selector existing in the DOM — so SPAs
+            // that lazy-load timelines/feeds dump only after the
+            // requested content has actually appeared.
             if (!poll_injected && g_browser) {
                 cef_frame_t* f = g_browser->get_main_frame(g_browser);
                 if (f) {
-                    char js[1024];
+                    char js[2048];
                     snprintf(js, sizeof(js),
                         "(function(){"
+                        "var sel=%s%s%s;"
                         "var last=0,stable=0,t=0;"
                         "var iv=setInterval(function(){"
                         "  var len=document.body?document.body.innerText.length:0;"
                         "  t+=300;"
                         "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
                         "  last=len;"
-                        "  if((len>500&&stable>=1000)||t>=8000){"
+                        "  var hit=sel?!!document.querySelector(sel):true;"
+                        "  var stableHit=len>500&&stable>=1000&&hit;"
+                        "  var cap=sel?20000:8000;"
+                        "  if(stableHit||t>=cap){"
                         "    clearInterval(iv);"
                         "    console.log('%s'+document.documentElement.outerHTML);"
                         "  }"
                         "},300);"
-                        "})();", g_marker);
+                        "})();",
+                        g_selector[0] ? "'" : "",
+                        g_selector[0] ? g_selector : "null",
+                        g_selector[0] ? "'" : "",
+                        g_marker);
                     cef_string_t cef_js = {};
                     cef_string_utf8_to_utf16(js, strlen(js), &cef_js);
                     f->execute_java_script(f, &cef_js, NULL, 0);
@@ -435,7 +465,7 @@ static void render_url_smart(const char* url) {
             }
 
             // Safety timeout
-            if (post_load_ms >= 12000 && !g_source_done) {
+            if (post_load_ms >= post_load_cap && !g_source_done) {
                 if (g_browser) {
                     cef_frame_t* f = g_browser->get_main_frame(g_browser);
                     if (f) {
@@ -682,6 +712,28 @@ int main(int argc, char* argv[]) {
         while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r'))
             line[--len] = '\0';
         if (len == 0) break;
+
+        // Protocol: "URL" or "URL\tSELECTOR" — tab separates the optional
+        // selector. Backward-compatible with the URL-only callers.
+        g_selector[0] = '\0';
+        char* tab = strchr(line, '\t');
+        if (tab) {
+            *tab = '\0';
+            const char* sel = tab + 1;
+            // Skip any leading whitespace on the selector.
+            while (*sel == ' ' || *sel == '\t') sel++;
+            // Strip single quotes and backslashes — we splice this into a
+            // JS '...' literal, so quote/backslash injection would break
+            // the poller. Conservative: drop unsafe chars rather than
+            // attempt JS escaping.
+            char* dst = g_selector;
+            size_t dst_cap = sizeof(g_selector) - 1;
+            for (; *sel && (size_t)(dst - g_selector) < dst_cap; sel++) {
+                if (*sel == '\'' || *sel == '\\') continue;
+                *dst++ = *sel;
+            }
+            *dst = '\0';
+        }
 
         render_url_smart(line);
 

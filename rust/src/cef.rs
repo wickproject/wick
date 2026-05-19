@@ -22,38 +22,58 @@ struct DaemonProcess {
     stdout: BufReader<ChildStdout>,
 }
 
-/// Render with default options (no residential tunnel).
+/// Render with default options (no residential tunnel, no selector wait).
 pub async fn render(url: &str) -> Result<String> {
-    render_with_residential(url, false).await
+    render_with(url, RenderOptions::default()).await
+}
+
+/// Per-request knobs for the CEF renderer.
+///
+/// `wait_for_selector` tells the renderer to delay the DOM dump until the
+/// given CSS selector exists in the document. Used to read SPA content
+/// that loads via XHR after initial hydration (X timelines, etc).
+#[derive(Debug, Clone, Default)]
+pub struct RenderOptions {
+    pub use_residential: bool,
+    pub wait_for_selector: Option<String>,
 }
 
 pub async fn render_with_residential(url: &str, use_residential: bool) -> Result<String> {
-    render_with_options(url, use_residential, None).await
+    render_with(
+        url,
+        RenderOptions {
+            use_residential,
+            ..Default::default()
+        },
+    )
+    .await
 }
 
-pub async fn render_with_options(
-    url: &str,
-    use_residential: bool,
-    _cookie: Option<&str>,
-) -> Result<String> {
+pub async fn render_with(url: &str, opts: RenderOptions) -> Result<String> {
     let url = url.to_string();
-    let result = tokio::task::spawn_blocking(move || {
-        render_blocking(&url, use_residential)
-    }).await
-    .map_err(|e| anyhow::anyhow!("spawn_blocking: {}", e))?;
-
-    result
+    tokio::task::spawn_blocking(move || render_blocking(&url, &opts))
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking: {}", e))?
 }
 
 /// Blocking render via daemon's stdin/stdout protocol.
-fn render_blocking(url: &str, use_residential: bool) -> Result<String> {
-    ensure_daemon(use_residential)?;
+fn render_blocking(url: &str, opts: &RenderOptions) -> Result<String> {
+    ensure_daemon(opts.use_residential)?;
 
     let mut daemon = DAEMON.lock().map_err(|e| anyhow::anyhow!("lock: {}", e))?;
     let proc = daemon.as_mut().ok_or_else(|| anyhow::anyhow!("daemon not started"))?;
 
-    // Send URL
-    writeln!(proc.stdin, "{}", url)?;
+    // Protocol: "URL\n" or "URL\tSELECTOR\n". The daemon strips
+    // single-quote / backslash from the selector to keep it safe to splice
+    // into a JS string literal, so callers don't have to JS-escape.
+    match opts.wait_for_selector.as_deref() {
+        Some(sel) if !sel.is_empty() => {
+            writeln!(proc.stdin, "{}\t{}", url, sel)?;
+        }
+        _ => {
+            writeln!(proc.stdin, "{}", url)?;
+        }
+    }
     proc.stdin.flush()?;
 
     // Read length-prefixed response using the persistent BufReader.

@@ -28,6 +28,11 @@
 #include "include/capi/cef_string_visitor_capi.h"
 #include "include/cef_api_hash.h"
 
+// Protocol version marker — see renderer.m for usage. Linux mirrors the
+// same marker so the Linux installer's grep-check works identically.
+__attribute__((used)) static const char WICK_RENDERER_PROTOCOL[] =
+    "WICK_RENDERER_PROTOCOL=v2-selector";
+
 // ── Globals ────────────────────────────────────────────────────
 
 static cef_browser_t* g_browser = NULL;
@@ -42,6 +47,10 @@ static size_t g_html_len = 0;
 static char g_cookie[2048] = {}; // Optional cookie to inject (e.g., datadome=...)
 // Random marker per process to avoid fingerprinting via console.log
 static char g_marker[32];
+// Optional CSS selector to wait for before dumping the DOM. Set per-render
+// from the daemon stdin protocol (URL\tSELECTOR\n). Empty = no selector.
+// See renderer.m for the macOS counterpart and full rationale.
+static char g_selector[256] = {};
 
 static void init_marker(void) {
     // Generate random hex strings from /dev/urandom
@@ -680,6 +689,24 @@ int main(int argc, char* argv[]) {
             line[--len] = '\0';
         if (len == 0) break;
 
+        // Protocol: "URL" or "URL\tSELECTOR". Mirrors renderer.m.
+        g_selector[0] = '\0';
+        {
+            char* tab = strchr(line, '\t');
+            if (tab) {
+                *tab = '\0';
+                const char* sel = tab + 1;
+                while (*sel == ' ' || *sel == '\t') sel++;
+                char* dst = g_selector;
+                size_t dst_cap = sizeof(g_selector) - 1;
+                for (; *sel && (size_t)(dst - g_selector) < dst_cap; sel++) {
+                    if (*sel == '\'' || *sel == '\\') continue;
+                    *dst++ = *sel;
+                }
+                *dst = '\0';
+            }
+        }
+
         // Reset state for new request
         g_load_done = 0;
         g_source_done = 0;
@@ -708,6 +735,9 @@ int main(int argc, char* argv[]) {
         int poll_injected = 0;
         int last_nav = g_nav_count;
         int total_ms = 0;
+        // Bump outer caps when a selector gate is in play — see renderer.m.
+        const int post_load_cap = g_selector[0] ? 30000 : 12000;
+        const int total_cap = g_selector[0] ? 60000 : 45000;
 
         while (!g_source_done) {
             cef_do_message_loop_work();
@@ -720,7 +750,7 @@ int main(int argc, char* argv[]) {
                 poll_injected = 0;
             }
 
-            if (total_ms >= 45000) {
+            if (total_ms >= total_cap) {
                 if (g_browser && !g_source_done) {
                     cef_frame_t* f = g_browser->get_main_frame(g_browser);
                     if (f) {
@@ -747,21 +777,29 @@ int main(int argc, char* argv[]) {
                 if (!poll_injected && g_browser) {
                     cef_frame_t* f = g_browser->get_main_frame(g_browser);
                     if (f) {
-                        char js[1024];
+                        char js[2048];
                         snprintf(js, sizeof(js),
                             "(function(){"
+                            "var sel=%s%s%s;"
                             "var last=0,stable=0,t=0;"
                             "var iv=setInterval(function(){"
                             "  var len=document.body?document.body.innerText.length:0;"
                             "  t+=300;"
                             "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
                             "  last=len;"
-                            "  if((len>500&&stable>=1000)||t>=8000){"
+                            "  var hit=sel?!!document.querySelector(sel):true;"
+                            "  var stableHit=len>500&&stable>=1000&&hit;"
+                            "  var cap=sel?20000:8000;"
+                            "  if(stableHit||t>=cap){"
                             "    clearInterval(iv);"
                             "    console.log('%s'+document.documentElement.outerHTML);"
                             "  }"
                             "},300);"
-                            "})();", g_marker);
+                            "})();",
+                            g_selector[0] ? "'" : "",
+                            g_selector[0] ? g_selector : "null",
+                            g_selector[0] ? "'" : "",
+                            g_marker);
                         cef_string_t cef_js = {};
                         cef_string_utf8_to_utf16(js, strlen(js), &cef_js);
                         f->execute_java_script(f, &cef_js, NULL, 0);
@@ -770,7 +808,7 @@ int main(int argc, char* argv[]) {
                     poll_injected = 1;
                 }
 
-                if (post_load_ms >= 12000 && !g_source_done) {
+                if (post_load_ms >= post_load_cap && !g_source_done) {
                     if (g_browser) {
                         cef_frame_t* f = g_browser->get_main_frame(g_browser);
                         if (f) {

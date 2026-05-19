@@ -16,7 +16,7 @@ use tower_http::cors::CorsLayer;
 use crate::crawl;
 use crate::engine::Client;
 use crate::extract::Format;
-use crate::fetch;
+use crate::fetch::{self, RenderMode};
 use crate::search;
 
 #[derive(Clone)]
@@ -31,6 +31,8 @@ pub struct FetchParams {
     url: String,
     format: Option<String>,
     respect_robots: Option<bool>,
+    render: Option<String>,
+    wait_for_selector: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -132,8 +134,19 @@ async fn handle_fetch(
 ) -> impl IntoResponse {
     let format = params.format.as_deref().map(Format::from_str).unwrap_or(Format::Markdown);
     let respect_robots = params.respect_robots.unwrap_or(true);
+    let render = params.render.as_deref().map(RenderMode::from_str).unwrap_or_default();
+    let wait_for_selector = params.wait_for_selector.as_deref();
 
-    match fetch::fetch(&state.client, &params.url, format, respect_robots).await {
+    match fetch::fetch(
+        &state.client,
+        &params.url,
+        format,
+        respect_robots,
+        render,
+        wait_for_selector,
+    )
+    .await
+    {
         Ok(result) => Json(FetchResponse {
             url: params.url,
             status: result.status_code,

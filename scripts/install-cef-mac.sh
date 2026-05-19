@@ -98,7 +98,23 @@ if [[ "$WICK_VERSION" != "main" && "$WICK_VERSION" != v* ]]; then
 fi
 RAW_BASE="https://raw.githubusercontent.com/wickproject/wick/${WICK_VERSION}/rust/cef"
 
-if [[ ! -f "$APP_DIR/Contents/MacOS/wick-renderer" ]]; then
+# Force-rebuild when the installed renderer is from a version before the
+# current stdin protocol. Each protocol-changing release bumps the marker
+# below; install-cef-mac.sh greps the installed binary for it and treats
+# a missing marker as "stale, must rebuild" — keeps wick + renderer in
+# sync without forcing all users to manually `rm -rf ~/.wick/cef`.
+RENDERER_PROTOCOL="v2-selector"
+RENDERER_BIN="$APP_DIR/Contents/MacOS/wick-renderer"
+NEEDS_BUILD=0
+if [[ ! -f "$RENDERER_BIN" ]]; then
+    NEEDS_BUILD=1
+elif ! grep -q "WICK_RENDERER_PROTOCOL=${RENDERER_PROTOCOL}" "$RENDERER_BIN" 2>/dev/null; then
+    echo "Installed wick-renderer is from a pre-${RENDERER_PROTOCOL} build. Rebuilding..."
+    rm -rf "$APP_DIR"
+    NEEDS_BUILD=1
+fi
+
+if [[ "$NEEDS_BUILD" -eq 1 ]]; then
     echo "Building wick-renderer..."
 
     # Check for source files — prefer a local checkout, fall back to

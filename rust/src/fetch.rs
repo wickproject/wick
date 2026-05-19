@@ -32,6 +32,33 @@ pub struct FetchRawResult {
     pub timing_ms: u64,
 }
 
+/// Caller-controlled override for transport selection.
+///
+/// - `Auto`: adaptive — Cronet first (or CEF first if the site cache says
+///   so), with CEF escalation on 403/503 and on JS-required interstitials.
+/// - `Cef`: force the CEF renderer (full Chromium with JS). Returns an
+///   error if the renderer isn't installed.
+/// - `Cronet`: force the network-only path. Never spawns CEF, even on
+///   block or JS-shell — useful when you specifically want the raw HTML
+///   the origin sends to a non-JS client.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RenderMode {
+    #[default]
+    Auto,
+    Cef,
+    Cronet,
+}
+
+impl RenderMode {
+    pub fn from_str(s: &str) -> RenderMode {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "cef" | "browser" | "render" | "js" => RenderMode::Cef,
+            "cronet" | "network" | "fast" | "no-js" | "nojs" => RenderMode::Cronet,
+            _ => RenderMode::Auto,
+        }
+    }
+}
+
 /// Full fetch pipeline: validate → robots.txt → fetch → CAPTCHA → extract.
 ///
 /// Strategy selection:
@@ -54,6 +81,8 @@ pub async fn fetch(
     url: &str,
     format: Format,
     respect_robots: bool,
+    render: RenderMode,
+    wait_for_selector: Option<&str>,
 ) -> Result<FetchResult> {
     let start = Instant::now();
     analytics::ping("fetch");
@@ -73,7 +102,15 @@ pub async fn fetch(
         let old_url = url
             .replace("://www.reddit.com", "://old.reddit.com")
             .replace("://reddit.com", "://old.reddit.com");
-        return Box::pin(fetch(client, &old_url, format, respect_robots)).await;
+        return Box::pin(fetch(
+            client,
+            &old_url,
+            format,
+            respect_robots,
+            render,
+            wait_for_selector,
+        ))
+        .await;
     }
 
     // robots.txt check. Not a "strategy" outcome — don't tag as telemetry.
@@ -93,10 +130,19 @@ pub async fn fetch(
 
     let cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
-    let cef_first = should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed);
+    // Forced CEF: bail early with a hint if the renderer isn't installed.
+    if render == RenderMode::Cef && !cef_installed {
+        anyhow::bail!(
+            "render=cef requested but the CEF renderer is not installed. \
+             Run `wick install cef` first."
+        );
+    }
+    let cef_first = render == RenderMode::Cef
+        || (render == RenderMode::Auto
+            && should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed));
 
     if cef_first {
-        match crate::cef::render(url).await {
+        match cef_render_with_retry(url, wait_for_selector).await {
             Ok(html) => {
                 let extracted = extract::extract(&html, &parsed, format)?;
                 let content = append_media(&extracted.content, &html, &parsed);
@@ -113,8 +159,14 @@ pub async fn fetch(
             }
             Err(e) => {
                 let timing_ms = start.elapsed().as_millis() as u64;
-                tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
                 analytics::report_failure(host, 0, "cef_failed");
+                // Forced CEF: surface the failure rather than silently
+                // falling through to a transport the caller said not to use.
+                if render == RenderMode::Cef {
+                    site_cache::record(host, "cef_timeout", false, timing_ms);
+                    return Err(anyhow::anyhow!("CEF renderer failed: {}", e));
+                }
+                tracing::warn!("CEF renderer failed: {}. Falling back to Cronet.", e);
                 // Mark this host as cef_timeout so the next fetch won't pay
                 // the CEF-first cost again until cef succeeds and overwrites it.
                 site_cache::record(host, "cef_timeout", false, timing_ms);
@@ -254,9 +306,14 @@ pub async fn fetch(
         });
     }
 
-    // Cronet blocked but CEF might work — escalate if available and we haven't tried yet.
-    if (status == 403 || status == 503) && cef_installed && escalated_from.is_none() {
-        match crate::cef::render(url).await {
+    // Cronet blocked but CEF might work — escalate if available, we haven't
+    // tried yet, and the caller didn't pin us to Cronet.
+    if (status == 403 || status == 503)
+        && cef_installed
+        && escalated_from.is_none()
+        && render != RenderMode::Cronet
+    {
+        match cef_render_with_retry(url, wait_for_selector).await {
             Ok(html) => {
                 let extracted = extract::extract(&html, &parsed, format)?;
                 let content = append_media(&extracted.content, &html, &parsed);
@@ -319,6 +376,40 @@ pub async fn fetch(
         });
     }
 
+    // JS-required shell: HTTP 200 but the body is just an interstitial
+    // saying "you need JavaScript" (X/Twitter, CRA, etc). Cronet can't run
+    // JS, so escalate to CEF if available and the caller didn't pin us to
+    // Cronet. This is the second auto-escalation trigger alongside 403/503.
+    if cef_installed
+        && escalated_from.is_none()
+        && render != RenderMode::Cronet
+        && is_js_required_shell(&body)
+    {
+        match cef_render_with_retry(url, wait_for_selector).await {
+            Ok(html) => {
+                let extracted = extract::extract(&html, &parsed, format)?;
+                let content = append_media(&extracted.content, &html, &parsed);
+                let timing_ms = start.elapsed().as_millis() as u64;
+                site_cache::record(host, "cef", false, timing_ms);
+                analytics::report_fetch(FetchEvent {
+                    host, strategy: "cef-after-js-shell",
+                    escalated_from: Some("cronet"),
+                    ok: true, status: 200, timing_ms,
+                });
+                return Ok(FetchResult {
+                    content, title: extracted.title,
+                    url: url.to_string(), status_code: 200, timing_ms,
+                });
+            }
+            Err(e) => {
+                tracing::warn!("CEF escalation for JS-shell failed: {}", e);
+                analytics::report_failure(host, 0, "cef_failed");
+                // Fall through and return the shell — at least the caller
+                // sees something rather than an opaque error.
+            }
+        }
+    }
+
     let extracted = extract::extract(&body, &parsed, format)?;
     let content = append_media(&extracted.content, &body, &parsed);
     let timing_ms = start.elapsed().as_millis() as u64;
@@ -331,6 +422,42 @@ pub async fn fetch(
         content, title: extracted.title,
         url: url.to_string(), status_code: status, timing_ms,
     })
+}
+
+/// Render via CEF, retrying once if the first attempt fails or comes back
+/// implausibly small. Most "main frame load error -3" aborts from
+/// anti-bot sites (X, Discord, Cloudflare) are transient — a single retry
+/// closes a noticeable chunk of the failure rate without unbounded cost.
+async fn cef_render_with_retry(
+    url: &str,
+    wait_for_selector: Option<&str>,
+) -> Result<String> {
+    let opts = crate::cef::RenderOptions {
+        use_residential: false,
+        wait_for_selector: wait_for_selector.map(|s| s.to_string()),
+    };
+    match crate::cef::render_with(url, opts.clone()).await {
+        Ok(html) if looks_like_real_render(&html) => Ok(html),
+        first => {
+            tracing::debug!(
+                "cef render for {} failed first attempt ({}); retrying once",
+                url,
+                match &first {
+                    Ok(html) => format!("body too small: {} bytes", html.len()),
+                    Err(e) => e.to_string(),
+                }
+            );
+            crate::cef::render_with(url, opts).await
+        }
+    }
+}
+
+/// Sanity check on a CEF render result. A successful page — even an empty
+/// one — should produce at least a few KB of HTML (React/Vue shell +
+/// inline scripts). Anything smaller is almost certainly a load abort
+/// that returned a near-empty `<html><head></head><body></body></html>`.
+fn looks_like_real_render(html: &str) -> bool {
+    html.len() >= 2000
 }
 
 /// Append detected media URLs to content so agents/crawlers can discover them.
@@ -381,7 +508,7 @@ pub async fn fetch_html(
     let cef_first = should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed);
 
     if cef_first {
-        match crate::cef::render(url).await {
+        match cef_render_with_retry(url, None).await {
             Ok(html) => {
                 let timing_ms = start.elapsed().as_millis() as u64;
                 site_cache::record(host, "cef", false, timing_ms);
@@ -424,7 +551,7 @@ pub async fn fetch_html(
             host, strategy: "cronet-blocked", escalated_from: None,
             ok: false, status: resp.status, timing_ms,
         });
-        match crate::cef::render(url).await {
+        match cef_render_with_retry(url, None).await {
             Ok(html) => {
                 let timing_ms = start.elapsed().as_millis() as u64;
                 site_cache::record(host, "cef", false, timing_ms);
@@ -552,6 +679,36 @@ fn is_challenge(body: &str) -> bool {
     .any(|sig| lower.contains(sig))
 }
 
+/// Detect a "you need JavaScript to view this site" interstitial returned
+/// on an HTTP 200. These look like a successful response but contain no
+/// real content — just a noscript message and an empty React/Vue root.
+/// Used to trigger CEF escalation for SPAs (X/Twitter, CRA defaults, etc).
+///
+/// Conservative: only matches exact phrases known to ship in JS-required
+/// shells, to avoid false positives on real pages that happen to have a
+/// noscript fallback. The 2MB cap exists so a multi-megabyte article that
+/// happens to quote one of these phrases doesn't cost a CEF render — real
+/// shells (even X.com's bundled-script response, which clocks in around
+/// 270KB) are well under this.
+fn is_js_required_shell(body: &str) -> bool {
+    if body.len() > 2_000_000 {
+        return false;
+    }
+    let lower = body.to_lowercase();
+    const SIGNALS: &[&str] = &[
+        "javascript is not available",                   // X / Twitter
+        "we've detected that javascript is disabled",    // X / Twitter
+        "we’ve detected that javascript is disabled",    // X / Twitter (curly apostrophe)
+        "you need to enable javascript to run this app", // Create React App default
+        "please enable javascript to continue",
+        "enable javascript and cookies to continue",     // Cloudflare soft-wall
+        "this site requires javascript",
+        "enable javascript to see google maps",          // Google Maps
+        "when you have eliminated the javascript",       // Google "Sherlock" variant — Maps and a few others
+    ];
+    SIGNALS.iter().any(|s| lower.contains(s))
+}
+
 /// Decide whether to try CEF first based on the cached strategy and CEF
 /// availability. Pure function so the strategy-selection rule is easy
 /// to unit-test without spinning up a fetch pipeline.
@@ -594,5 +751,89 @@ mod tests {
         assert!(!should_use_cef_first(Some("captcha-auto"), true));
         assert!(!should_use_cef_first(Some("cef_timeout"), true));
         assert!(!should_use_cef_first(Some(""), true));
+    }
+
+    #[test]
+    fn js_shell_detects_x_interstitial() {
+        let body = r#"<style>body{}</style>
+            <div class="errorContainer">
+            <h1>JavaScript is not available.</h1>
+            <p>We've detected that JavaScript is disabled in this browser.</p>
+            </div>"#;
+        assert!(is_js_required_shell(body));
+    }
+
+    #[test]
+    fn js_shell_detects_create_react_app() {
+        let body = r#"<noscript>You need to enable JavaScript to run this app.</noscript>
+            <div id="root"></div>"#;
+        assert!(is_js_required_shell(body));
+    }
+
+    #[test]
+    fn js_shell_detects_google_maps() {
+        let body = r#"<div id="XvQR9b"><div class="wSgKnf">
+            <div>When you have eliminated the <strong>JavaScript</strong>,
+            whatever remains must be an empty page.</div>
+            <a href="..." target="_blank">Enable JavaScript to see Google Maps.</a>
+            </div></div>"#;
+        assert!(is_js_required_shell(body));
+    }
+
+    #[test]
+    fn js_shell_no_false_positive_on_real_content() {
+        let body = "<html><body><h1>Welcome</h1><p>Normal page content here.</p></body></html>";
+        assert!(!is_js_required_shell(body));
+    }
+
+    #[test]
+    fn js_shell_ignores_huge_bodies() {
+        // A 3MB page that happens to quote the phrase shouldn't trip the
+        // heuristic — real shells (even X's bundled-script response) come
+        // in well under 2MB.
+        let mut body = String::from("javascript is not available ");
+        body.push_str(&"<p>real article content</p>".repeat(120_000));
+        assert!(body.len() > 2_000_000);
+        assert!(!is_js_required_shell(&body));
+    }
+
+    #[test]
+    fn js_shell_detects_x_size_response() {
+        // X.com's JS-shell response is ~270KB (bundled JS + interstitial
+        // text). The old 200KB cap dropped this case, so guard against
+        // regressing the cap below 300KB.
+        let mut body = String::from("<h1>JavaScript is not available.</h1>");
+        body.push_str(&"<script>/* bundle */</script>".repeat(10_000));
+        assert!(body.len() > 250_000);
+        assert!(is_js_required_shell(&body));
+    }
+
+    #[test]
+    fn real_render_rejects_empty_aborts() {
+        // A CEF "main frame load error -3" produces near-empty HTML —
+        // anything under 2KB is treated as a transient abort worth retrying.
+        assert!(!looks_like_real_render(""));
+        assert!(!looks_like_real_render("<html><head></head><body></body></html>"));
+        assert!(!looks_like_real_render(&"x".repeat(1500)));
+    }
+
+    #[test]
+    fn real_render_accepts_normal_pages() {
+        // Even minimal real pages clear 2KB once React/Vue shells and
+        // inline scripts are included.
+        assert!(looks_like_real_render(&"<p>content</p>".repeat(200)));
+    }
+
+    #[test]
+    fn render_mode_parses_synonyms() {
+        assert_eq!(RenderMode::from_str("cef"), RenderMode::Cef);
+        assert_eq!(RenderMode::from_str("CEF"), RenderMode::Cef);
+        assert_eq!(RenderMode::from_str("browser"), RenderMode::Cef);
+        assert_eq!(RenderMode::from_str("js"), RenderMode::Cef);
+        assert_eq!(RenderMode::from_str("cronet"), RenderMode::Cronet);
+        assert_eq!(RenderMode::from_str("no-js"), RenderMode::Cronet);
+        assert_eq!(RenderMode::from_str("auto"), RenderMode::Auto);
+        assert_eq!(RenderMode::from_str(""), RenderMode::Auto);
+        assert_eq!(RenderMode::from_str("garbage"), RenderMode::Auto);
     }
 }

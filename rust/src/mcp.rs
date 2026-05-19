@@ -7,7 +7,7 @@ use rmcp::{
 
 use crate::engine::Client;
 use crate::extract::Format;
-use crate::fetch;
+use crate::fetch::{self, RenderMode};
 use crate::session;
 
 // ── Tool input types ──────────────────────────────────────────
@@ -20,6 +20,14 @@ pub struct FetchInput {
     pub format: Option<String>,
     #[schemars(description = "Whether to respect robots.txt (default true)")]
     pub respect_robots: Option<bool>,
+    #[schemars(
+        description = "Render mode: 'auto' (default — Cronet network stack with automatic CEF escalation on 403/503 blocks and JavaScript-required interstitials like X/Twitter, CRA shells, etc), 'cef' (force the full Chromium renderer with JS execution — slower but reads any SPA), or 'cronet' (force network-only, never spawn CEF). Use 'cef' explicitly when you know the target is a JS-heavy SPA and want to skip the Cronet probe."
+    )]
+    pub render: Option<String>,
+    #[schemars(
+        description = "CSS selector to wait for before capturing the DOM. Only applies when the CEF renderer runs (force render='cef' or it auto-escalates). Use this for SPAs that lazy-load content after initial hydration — e.g. '[data-testid=\"primaryColumn\"]' for X/Twitter timelines, 'article' for blog feeds. The renderer waits up to 20s for the selector to appear. Use simple selectors (data-testid, class, id) — single quotes and backslashes are stripped server-side for safety."
+    )]
+    pub wait_for_selector: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -112,7 +120,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_fetch",
-        description = "Fetch a web page using Chrome's network stack with browser-grade TLS fingerprinting. Returns clean, LLM-friendly content. Succeeds on sites that block standard HTTP clients."
+        description = "Fetch a web page using Chrome's network stack with browser-grade TLS fingerprinting. Returns clean, LLM-friendly content. Succeeds on sites that block standard HTTP clients. Automatically falls back to a full Chromium (CEF) renderer when the page is JavaScript-only or blocked — pass render='cef' to force it, render='cronet' to skip it."
     )]
     async fn wick_fetch(
         &self,
@@ -126,9 +134,22 @@ impl WickServer {
             .map(Format::from_str)
             .unwrap_or(Format::Markdown);
         let respect_robots = input.respect_robots.unwrap_or(true);
+        let render = input
+            .render
+            .as_deref()
+            .map(RenderMode::from_str)
+            .unwrap_or_default();
+        let wait_for_selector = input.wait_for_selector.as_deref();
 
-        let result = fetch::fetch(client, &input.url, format, respect_robots)
-            .await
+        let result = fetch::fetch(
+            client,
+            &input.url,
+            format,
+            respect_robots,
+            render,
+            wait_for_selector,
+        )
+        .await
             .map_err(|e| {
                 McpError::internal_error(format!("fetch failed: {}", e), None)
             })?;

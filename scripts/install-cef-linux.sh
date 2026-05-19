@@ -162,7 +162,20 @@ fi
 
 # ── Step 4: Build CEF renderer ────────────────────────────────
 
+# Force-rebuild when the installed renderer is from a version before the
+# current stdin protocol. Mirror of the macOS installer logic — keeps
+# wick + renderer in sync without manual cleanup.
+RENDERER_PROTOCOL="v2-selector"
+RENDERER_NEEDS_BUILD=0
 if [[ ! -f "$WICK_DIR/wick-renderer" ]]; then
+    RENDERER_NEEDS_BUILD=1
+elif ! grep -q "WICK_RENDERER_PROTOCOL=${RENDERER_PROTOCOL}" "$WICK_DIR/wick-renderer" 2>/dev/null; then
+    echo "Installed wick-renderer is from a pre-${RENDERER_PROTOCOL} build. Rebuilding..."
+    rm -f "$WICK_DIR/wick-renderer"
+    RENDERER_NEEDS_BUILD=1
+fi
+
+if [[ "$RENDERER_NEEDS_BUILD" -eq 1 ]]; then
     if command -v gcc &>/dev/null; then
         echo "Building CEF renderer..."
 

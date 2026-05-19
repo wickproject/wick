@@ -59,6 +59,16 @@ enum Command {
         /// a TTY; redirect to a file: `wick fetch --format raw URL > out.pdf`)
         #[arg(long, default_value = "markdown")]
         format: String,
+        /// Render mode: auto (default — Cronet + adaptive CEF escalation),
+        /// cef (force full Chromium with JS execution), or cronet (force
+        /// network-only). Use --render cef for known JS-heavy SPAs.
+        #[arg(long, default_value = "auto")]
+        render: String,
+        /// CSS selector to wait for before capturing the DOM. Only applies
+        /// when CEF runs. Useful for SPAs that lazy-load content (e.g.
+        /// '[data-testid="primaryColumn"]' for X timelines).
+        #[arg(long)]
+        wait_for_selector: Option<String>,
         /// Ignore robots.txt restrictions
         #[arg(long)]
         no_robots: bool,
@@ -195,10 +205,14 @@ async fn main() -> Result<()> {
         Command::Fetch {
             url,
             format,
+            render,
+            wait_for_selector,
             no_robots,
         } => {
             let client = engine::Client::new(proxy)?;
             let parsed_format = extract::Format::from_str(&format);
+            let render_mode = fetch::RenderMode::from_str(&render);
+            let selector = wait_for_selector.as_deref();
 
             // Raw format: skip extraction, write response bytes straight
             // to stdout. Used for PDFs, images, archives — anything where
@@ -225,6 +239,8 @@ async fn main() -> Result<()> {
                 &url,
                 parsed_format,
                 !no_robots,
+                render_mode,
+                selector,
             )
             .await?;
 
