@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Why CEF Beats CDP for Anti-Detection — Wick</title>
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-<meta name="description" content="Playwright, Puppeteer, and Browserbase all use CDP to control Chrome remotely. That's detectable. Wick Pro uses CEF — Chrome's rendering engine embedded directly, with no debug protocol to fingerprint.">
+<meta name="description" content="Playwright, Puppeteer, and Browserbase all use CDP to control Chrome remotely. That's detectable. Wick uses CEF — Chrome's rendering engine embedded directly, with no debug protocol to fingerprint.">
 <meta name="keywords" content="CEF vs CDP, chrome devtools protocol detection, chromium embedded framework, anti-detection, browser fingerprinting, playwright detection, puppeteer detection, headless browser detection">
 <meta property="og:title" content="Why CEF Beats CDP for Anti-Detection">
 <meta property="og:description" content="Every tool built on Playwright or Puppeteer uses CDP — and sites can detect it. Here's why embedding Chrome's engine directly is a fundamentally better approach.">
@@ -104,7 +104,7 @@
 <p>From the perspective of JavaScript running on the page, it's a normal browser. Because it <em>is</em> a normal browser &mdash; just embedded.</p>
 
 <table>
-<tr><th></th><th>CDP (Playwright, etc.)</th><th>CEF (Wick Pro)</th></tr>
+<tr><th></th><th>CDP (Playwright, etc.)</th><th>CEF (Wick)</th></tr>
 <tr><td>Architecture</td><td>Remote control via WebSocket</td><td>Engine embedded in process</td></tr>
 <tr><td>navigator.webdriver</td><td>Must be patched/hidden</td><td>Not set (not automated)</td></tr>
 <tr><td>Runtime injection</td><td>Yes (CDP contexts)</td><td>None</td></tr>
@@ -123,7 +123,7 @@
 
 <h2>What Wick does with CEF</h2>
 
-<p>Wick Pro embeds CEF for pages that need JavaScript rendering. The request flow:</p>
+<p>Wick embeds CEF for pages that need JavaScript rendering. The request flow:</p>
 
 <ol>
 <li>Wick receives a fetch request</li>
@@ -145,7 +145,7 @@
 
 <h2>Try it</h2>
 
-<p>The free version of Wick uses Cronet (Chrome's network stack without rendering) and handles most sites. For JS-heavy sites that need rendering, <a href="https://getwick.dev">Wick Pro</a> adds CEF at $20/month.</p>
+<p>Wick uses Cronet (Chrome's network stack without rendering) for the common case, and auto-escalates to CEF on JS-heavy or anti-bot-protected sites. Both ship in the free unified binary — install CEF with <code>wick install cef</code>. All MIT-licensed.</p>
 
 <pre><code>brew tap wickproject/wick && brew install wick && wick setup</code></pre>
 

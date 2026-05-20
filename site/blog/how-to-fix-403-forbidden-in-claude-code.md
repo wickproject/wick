@@ -98,9 +98,9 @@ No cloud service. No proxy. No API key. Everything runs locally.
 
 ## What about sites that need JavaScript?
 
-Some sites (Reddit, SPAs, financial exchanges) require JavaScript to render content. The free tier handles most of the web, but for JS-heavy sites, [Wick Pro](https://getwick.dev) ($20/month) adds a full browser engine that renders JavaScript, handles CAPTCHAs automatically, and bypasses even aggressive anti-bot systems.
+Some sites (X/Twitter, Google Maps, financial exchanges, most SPAs) only render content via JavaScript. Wick handles these too via an optional embedded Chromium renderer (CEF) — full browser engine that runs JavaScript, handles CAPTCHAs automatically, and clears anti-bot challenges (Cloudflare "Just a moment", DataDome, etc).
 
-Run `wick pro activate` to upgrade. The free tier automatically detects when Pro would help and suggests it.
+Run `wick install cef` once to install it (~200MB, MIT-licensed, all open source). After that, `wick fetch` auto-detects JavaScript-required pages and escalates to the CEF renderer transparently — no flag needed. Force it explicitly with `--render cef` when you know the target is a JS-heavy SPA.
 
 ## Other tools Wick provides
 
@@ -114,7 +114,7 @@ Run `wick pro activate` to upgrade. The free tier automatically detects when Pro
 |---|---|
 | 403 Forbidden | Install Wick: `brew install wick && wick setup` |
 | Claude uses built-in fetch | Add CLAUDE.md instructions (see above) |
-| JS-rendered pages blank | `wick pro activate` for JS rendering |
+| JS-rendered pages blank | `wick install cef` for JS rendering |
 | robots.txt blocking | `wick fetch URL --no-robots` |
 | Need raw HTML | `wick fetch URL --format html` |
 

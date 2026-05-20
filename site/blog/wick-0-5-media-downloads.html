@@ -6,7 +6,7 @@
 <title>Wick 0.5: Media Downloads, Analytics, and $20/mo Pro — Wick</title>
 <link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <meta name="description" content="Wick 0.5 adds wick_download for Reddit/YouTube/Twitter video, auto media detection, usage analytics, and self-serve Pro at $20/month.">
-<meta name="keywords" content="wick 0.5, mcp server update, wick_download, media download ai agent, reddit video download, wick pro">
+<meta name="keywords" content="wick 0.5, mcp server update, wick_download, media download ai agent, reddit video download">
 <meta property="og:title" content="Wick 0.5: Media Downloads, Analytics, and $20/mo Pro">
 <meta property="og:description" content="Download video from Reddit, YouTube, Twitter. Auto-detect media in fetched pages. Self-serve Pro at $20/month.">
 <meta property="og:url" content="https://getwick.dev/blog/wick-0-5-media-downloads.html">
@@ -101,15 +101,17 @@
 
 <p>This means crawlers and agents automatically discover downloadable media as they browse. No separate step needed — fetch a page, see what media is there, download what you need.</p>
 
-<h2>Self-Serve Pro ($20/month)</h2>
+<h2>One-command CEF renderer install</h2>
 
-<p>Wick Pro is now self-serve. One command to upgrade:</p>
+<p>Wick's embedded Chromium renderer (CEF) is one command to install:</p>
 
-<pre><code>wick pro activate</code></pre>
+<pre><code>wick install cef</code></pre>
 
-<p>Opens Stripe checkout in your browser. After payment, your API key is generated and saved automatically. The Pro renderer installs itself. No manual configuration.</p>
+<p>This pulls down the CEF binary distribution (~200MB) and builds the wick-renderer + wick-helper binaries from source against your local CEF. No accounts, no keys.</p>
 
-<p>Pro adds: JavaScript rendering, advanced anti-detection (22 stealth patches), geo-restriction bypass, automated CAPTCHA handling, and adaptive per-site optimization that learns what works and gets faster over time.</p>
+<p>The renderer adds: JavaScript rendering, 20+ stealth patches against anti-bot fingerprinting, Cloudflare/DataDome/AWS WAF challenge clearing, and automated CAPTCHA handling. <code>wick fetch</code> auto-detects when CEF is needed and escalates transparently.</p>
+
+<p><em>Editor's note: this post was written when CEF was a paid tier. As of v0.10, Wick is fully unified open source — everything described here is in the free binary.</em></p>
 
 <h2>Usage Analytics</h2>
 

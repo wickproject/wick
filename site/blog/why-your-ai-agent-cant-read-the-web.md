@@ -108,24 +108,20 @@ There are other tools in this space — Firecrawl, Bright Data MCP, Browserbase,
 | Your data stays local | Yes | No | No | No | Yes |
 | Free tier | Forever | 500 pages | 5K req | Trial | Free |
 
-## For companies that need more
+## For JavaScript-heavy sites
 
-The free version handles the majority of the web. But some companies need access to sites that go beyond what a Chrome fingerprint alone can handle — JavaScript-heavy single-page apps, sites with advanced bot detection, or pages that require rendering before content is available.
-
-**Wick Pro** is a bespoke service for companies accessing high-value data:
+A browser-grade TLS fingerprint covers most of the web, but some sites only render content after JavaScript runs — X/Twitter, Google Maps, most modern SPAs. Wick handles these via an optional embedded Chromium renderer (CEF):
 
 - Full JavaScript rendering for dynamic pages
-- Advanced anti-detection that's continuously updated
-- Geo-restriction bypass — access region-locked exchanges and data sources worldwide
-- Residential IP routing from cloud servers
-- Adaptive per-site optimization — learns what works, gets faster over time
-- CAPTCHA handling (automated and human-in-the-loop)
-- macOS and Linux — one-command install on both platforms
-- Dedicated support with SLA
+- 20+ stealth patches against anti-bot fingerprinting
+- Cloudflare "Just a moment" / DataDome / AWS WAF challenges cleared in-browser
+- CAPTCHA handling (auto-solve with BYO CapSolver key, or interactive)
+- Residential IP tunneling via WireGuard
+- Wait-for-selector polling so SPA timelines arrive before capture
 
-We work with teams in financial data, competitive intelligence, compliance, market research, and other sectors where reliable web access is critical — not mass scraping.
+One command to add it: `wick install cef`. Wick auto-detects JavaScript-required pages and escalates transparently — no flag changes in your existing code.
 
-**Interested?** [Contact us](mailto:hello@getwick.dev). We'll set up a call to understand what you need.
+All of this is free and open source (MIT). For teams in financial data, competitive intelligence, compliance, or market research who want hands-on help wiring Wick into a larger system, [reach out](mailto:hello@getwick.dev) — happy to talk shape rather than sell tiers.
 
 ## Try it now
 
