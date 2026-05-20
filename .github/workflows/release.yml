@@ -28,6 +28,16 @@ jobs:
             -framework Cocoa -framework WebKit -fobjc-arc
         working-directory: rust
 
+      - name: Build wick-renderer bundle
+        env:
+          WICK_VERSION: ${{ github.ref_name }}
+          WICK_SKIP_BIN_INSTALL: "1"
+        run: |
+          bash scripts/install-cef-mac.sh
+          # The bundle ends up at ~/.wick/cef/wick-renderer.app — tar it
+          # so end users can skip the SDK download + clang build entirely.
+          tar czf wick-renderer-darwin-arm64.tar.gz -C "$HOME/.wick/cef" wick-renderer.app
+
       - name: Package
         run: |
           tar czf wick-darwin-arm64.tar.gz -C rust/target/release wick
@@ -40,6 +50,7 @@ jobs:
           path: |
             wick-darwin-arm64.tar.gz
             wick-captcha-darwin-arm64.tar.gz
+            wick-renderer-darwin-arm64.tar.gz
 
   build-linux-amd64:
     runs-on: ubuntu-latest
@@ -135,6 +146,7 @@ jobs:
             gh release upload "$TAG_NAME" --clobber \
               macos-arm64/wick-darwin-arm64.tar.gz \
               macos-arm64/wick-captcha-darwin-arm64.tar.gz \
+              macos-arm64/wick-renderer-darwin-arm64.tar.gz \
               linux-amd64/wick-linux-amd64.tar.gz \
               linux-amd64/wick-linux-amd64.deb
           else
@@ -142,6 +154,7 @@ jobs:
             gh release create "$TAG_NAME" \
               macos-arm64/wick-darwin-arm64.tar.gz \
               macos-arm64/wick-captcha-darwin-arm64.tar.gz \
+              macos-arm64/wick-renderer-darwin-arm64.tar.gz \
               linux-amd64/wick-linux-amd64.tar.gz \
               linux-amd64/wick-linux-amd64.deb \
               --title "$TAG_NAME" \

@@ -128,14 +128,24 @@ pub async fn fetch(
         });
     }
 
-    let cef_installed = crate::cef::is_available();
+    let mut cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
-    // Forced CEF: bail early with a hint if the renderer isn't installed.
+    // Forced CEF: attempt auto-install before bailing — the user has
+    // explicitly asked for the renderer, so it's the strongest signal
+    // they want CEF. Falls back to a clear error if install isn't
+    // possible (non-TTY without WICK_AUTO_INSTALL_CEF=1, or install
+    // failed).
     if render == RenderMode::Cef && !cef_installed {
-        anyhow::bail!(
-            "render=cef requested but the CEF renderer is not installed. \
-             Run `wick install cef` first."
-        );
+        if attempt_cef_install().await {
+            cef_installed = crate::cef::is_available();
+        }
+        if !cef_installed {
+            anyhow::bail!(
+                "render=cef requested but the CEF renderer is not installed. \
+                 Run `wick install cef` first, or set WICK_AUTO_INSTALL_CEF=1 \
+                 for headless install."
+            );
+        }
     }
     let cef_first = render == RenderMode::Cef
         || (render == RenderMode::Auto
@@ -293,13 +303,12 @@ pub async fn fetch(
         // `captcha-*` strategy is an enrichment of the cronet attempt, not
         // a transport switch).
         //
-        // If CEF is available and the caller hasn't pinned us to Cronet,
-        // don't terminate here — JS-based challenges (Cloudflare "Just a
-        // moment", DataDome, AWS WAF) clear under a real browser. Fall
-        // through to the 403/503 CEF escalation block below. Only emit
-        // captcha-blocked telemetry / response when there's no recovery
-        // path left.
-        if !cef_installed || render == RenderMode::Cronet {
+        // Fall through to the 403/503 CEF escalation block — it knows
+        // how to install CEF on demand (with TTY prompt or
+        // WICK_AUTO_INSTALL_CEF=1) and renders JS challenges in-browser.
+        // Only emit captcha-blocked telemetry / response when the caller
+        // has explicitly pinned us to Cronet, leaving no recovery path.
+        if render == RenderMode::Cronet {
             let timing_ms = start.elapsed().as_millis() as u64;
             analytics::report_fetch(FetchEvent {
                 host, strategy: "captcha-blocked", escalated_from: Some("cronet"),
@@ -317,35 +326,26 @@ pub async fn fetch(
         // else: fall through to the 403/503 CEF escalation block below.
     }
 
-    // Cronet blocked but CEF might work — escalate if available, we haven't
-    // tried yet, and the caller didn't pin us to Cronet.
-    if (status == 403 || status == 503)
-        && cef_installed
-        && escalated_from.is_none()
-        && render != RenderMode::Cronet
-    {
-        match cef_render_with_retry(url, wait_for_selector).await {
-            Ok(html) => {
-                let extracted = extract::extract(&html, &parsed, format)?;
-                let content = append_media(&extracted.content, &html, &parsed);
-                let timing_ms = start.elapsed().as_millis() as u64;
-                site_cache::record(host, "cef", false, timing_ms);
-                analytics::report_fetch(FetchEvent {
-                    host, strategy: "cef-after-cronet",
-                    escalated_from: Some("cronet"),
-                    ok: true, status: 200, timing_ms,
-                });
-                return Ok(FetchResult {
-                    content, title: extracted.title,
-                    url: url.to_string(), status_code: 200, timing_ms,
-                });
-            }
-            Err(e) => {
-                tracing::warn!("CEF escalation failed: {}", e);
-                analytics::report_failure(host, 0, "cef_failed");
-                // Fall through to the blocked response.
-            }
+    // Cronet blocked but CEF might work — escalate if available, or
+    // offer to install CEF on the spot in interactive sessions. The
+    // captcha branch above falls through here when CEF could help.
+    if (status == 403 || status == 503) && escalated_from.is_none() {
+        if let Some(html) = cef_render_or_install(url, wait_for_selector, render).await {
+            let extracted = extract::extract(&html, &parsed, format)?;
+            let content = append_media(&extracted.content, &html, &parsed);
+            let timing_ms = start.elapsed().as_millis() as u64;
+            site_cache::record(host, "cef", false, timing_ms);
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "cef-after-cronet",
+                escalated_from: Some("cronet"),
+                ok: true, status: 200, timing_ms,
+            });
+            return Ok(FetchResult {
+                content, title: extracted.title,
+                url: url.to_string(), status_code: 200, timing_ms,
+            });
         }
+        analytics::report_failure(host, 0, "cef_failed");
     }
 
     if status == 403 || status == 503 {
@@ -356,8 +356,11 @@ pub async fn fetch(
             ok: false, status, timing_ms,
         });
 
-        // If CEF is not installed, hint at wick install cef.
-        if !cef_installed {
+        // If CEF is still not installed (user declined the prompt, or
+        // we're in a non-interactive context), hint at the install
+        // command. Re-check availability since the user may have just
+        // installed via the prompt above.
+        if !crate::cef::is_available() {
             let hint = format!(
                 "HTTP {status}\n\n\
                  This site blocked the request. Install the CEF renderer\n\
@@ -389,40 +392,43 @@ pub async fn fetch(
 
     // JS-required shell: HTTP 200 but the body is just an interstitial
     // saying "you need JavaScript" (X/Twitter, CRA, etc). Cronet can't run
-    // JS, so escalate to CEF if available and the caller didn't pin us to
-    // Cronet. This is the second auto-escalation trigger alongside 403/503.
-    if cef_installed
-        && escalated_from.is_none()
-        && render != RenderMode::Cronet
-        && is_js_required_shell(&body)
-    {
-        match cef_render_with_retry(url, wait_for_selector).await {
-            Ok(html) => {
-                let extracted = extract::extract(&html, &parsed, format)?;
-                let content = append_media(&extracted.content, &html, &parsed);
-                let timing_ms = start.elapsed().as_millis() as u64;
-                site_cache::record(host, "cef", false, timing_ms);
-                analytics::report_fetch(FetchEvent {
-                    host, strategy: "cef-after-js-shell",
-                    escalated_from: Some("cronet"),
-                    ok: true, status: 200, timing_ms,
-                });
-                return Ok(FetchResult {
-                    content, title: extracted.title,
-                    url: url.to_string(), status_code: 200, timing_ms,
-                });
-            }
-            Err(e) => {
-                tracing::warn!("CEF escalation for JS-shell failed: {}", e);
-                analytics::report_failure(host, 0, "cef_failed");
-                // Fall through and return the shell — at least the caller
-                // sees something rather than an opaque error.
-            }
+    // JS, so escalate to CEF if available — or, in an interactive
+    // session, prompt the user to install CEF on the spot. This is the
+    // second auto-escalation trigger alongside 403/503.
+    let js_shell = is_js_required_shell(&body);
+    if escalated_from.is_none() && js_shell {
+        if let Some(html) = cef_render_or_install(url, wait_for_selector, render).await {
+            let extracted = extract::extract(&html, &parsed, format)?;
+            let content = append_media(&extracted.content, &html, &parsed);
+            let timing_ms = start.elapsed().as_millis() as u64;
+            site_cache::record(host, "cef", false, timing_ms);
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "cef-after-js-shell",
+                escalated_from: Some("cronet"),
+                ok: true, status: 200, timing_ms,
+            });
+            return Ok(FetchResult {
+                content, title: extracted.title,
+                url: url.to_string(), status_code: 200, timing_ms,
+            });
         }
+        // Fell through — CEF either wasn't available, the user declined
+        // to install, install failed, or the render itself failed. The
+        // hint below tells them they can install later.
     }
 
     let extracted = extract::extract(&body, &parsed, format)?;
-    let content = append_media(&extracted.content, &body, &parsed);
+    let mut content = append_media(&extracted.content, &body, &parsed);
+    // JS-required shell + still no CEF: tell the user this is the case
+    // so they don't think Wick is silently truncating. Re-check
+    // availability rather than reusing the snapshot from the top — the
+    // user may have just installed via the prompt above.
+    if js_shell
+        && render != RenderMode::Cronet
+        && !crate::cef::is_available()
+    {
+        content.push_str(CEF_NEEDED_HINT);
+    }
     let timing_ms = start.elapsed().as_millis() as u64;
     site_cache::record(host, "cronet", false, timing_ms);
     analytics::report_fetch(FetchEvent {
@@ -433,6 +439,111 @@ pub async fn fetch(
         content, title: extracted.title,
         url: url.to_string(), status_code: status, timing_ms,
     })
+}
+
+/// Trailer appended to a Cronet response when we know CEF would have done
+/// better but isn't installed. Mirrors the inline message the 403/503
+/// branch already emits; reused so the JS-shell branch tells the same
+/// story.
+const CEF_NEEDED_HINT: &str =
+    "\n\n---\n*Note: this page returned a JavaScript-only shell. \
+     Install the CEF renderer to read its rendered content:*\n\n    wick install cef\n";
+
+/// Try to obtain a CEF render for `url`, installing CEF on demand if
+/// it's not already present and the user has consented (interactive TTY,
+/// or `WICK_AUTO_INSTALL_CEF=1` for headless CI). Returns `None` when
+/// CEF isn't available and we couldn't / shouldn't install it — caller
+/// should fall through to the Cronet body and append the install hint.
+///
+/// Wraps `cef_render_with_retry` rather than replacing it, so callers
+/// can still bypass auto-install (e.g. recursive fall-back paths that
+/// know CEF is already installed).
+async fn cef_render_or_install(
+    url: &str,
+    wait_for_selector: Option<&str>,
+    render: RenderMode,
+) -> Option<String> {
+    if render == RenderMode::Cronet {
+        return None;
+    }
+    if !crate::cef::is_available() {
+        if !attempt_cef_install().await {
+            return None;
+        }
+        if !crate::cef::is_available() {
+            return None;
+        }
+    }
+    cef_render_with_retry(url, wait_for_selector).await.ok()
+}
+
+static USER_DECLINED_INSTALL: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Decide whether to install CEF on first need, and run the installer
+/// if so. Returns true iff CEF is installed afterwards.
+async fn attempt_cef_install() -> bool {
+    use std::sync::atomic::Ordering;
+    if USER_DECLINED_INSTALL.load(Ordering::Relaxed) {
+        return false;
+    }
+    let policy = cef_install_policy();
+    let consented = match policy {
+        InstallPolicy::Yes => true,
+        InstallPolicy::No => return false,
+        InstallPolicy::Prompt => prompt_user_for_install(),
+    };
+    if !consented {
+        USER_DECLINED_INSTALL.store(true, Ordering::Relaxed);
+        return false;
+    }
+    eprintln!("Installing CEF renderer (~200MB, one-time)...");
+    let installed = crate::pro::activate(None).await.is_ok();
+    if !installed {
+        eprintln!("CEF install failed. Continuing with Cronet-only fetch.");
+    }
+    installed
+}
+
+#[derive(Debug, Clone, Copy)]
+enum InstallPolicy {
+    Yes,
+    No,
+    Prompt,
+}
+
+fn cef_install_policy() -> InstallPolicy {
+    use std::io::IsTerminal;
+    match std::env::var("WICK_AUTO_INSTALL_CEF").as_deref().map(|s| s.trim()) {
+        Ok("1") | Ok("true") | Ok("yes") | Ok("y") => return InstallPolicy::Yes,
+        Ok("0") | Ok("false") | Ok("no") | Ok("n") => return InstallPolicy::No,
+        _ => {}
+    }
+    // Default behaviour requires both stderr (for our prompt) and stdin
+    // (for the user's reply) to be TTYs — that excludes MCP servers,
+    // HTTP API handlers, and cron/CI runs from triggering install
+    // unintentionally.
+    if std::io::stderr().is_terminal() && std::io::stdin().is_terminal() {
+        InstallPolicy::Prompt
+    } else {
+        InstallPolicy::No
+    }
+}
+
+fn prompt_user_for_install() -> bool {
+    use std::io::{BufRead, Write};
+    eprintln!();
+    eprintln!("⚠ This page only renders content via JavaScript.");
+    eprintln!("  Wick can install a Chromium renderer (CEF) to read it. One-time, ~200MB.");
+    eprint!("  Install now? [Y/n] ");
+    let _ = std::io::stderr().flush();
+    let stdin = std::io::stdin();
+    let mut line = String::new();
+    if stdin.lock().read_line(&mut line).is_err() {
+        return false;
+    }
+    let answer = line.trim().to_ascii_lowercase();
+    answer.is_empty() || answer == "y" || answer == "yes"
 }
 
 /// Render via CEF, retrying once if the first attempt fails or comes back

@@ -50,48 +50,26 @@ if ! command -v yt-dlp &>/dev/null; then
 fi
 
 # ── Step 1: Install wick binary (free tier via Homebrew) ──────
+# Skipped in CI / release-build contexts where the wick binary is
+# being produced by the same job and isn't on PATH yet.
 
-if ! command -v wick &>/dev/null; then
-    echo "Installing wick via Homebrew..."
-    brew tap wickproject/wick 2>/dev/null && brew install wick 2>/dev/null || {
-        red "Homebrew install failed. Install manually: brew tap wickproject/wick && brew install wick"
-        exit 1
-    }
+if [[ -z "${WICK_SKIP_BIN_INSTALL:-}" ]]; then
+    if ! command -v wick &>/dev/null; then
+        echo "Installing wick via Homebrew..."
+        brew tap wickproject/wick 2>/dev/null && brew install wick 2>/dev/null || {
+            red "Homebrew install failed. Install manually: brew tap wickproject/wick && brew install wick"
+            exit 1
+        }
+    fi
+    echo "wick binary: $(which wick)"
 fi
-echo "wick binary: $(which wick)"
-
-# ── Step 2: Download CEF SDK ──────────────────────────────────
 
 CEF_DIR="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}_minimal"
-
-if [[ ! -d "$WICK_DIR/$CEF_DIR" ]]; then
-    WICK_KEY="${WICK_KEY:-}"
-    # Try pre-stripped CEF from R2 first
-    if [[ -n "$WICK_KEY" ]] && curl -fL -o cef-runtime.tar.bz2 \
-        "https://releases.getwick.dev/releases/${WICK_KEY}/cef-runtime-macos-arm64.tar.bz2" < /dev/null 2>/dev/null \
-        && tar tjf cef-runtime.tar.bz2 &>/dev/null; then
-        echo "Downloading CEF runtime (pre-stripped)..."
-        tar xjf cef-runtime.tar.bz2
-        rm -f cef-runtime.tar.bz2
-    else
-        rm -f cef-runtime.tar.bz2 2>/dev/null
-        echo "Downloading CEF from upstream (~120MB)..."
-        curl -fL --progress-bar -o cef.tar.bz2 \
-            "https://cef-builds.spotifycdn.com/cef_binary_${CEF_VERSION}_${CEF_PLATFORM}_minimal.tar.bz2" < /dev/null
-        tar xjf cef.tar.bz2
-        rm -f cef.tar.bz2
-    fi
-else
-    echo "CEF already downloaded."
-fi
-
-# ── Step 3: Build renderer + helpers ──────────────────────────
-
 APP_DIR="$WICK_DIR/wick-renderer.app"
 
-# WICK_VERSION pins which ref to fetch source files from when running
-# via `curl | bash` (no local checkout). Defaults to "main" for dev use.
-# `wick install cef` passes the wick binary's own version.
+# WICK_VERSION pins which ref to fetch source files / prebuilt artifacts
+# from. Defaults to "main" for dev use. `wick install cef` passes the
+# wick binary's own version.
 WICK_VERSION="${WICK_VERSION:-main}"
 if [[ "$WICK_VERSION" != "main" && "$WICK_VERSION" != v* ]]; then
     WICK_VERSION="v$WICK_VERSION"
@@ -114,8 +92,69 @@ elif ! grep -q "WICK_RENDERER_PROTOCOL=${RENDERER_PROTOCOL}" "$RENDERER_BIN" 2>/
     NEEDS_BUILD=1
 fi
 
+# ── Prebuilt fast path ────────────────────────────────────────
+# Before falling back to "download CEF SDK + clang-build the renderer",
+# try fetching a release-built wick-renderer.app bundle that already
+# contains everything (renderer binary + CEF framework + helpers).
+# Eliminates the SDK download (~120MB) and the clang build step for
+# typical users. Only attempts this for tagged releases; main/dev
+# users go straight to source build.
+PREBUILT_INSTALLED=0
+if [[ "$NEEDS_BUILD" -eq 1 && "$WICK_VERSION" != "main" ]]; then
+    PREBUILT_URL="https://github.com/wickproject/wick/releases/download/${WICK_VERSION}/wick-renderer-darwin-arm64.tar.gz"
+    echo "Looking for prebuilt wick-renderer for ${WICK_VERSION}..."
+    TMP_TAR="/tmp/wick-renderer-$$-${WICK_VERSION}.tar.gz"
+    if curl -fL --progress-bar -o "$TMP_TAR" "$PREBUILT_URL" 2>/dev/null && [[ -s "$TMP_TAR" ]]; then
+        # Tarball contains wick-renderer.app/ at the top level. Extract
+        # into WICK_DIR, which becomes ~/.wick/cef/wick-renderer.app.
+        rm -rf "$APP_DIR"
+        if tar xzf "$TMP_TAR" -C "$WICK_DIR" && [[ -f "$RENDERER_BIN" ]] && \
+           grep -q "WICK_RENDERER_PROTOCOL=${RENDERER_PROTOCOL}" "$RENDERER_BIN" 2>/dev/null; then
+            # Strip macOS quarantine attribute so Gatekeeper doesn't
+            # block the unsigned bundle on first run.
+            xattr -dr com.apple.quarantine "$APP_DIR" 2>/dev/null || true
+            echo "Installed prebuilt wick-renderer for ${WICK_VERSION}."
+            PREBUILT_INSTALLED=1
+            NEEDS_BUILD=0
+        else
+            echo "  Prebuilt tarball was incomplete; falling back to source build."
+            rm -rf "$APP_DIR"
+        fi
+    else
+        echo "  No prebuilt found for ${WICK_VERSION}; building from source."
+    fi
+    rm -f "$TMP_TAR"
+fi
+
+# ── Step 2: Download CEF SDK ──────────────────────────────────
+# Only when we're going to source-build. The prebuilt bundles CEF
+# inside the .app already.
+
+if [[ "$NEEDS_BUILD" -eq 1 && ! -d "$WICK_DIR/$CEF_DIR" ]]; then
+    WICK_KEY="${WICK_KEY:-}"
+    # Try pre-stripped CEF from R2 first
+    if [[ -n "$WICK_KEY" ]] && curl -fL -o cef-runtime.tar.bz2 \
+        "https://releases.getwick.dev/releases/${WICK_KEY}/cef-runtime-macos-arm64.tar.bz2" < /dev/null 2>/dev/null \
+        && tar tjf cef-runtime.tar.bz2 &>/dev/null; then
+        echo "Downloading CEF runtime (pre-stripped)..."
+        tar xjf cef-runtime.tar.bz2
+        rm -f cef-runtime.tar.bz2
+    else
+        rm -f cef-runtime.tar.bz2 2>/dev/null
+        echo "Downloading CEF from upstream (~120MB)..."
+        curl -fL --progress-bar -o cef.tar.bz2 \
+            "https://cef-builds.spotifycdn.com/cef_binary_${CEF_VERSION}_${CEF_PLATFORM}_minimal.tar.bz2" < /dev/null
+        tar xjf cef.tar.bz2
+        rm -f cef.tar.bz2
+    fi
+elif [[ "$NEEDS_BUILD" -eq 1 ]]; then
+    echo "CEF already downloaded."
+fi
+
+# ── Step 3: Build renderer + helpers ──────────────────────────
+
 if [[ "$NEEDS_BUILD" -eq 1 ]]; then
-    echo "Building wick-renderer..."
+    echo "Building wick-renderer from source..."
 
     # Check for source files — prefer a local checkout, fall back to
     # fetching from the wick repo at WICK_VERSION.
@@ -205,7 +244,7 @@ PLIST
     done
 
     echo "  Built wick-renderer.app"
-else
+elif [[ "$PREBUILT_INSTALLED" -ne 1 ]]; then
     echo "wick-renderer.app already installed."
 fi
 
