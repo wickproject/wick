@@ -9,11 +9,11 @@ const PLATFORM = `${process.platform}-${process.arch}`;
 const ASSETS = {
   "darwin-arm64": {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-darwin-arm64.tar.gz`,
-    sha256: "32bd4d71ef1738f295902c1f89ad2f2fc708bffbf2afbed721b4119f15f1b667",
+    sha256: "927e8543497337de09c962ed157105ec262da1d08453dfa9cc552be6ac6753ce",
   },
   "linux-x64": {
     url: `https://github.com/wickproject/wick/releases/download/v${VERSION}/wick-linux-amd64.tar.gz`,
-    sha256: "475ce12c5511467794433f76eafb11a66e789aae3c34926b3ba9cfa506895760",
+    sha256: "0560f34791076b38e738df03104a3c687e98eda78eee5d197c682e832c35c417",
     hasLib: true,
   },
 };
