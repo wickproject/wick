@@ -103,7 +103,7 @@ RAW_BASE="https://raw.githubusercontent.com/wickproject/wick/${WICK_VERSION}/rus
 # below; install-cef-mac.sh greps the installed binary for it and treats
 # a missing marker as "stale, must rebuild" — keeps wick + renderer in
 # sync without forcing all users to manually `rm -rf ~/.wick/cef`.
-RENDERER_PROTOCOL="v2-selector"
+RENDERER_PROTOCOL="v3-cf-aware"
 RENDERER_BIN="$APP_DIR/Contents/MacOS/wick-renderer"
 NEEDS_BUILD=0
 if [[ ! -f "$RENDERER_BIN" ]]; then

@@ -165,7 +165,7 @@ fi
 # Force-rebuild when the installed renderer is from a version before the
 # current stdin protocol. Mirror of the macOS installer logic — keeps
 # wick + renderer in sync without manual cleanup.
-RENDERER_PROTOCOL="v2-selector"
+RENDERER_PROTOCOL="v3-cf-aware"
 RENDERER_NEEDS_BUILD=0
 if [[ ! -f "$WICK_DIR/wick-renderer" ]]; then
     RENDERER_NEEDS_BUILD=1

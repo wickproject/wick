@@ -28,10 +28,11 @@
 #include "include/capi/cef_string_visitor_capi.h"
 #include "include/cef_api_hash.h"
 
-// Protocol version marker — see renderer.m for usage. Linux mirrors the
-// same marker so the Linux installer's grep-check works identically.
+// Protocol version marker — see renderer.m for usage and version history.
+// Linux mirrors the macOS marker so the installer grep-check works
+// identically across both platforms.
 __attribute__((used)) static const char WICK_RENDERER_PROTOCOL[] =
-    "WICK_RENDERER_PROTOCOL=v2-selector";
+    "WICK_RENDERER_PROTOCOL=v3-cf-aware";
 
 // ── Globals ────────────────────────────────────────────────────
 
@@ -553,17 +554,27 @@ int main(int argc, char* argv[]) {
                 if (frame) {
                     // JS poller: checks text length every 300ms.
                     // When content is >500 chars and stable for 1s, dumps DOM.
-                    // Falls back after 8s regardless.
-                    char js[1024];
+                    // Refuses to count the page as stable while a
+                    // Cloudflare "Just a moment" interstitial is on
+                    // screen — see renderer.m for full rationale.
+                    char js[1400];
                     snprintf(js, sizeof(js),
                         "(function(){"
                         "var last=0,stable=0,t=0;"
                         "var iv=setInterval(function(){"
-                        "  var len=document.body?document.body.innerText.length:0;"
+                        "  var body=document.body;"
+                        "  var bt=body?body.innerText:'';"
+                        "  var len=bt.length;"
+                        "  var blt=bt.toLowerCase();"
+                        "  var isCF=blt.indexOf('performing security verification')>=0||"
+                        "           blt.indexOf('checking your browser')>=0;"
                         "  t+=300;"
-                        "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
-                        "  last=len;"
-                        "  if((len>500&&stable>=1000)||t>=8000){"
+                        "  if(isCF){stable=0;last=len;}"
+                        "  else if(len>500&&len===last){stable+=300;}"
+                        "  else{stable=0;last=len;}"
+                        "  var stableHit=!isCF&&len>500&&stable>=1000;"
+                        "  var cap=isCF?30000:8000;"
+                        "  if(stableHit||t>=cap){"
                         "    clearInterval(iv);"
                         "    console.log('%s'+document.documentElement.outerHTML);"
                         "  }"
@@ -777,19 +788,29 @@ int main(int argc, char* argv[]) {
                 if (!poll_injected && g_browser) {
                     cef_frame_t* f = g_browser->get_main_frame(g_browser);
                     if (f) {
-                        char js[2048];
+                        // Daemon poller. Cloudflare-aware — refuses to
+                        // dump while a "Just a moment" / "Performing
+                        // security verification" interstitial is
+                        // visible. See renderer.m for the macOS twin.
+                        char js[2400];
                         snprintf(js, sizeof(js),
                             "(function(){"
                             "var sel=%s%s%s;"
                             "var last=0,stable=0,t=0;"
                             "var iv=setInterval(function(){"
-                            "  var len=document.body?document.body.innerText.length:0;"
+                            "  var body=document.body;"
+                            "  var bt=body?body.innerText:'';"
+                            "  var len=bt.length;"
+                            "  var blt=bt.toLowerCase();"
+                            "  var isCF=blt.indexOf('performing security verification')>=0||"
+                            "           blt.indexOf('checking your browser')>=0;"
                             "  t+=300;"
-                            "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
-                            "  last=len;"
+                            "  if(isCF){stable=0;last=len;}"
+                            "  else if(len>500&&len===last){stable+=300;}"
+                            "  else{stable=0;last=len;}"
                             "  var hit=sel?!!document.querySelector(sel):true;"
-                            "  var stableHit=len>500&&stable>=1000&&hit;"
-                            "  var cap=sel?20000:8000;"
+                            "  var stableHit=!isCF&&len>500&&stable>=1000&&hit;"
+                            "  var cap=isCF?30000:(sel?20000:8000);"
                             "  if(stableHit||t>=cap){"
                             "    clearInterval(iv);"
                             "    console.log('%s'+document.documentElement.outerHTML);"

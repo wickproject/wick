@@ -292,18 +292,29 @@ pub async fn fetch(
         // the captcha-auto / captcha-interactive branches above (the
         // `captcha-*` strategy is an enrichment of the cronet attempt, not
         // a transport switch).
-        let timing_ms = start.elapsed().as_millis() as u64;
-        analytics::report_fetch(FetchEvent {
-            host, strategy: "captcha-blocked", escalated_from: Some("cronet"),
-            ok: false, status, timing_ms,
-        });
-        return Ok(FetchResult {
-            content: "This page returned a CAPTCHA or browser challenge. \
-                      The content could not be extracted automatically.\n\
-                      Install wick-captcha to solve CAPTCHAs interactively."
-                .to_string(),
-            title: None, url: url.to_string(), status_code: status, timing_ms,
-        });
+        //
+        // If CEF is available and the caller hasn't pinned us to Cronet,
+        // don't terminate here — JS-based challenges (Cloudflare "Just a
+        // moment", DataDome, AWS WAF) clear under a real browser. Fall
+        // through to the 403/503 CEF escalation block below. Only emit
+        // captcha-blocked telemetry / response when there's no recovery
+        // path left.
+        if !cef_installed || render == RenderMode::Cronet {
+            let timing_ms = start.elapsed().as_millis() as u64;
+            analytics::report_fetch(FetchEvent {
+                host, strategy: "captcha-blocked", escalated_from: Some("cronet"),
+                ok: false, status, timing_ms,
+            });
+            return Ok(FetchResult {
+                content: "This page returned a CAPTCHA or browser challenge. \
+                          The content could not be extracted automatically.\n\
+                          Install wick-captcha to solve CAPTCHAs interactively, \
+                          or `wick install cef` for JS-rendered challenges."
+                    .to_string(),
+                title: None, url: url.to_string(), status_code: status, timing_ms,
+            });
+        }
+        // else: fall through to the 403/503 CEF escalation block below.
     }
 
     // Cronet blocked but CEF might work — escalate if available, we haven't
@@ -437,12 +448,14 @@ async fn cef_render_with_retry(
         wait_for_selector: wait_for_selector.map(|s| s.to_string()),
     };
     match crate::cef::render_with(url, opts.clone()).await {
-        Ok(html) if looks_like_real_render(&html) => Ok(html),
+        Ok(html) if is_acceptable_render(&html) => Ok(html),
         first => {
             tracing::debug!(
                 "cef render for {} failed first attempt ({}); retrying once",
                 url,
                 match &first {
+                    Ok(html) if looks_like_cloudflare_interstitial(html) =>
+                        "cloudflare interstitial captured before redirect".to_string(),
                     Ok(html) => format!("body too small: {} bytes", html.len()),
                     Err(e) => e.to_string(),
                 }
@@ -452,12 +465,33 @@ async fn cef_render_with_retry(
     }
 }
 
+/// A CEF render is acceptable when it has plausible bulk AND isn't a
+/// challenge interstitial captured before its post-verification redirect.
+fn is_acceptable_render(html: &str) -> bool {
+    looks_like_real_render(html) && !looks_like_cloudflare_interstitial(html)
+}
+
 /// Sanity check on a CEF render result. A successful page — even an empty
 /// one — should produce at least a few KB of HTML (React/Vue shell +
 /// inline scripts). Anything smaller is almost certainly a load abort
 /// that returned a near-empty `<html><head></head><body></body></html>`.
 fn looks_like_real_render(html: &str) -> bool {
     html.len() >= 2000
+}
+
+/// True when the renderer dumped Cloudflare's "Just a moment" challenge
+/// page itself, rather than the post-verification destination. Hitting
+/// this means the renderer's stability poller fired during the
+/// (effectively static) interstitial before Cloudflare's JS redirected
+/// us to the real content. Triggers a one-shot retry — by then the
+/// persistent daemon has cleared cookies and the second render usually
+/// lands on real content.
+fn looks_like_cloudflare_interstitial(html: &str) -> bool {
+    let lower = html.to_lowercase();
+    lower.contains("just a moment")
+        && (lower.contains("performing security verification")
+            || lower.contains("checking your browser")
+            || lower.contains("challenge-platform"))
 }
 
 /// Append detected media URLs to content so agents/crawlers can discover them.
@@ -822,6 +856,26 @@ mod tests {
         // Even minimal real pages clear 2KB once React/Vue shells and
         // inline scripts are included.
         assert!(looks_like_real_render(&"<p>content</p>".repeat(200)));
+    }
+
+    #[test]
+    fn cloudflare_interstitial_detected() {
+        let body = "<title>Just a moment...</title><body>\
+            <h2>Performing security verification</h2>\
+            <p>This website uses a security service to protect against malicious bots.</p>\
+            </body>";
+        assert!(looks_like_cloudflare_interstitial(body));
+        assert!(!is_acceptable_render(body));
+    }
+
+    #[test]
+    fn cloudflare_interstitial_no_false_positive_on_articles() {
+        // A real article that happens to mention "just a moment" but
+        // doesn't have the security-verification scaffolding shouldn't
+        // trip the heuristic.
+        let body = "<title>Wait Just a Moment - News Article</title>\
+            <body><p>Real article content goes here for many paragraphs.</p></body>";
+        assert!(!looks_like_cloudflare_interstitial(body));
     }
 
     #[test]

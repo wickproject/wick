@@ -6,12 +6,18 @@
 //   Daemon:   wick-renderer (no args)
 //             → reads URLs from stdin, writes length-prefixed HTML to stdout
 //
-// Protocol version marker — bump when the stdin protocol or selector
+// Protocol version marker — bump when the stdin protocol or poller
 // semantics change. install-cef-mac.sh greps the installed binary for
 // this exact string and force-rebuilds if missing. Keep this string
 // stable and grep-friendly.
+//
+// History:
+//   v2-selector  : URL\tSELECTOR stdin protocol, selector-aware poller.
+//   v3-cf-aware  : poller refuses to dump while a Cloudflare challenge
+//                  interstitial is on screen, so chroniclingamerica.loc.gov
+//                  and similar JS-challenge pages capture real content.
 __attribute__((used)) static const char WICK_RENDERER_PROTOCOL[] =
-    "WICK_RENDERER_PROTOCOL=v2-selector";
+    "WICK_RENDERER_PROTOCOL=v3-cf-aware";
 //
 // Features:
 //   - Stealth patches injected at on_load_start + on_load_end fixup
@@ -381,22 +387,37 @@ static void render_url_smart(const char* url) {
             // completion on the selector existing in the DOM — so SPAs
             // that lazy-load timelines/feeds dump only after the
             // requested content has actually appeared.
+            //
+            // Also refuses to count the page as stable while a Cloudflare
+            // "Just a moment" / "Performing security verification"
+            // interstitial is visible: that page is text-stable within a
+            // second, so without this guard the renderer captures it
+            // before the post-verification redirect lands. The cap
+            // stretches to 30s on Cloudflare to give the challenge time
+            // to clear; on other pages it stays at 8s (or 20s with a
+            // selector).
             if (!poll_injected && g_browser) {
                 cef_frame_t* f = g_browser->get_main_frame(g_browser);
                 if (f) {
-                    char js[2048];
+                    char js[2400];
                     snprintf(js, sizeof(js),
                         "(function(){"
                         "var sel=%s%s%s;"
                         "var last=0,stable=0,t=0;"
                         "var iv=setInterval(function(){"
-                        "  var len=document.body?document.body.innerText.length:0;"
+                        "  var body=document.body;"
+                        "  var bt=body?body.innerText:'';"
+                        "  var len=bt.length;"
+                        "  var blt=bt.toLowerCase();"
+                        "  var isCF=blt.indexOf('performing security verification')>=0||"
+                        "           blt.indexOf('checking your browser')>=0;"
                         "  t+=300;"
-                        "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
-                        "  last=len;"
+                        "  if(isCF){stable=0;last=len;}"
+                        "  else if(len>500&&len===last){stable+=300;}"
+                        "  else{stable=0;last=len;}"
                         "  var hit=sel?!!document.querySelector(sel):true;"
-                        "  var stableHit=len>500&&stable>=1000&&hit;"
-                        "  var cap=sel?20000:8000;"
+                        "  var stableHit=!isCF&&len>500&&stable>=1000&&hit;"
+                        "  var cap=isCF?30000:(sel?20000:8000);"
                         "  if(stableHit||t>=cap){"
                         "    clearInterval(iv);"
                         "    console.log('%s'+document.documentElement.outerHTML);"
@@ -643,16 +664,27 @@ int main(int argc, char* argv[]) {
                 if (!poll_injected && g_browser) {
                     cef_frame_t* f = g_browser->get_main_frame(g_browser);
                     if (f) {
-                        char js[1024];
+                        // One-shot mode poller. Mirrors the daemon
+                        // poller's Cloudflare-aware logic — see daemon
+                        // injection above for rationale.
+                        char js[1400];
                         snprintf(js, sizeof(js),
                             "(function(){"
                             "var last=0,stable=0,t=0;"
                             "var iv=setInterval(function(){"
-                            "  var len=document.body?document.body.innerText.length:0;"
+                            "  var body=document.body;"
+                            "  var bt=body?body.innerText:'';"
+                            "  var len=bt.length;"
+                            "  var blt=bt.toLowerCase();"
+                            "  var isCF=blt.indexOf('performing security verification')>=0||"
+                            "           blt.indexOf('checking your browser')>=0;"
                             "  t+=300;"
-                            "  if(len>500&&len===last){stable+=300;}else{stable=0;}"
-                            "  last=len;"
-                            "  if((len>500&&stable>=1000)||t>=8000){"
+                            "  if(isCF){stable=0;last=len;}"
+                            "  else if(len>500&&len===last){stable+=300;}"
+                            "  else{stable=0;last=len;}"
+                            "  var stableHit=!isCF&&len>500&&stable>=1000;"
+                            "  var cap=isCF?30000:8000;"
+                            "  if(stableHit||t>=cap){"
                             "    clearInterval(iv);"
                             "    console.log('%s'+document.documentElement.outerHTML);"
                             "  }"
