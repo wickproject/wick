@@ -610,14 +610,7 @@ section{position:relative;z-index:5;}
   background:linear-gradient(180deg, rgba(10,14,20,.8), rgba(5,7,11,.4));
   position:relative;
 }
-.plan.pro{border-color:var(--cyan);box-shadow:0 0 40px rgba(111,227,255,.12);}
-.plan.pro::before{
-  content:"RECOMMENDED";position:absolute;top:-10px;left:34px;
-  font-family:var(--f-mono);font-size:9px;letter-spacing:.25em;color:var(--ink);
-  background:var(--cyan);padding:3px 8px;
-}
-.plan .tier{font-family:var(--f-mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--bone-dim);}
-.plan.pro .tier{color:var(--cyan);}
+.plan .tier{font-family:var(--f-mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan);}
 .plan .price{
   font-family:var(--f-display);font-style:italic;font-weight:300;
   font-size:54px;margin:14px 0 6px;color:var(--bone);line-height:1;
@@ -1093,8 +1086,7 @@ footer{padding:40px 40px;border-top:1px solid var(--line);}
         <thead>
           <tr>
             <th style="text-align:left;padding-left:18px;">&nbsp;</th>
-            <th class="us">Wick<br><span style="font-size:9px;color:var(--mute)">FREE</span></th>
-            <th class="us">Wick<br><span style="font-size:9px;color:var(--mute)">PRO</span></th>
+            <th class="us">Wick</th>
             <th>Firecrawl</th>
             <th>Bright Data</th>
             <th>Browserbase</th>
@@ -1104,31 +1096,31 @@ footer{padding:40px 40px;border-top:1px solid var(--line);}
         <tbody>
           <tr>
             <td class="row-label">Anti-bot bypass</td>
-            <td class="yes">●</td><td class="yes-strong">●●</td><td class="no">○</td><td class="partial">part</td><td class="no">○</td><td class="no">○</td>
+            <td class="yes-strong">●●</td><td class="no">○</td><td class="partial">part</td><td class="no">○</td><td class="no">○</td>
           </tr>
           <tr>
             <td class="row-label">JavaScript rendering</td>
-            <td class="no">○</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td>
           </tr>
           <tr>
             <td class="row-label">Runs locally</td>
-            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
+            <td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
           </tr>
           <tr>
             <td class="row-label">Your residential IP</td>
-            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="partial">pool</td><td class="no">○</td><td class="yes">●</td>
+            <td class="yes">●</td><td class="no">○</td><td class="partial">pool</td><td class="no">○</td><td class="yes">●</td>
           </tr>
           <tr>
             <td class="row-label">Markdown output</td>
-            <td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td>
+            <td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td>
           </tr>
           <tr>
             <td class="row-label">No cloud round-trip</td>
-            <td class="yes">●</td><td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
+            <td class="yes">●</td><td class="no">○</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td>
           </tr>
           <tr>
             <td class="row-label">Paid starting at</td>
-            <td style="color:var(--cyan);">$0</td><td style="color:var(--cyan);">custom</td><td>$19/mo</td><td>metered</td><td>$150/mo</td><td>$0</td>
+            <td style="color:var(--cyan);">$0</td><td>$19/mo</td><td>metered</td><td>$150/mo</td><td>$0</td>
           </tr>
         </tbody>
       </table>
