@@ -265,7 +265,10 @@ export default {
       // this stays empty for them. This is what lets the stats page and the
       // self-improvement harness exclude user-side "offline" failures from
       // "this site is hard" — see analytics::report_transport_error.
-      if (isErrorKind(body.error_kind)) {
+      // Only a transport FAILURE carries a cause — never an OK response. The
+      // endpoint is unauthenticated, so reject error_kind on ok events so a
+      // client can't skew the offline fraction by attaching it to successes.
+      if (body.ok !== true && isErrorKind(body.error_kind)) {
         existing.error_kind_dist[body.error_kind] =
           (existing.error_kind_dist[body.error_kind] || 0) + 1;
       }

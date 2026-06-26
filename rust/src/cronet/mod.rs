@@ -307,8 +307,8 @@ unsafe extern "C" fn on_failed(
 }
 
 /// Map a `Cronet_Error_ERROR_CODE` (include/cronet.idl_c.h) to a stable name
-/// embedded in the error message. `fetch::error_kind_from_message` matches on
-/// these (lowercased) to classify the failure cause.
+/// embedded in the error message. `fetch::classify_transport_error` (via
+/// `candidate_cause`) matches on these (lowercased) to classify the cause.
 fn net_error_name(code: std::os::raw::c_int) -> &'static str {
     match code {
         0 => "ERROR_CALLBACK",

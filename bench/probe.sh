@@ -15,7 +15,7 @@
 #      so we never chase phantom "this site is hard" signals.
 #   2. For each candidate, run a strategy matrix via `wick fetch --json`:
 #        - cronet            (--render cronet)                 [direct]
-#        - cronet+residential(--render cronet --proxy <socks>) [datacenter-block test]
+#        - cronet+residential(--render cronet --proxy <url>)   [datacenter-block test]
 #        - cef               (--render cef)                    [JS / bot-managed test]
 #      (cef+residential is NOT tested here: --proxy routes only the Cronet/
 #      reqwest engine, not CEF, whose residential path is a WireGuard preload
@@ -135,7 +135,8 @@ if [[ -z "$PROVIDER" ]]; then
     echo "WARN: no --provider set; testing cronet-direct and cef-direct only (cannot derive needs_residential)." >&2
 fi
 
-# Build a fresh residential SOCKS URL (new session → new exit IP) per call.
+# Build a fresh residential proxy URL (new session → new exit IP) per call.
+# Scheme is provider-specific (oxylabs = HTTP CONNECT, others = SOCKS5).
 build_proxy() {
     [[ -z "$PROVIDER" ]] && return 1
     "$PROXY_BUILDER" --provider="$PROVIDER" --country="$COUNTRY" 2>>"$RESULTS.err"

@@ -176,7 +176,13 @@ fn refresh_now(path: &Path) -> std::io::Result<()> {
     // half-written overlay.
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, body.as_bytes())?;
-    std::fs::rename(&tmp, path)?;
+    // Unix `rename` atomically replaces the destination; Windows `rename`
+    // errors if it already exists, which would silently stop refresh once the
+    // overlay was written. Fall back to a direct overwrite there.
+    if std::fs::rename(&tmp, path).is_err() {
+        std::fs::write(path, body.as_bytes())?;
+        let _ = std::fs::remove_file(&tmp);
+    }
     Ok(())
 }
 
