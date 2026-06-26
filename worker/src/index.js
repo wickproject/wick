@@ -60,6 +60,21 @@ function isPrivateHost(hostname) {
   return false;
 }
 
+/**
+ * Allowlist of transport-failure causes the client emits (see
+ * fetch::classify_transport_error). The /v1/events endpoint is
+ * unauthenticated, so we bound `error_kind_dist` to this fixed set rather
+ * than a loose regex — otherwise a buggy/malicious client could spray
+ * arbitrary [a-z_]{1,20} keys and inflate a day's KV value.
+ */
+const ERROR_KINDS = new Set([
+  "offline", "dns", "timeout", "reset", "refused",
+  "unreachable", "quic", "connect", "other",
+]);
+function isErrorKind(k) {
+  return typeof k === "string" && ERROR_KINDS.has(k);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -144,6 +159,7 @@ export default {
     // POST /v1/events with body:
     // { "host": "nytimes.com", "strategy": "cef", "escalated_from": null|"cronet",
     //   "ok": true, "status": 200, "timing_ms": 1840,
+    //   "error_kind": "reset"|"offline"|...,   // only on transport failures
     //   "version": "0.9.2", "os": "macos" }
     //
     // Storage model: one KV key per (date, host, strategy) with a merged
@@ -186,7 +202,7 @@ export default {
       // manually edited in the KV dashboard) is treated as "start
       // fresh" so we never throw during increment or write back a
       // poisoned value.
-      const existing = { fetches: 0, successes: 0, total_ms: 0, status_dist: {} };
+      const existing = { fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {} };
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
       if (existingRaw) {
         try {
@@ -208,6 +224,16 @@ export default {
                 // payload and we don't want garbage in the bucket.
                 if (Number.isFinite(n) && /^\d{1,3}$/.test(code)) {
                   existing.status_dist[code] = n;
+                }
+              }
+            }
+            // error_kind_dist: {cause: count} for transport failures. Older
+            // KV values won't have it; ignore non-objects defensively.
+            if (parsed.error_kind_dist && typeof parsed.error_kind_dist === "object") {
+              for (const [kind, count] of Object.entries(parsed.error_kind_dist)) {
+                const n = Number(count);
+                if (Number.isFinite(n) && isErrorKind(kind)) {
+                  existing.error_kind_dist[kind] = n;
                 }
               }
             }
@@ -233,6 +259,17 @@ export default {
         : "0";
       existing.status_dist[statusBucket] = (existing.status_dist[statusBucket] || 0) + 1;
 
+      // Record the transport-failure cause when present (offline / dns /
+      // reset / refused / timeout / unreachable / quic / connect / other).
+      // Only transport-error events carry it; HTTP responses omit it, so
+      // this stays empty for them. This is what lets the stats page and the
+      // self-improvement harness exclude user-side "offline" failures from
+      // "this site is hard" — see analytics::report_transport_error.
+      if (isErrorKind(body.error_kind)) {
+        existing.error_kind_dist[body.error_kind] =
+          (existing.error_kind_dist[body.error_kind] || 0) + 1;
+      }
+
       await env.SUBSCRIPTIONS.put(key, JSON.stringify(existing), {
         expirationTtl: 30 * 86400,
       });
@@ -250,7 +287,7 @@ export default {
       // v2 added per-row status_dist; bumping the key ensures the
       // first request after deploy rebuilds the cached payload in the
       // new shape instead of serving stale v1 JSON for up to 5 minutes.
-      const cacheKey = "stats:summary:v2";
+      const cacheKey = "stats:summary:v3";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
       if (cached) {
         return new Response(cached, {
@@ -307,7 +344,7 @@ export default {
             const strategy = rest.slice(lastColon + 1);
             const aggKey = `${host}|${strategy}`;
             const cur = agg.get(aggKey) || {
-              host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {},
+              host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
             };
             // Coerce each field via Number() and ignore non-finite
             // values — a stringly-typed stored value (`"1"`) would
@@ -326,6 +363,16 @@ export default {
                 const n = Number(count);
                 if (Number.isFinite(n) && /^\d{1,3}$/.test(code)) {
                   cur.status_dist[code] = (cur.status_dist[code] || 0) + n;
+                }
+              }
+            }
+            // Merge transport-failure causes across days (same shape as
+            // status_dist). Pre-error_kind events simply don't contribute.
+            if (v.error_kind_dist && typeof v.error_kind_dist === "object") {
+              for (const [kind, count] of Object.entries(v.error_kind_dist)) {
+                const n = Number(count);
+                if (Number.isFinite(n) && isErrorKind(kind)) {
+                  cur.error_kind_dist[kind] = (cur.error_kind_dist[kind] || 0) + n;
                 }
               }
             }
@@ -348,6 +395,10 @@ export default {
           // of just a red bar. Pre-v2 events won't contribute here, so
           // historical rows may sum to less than `fetches`.
           status_dist: r.status_dist || {},
+          // Per-cause counts for transport failures, so a row reading 0%
+          // success can be split into "offline×20" (user's network — ignore)
+          // vs "reset×20" (the site is actively blocking — a real signal).
+          error_kind_dist: r.error_kind_dist || {},
         }))
         .sort((a, b) => b.fetches - a.fetches)
         .slice(0, 500);
@@ -366,6 +417,75 @@ export default {
           "Content-Type": "application/json",
           "Cache-Control": "public, max-age=300",
         },
+      });
+    }
+
+    // ── Curated site-rules (the evolving "known behaviors" list) ─────────
+    //
+    // GET  /v1/site-rules       → public, cached 1h. Clients refresh this
+    //                             daily into <wick-home>/site-rules.json,
+    //                             which overlays the binary's bundled seed
+    //                             (see rust/src/site_rules.rs). This is how
+    //                             the list "constantly evolves" without a
+    //                             reinstall.
+    // POST /v1/site-rules/:key  → API-key gated. The self-improvement loop
+    //                             publishes a merged rules doc here (seed ∪
+    //                             measured ∪ curated). Body is the full
+    //                             { version, rules: { host: {...} } } doc.
+    if (request.method === "GET" && path === "/v1/site-rules") {
+      const stored = await env.SUBSCRIPTIONS.get("site-rules:published");
+      const body = stored || JSON.stringify({ version: 1, rules: {} });
+      return new Response(body, {
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+
+    const rulesPubMatch = path.match(/^\/v1\/site-rules\/([^/]+)$/);
+    if (request.method === "POST" && rulesPubMatch) {
+      const pubKey = rulesPubMatch[1];
+      let keys;
+      try { keys = JSON.parse(env.API_KEYS || "{}"); } catch {
+        return new Response("Server error\n", { status: 500, headers });
+      }
+      if (!keys[pubKey] || !keys[pubKey].active) {
+        return new Response("Invalid API key\n", { status: 403, headers });
+      }
+      let doc;
+      try { doc = await request.json(); } catch {
+        return new Response("bad json\n", { status: 400, headers });
+      }
+      if (!doc || typeof doc !== "object" || typeof doc.rules !== "object" || doc.rules === null) {
+        return new Response("expected { rules: { host: {...} } }\n", { status: 400, headers });
+      }
+      const hostCount = Object.keys(doc.rules).length;
+      if (hostCount > 5000) {
+        return new Response("too many rules (max 5000)\n", { status: 400, headers });
+      }
+      // Store verbatim (clients tolerate unknown fields; an unrecognized
+      // `render` is treated as "no opinion" client-side). Stamp a server
+      // receive time so clients/operators can see staleness.
+      const toStore = JSON.stringify({
+        version: Number(doc.version) || 1,
+        published_at: new Date().toISOString(),
+        rules: doc.rules,
+      });
+      if (toStore.length > 1_000_000) {
+        return new Response("payload too large (max 1MB)\n", { status: 413, headers });
+      }
+      await env.SUBSCRIPTIONS.put("site-rules:published", toStore);
+      console.log(JSON.stringify({
+        event: "site_rules_publish",
+        customer: keys[pubKey].customer,
+        hosts: hostCount,
+        timestamp: new Date().toISOString(),
+      }));
+      return new Response(JSON.stringify({ ok: true, hosts: hostCount }), {
+        status: 200,
+        headers: { ...headers, "Content-Type": "application/json" },
       });
     }
 

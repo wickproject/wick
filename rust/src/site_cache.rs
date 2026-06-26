@@ -22,21 +22,25 @@ pub struct SiteStrategy {
 static CACHE: std::sync::LazyLock<Mutex<HashMap<String, SiteStrategy>>> =
     std::sync::LazyLock::new(|| Mutex::new(load_cache()));
 
+/// Given a host, return its one-level parent domain when that parent still
+/// contains a dot (e.g. `www.reuters.com` → `reuters.com`, but `reuters.com` →
+/// `None` since `com` isn't a usable key). Shared by the `site_cache` and
+/// `site_rules` lookups so the two layers scope hosts identically — note this
+/// is a single label strip, not PSL/eTLD+1 normalization.
+pub(crate) fn parent_domain(host: &str) -> Option<&str> {
+    let dot = host.find('.')?;
+    let parent = &host[dot + 1..];
+    parent.contains('.').then_some(parent)
+}
+
 /// Get the best strategy for a domain based on past fetches.
 pub fn get(host: &str) -> Option<SiteStrategy> {
     let cache = CACHE.lock().ok()?;
-    // Check exact match, then parent domain (e.g., sub.example.com → example.com)
+    // Exact match, then one-level parent (e.g. sub.example.com → example.com).
     if let Some(s) = cache.get(host) {
         return Some(s.clone());
     }
-    // Try parent domain
-    if let Some(dot) = host.find('.') {
-        let parent = &host[dot + 1..];
-        if parent.contains('.') {
-            return cache.get(parent).cloned();
-        }
-    }
-    None
+    parent_domain(host).and_then(|p| cache.get(p).cloned())
 }
 
 /// Record the result of a fetch for future use.

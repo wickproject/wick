@@ -19,6 +19,7 @@ mod search;
 mod session;
 mod setup;
 mod site_cache;
+mod site_rules;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -72,6 +73,12 @@ enum Command {
         /// Ignore robots.txt restrictions
         #[arg(long)]
         no_robots: bool,
+        /// Emit one structured JSON line ({url, status_code, timing_ms,
+        /// bytes, title}) instead of page content. Used by the
+        /// self-improvement probe harness to judge per-strategy success
+        /// (forced --render + --proxy) deterministically.
+        #[arg(long)]
+        json: bool,
     },
     /// Search the web and print results
     Search {
@@ -208,6 +215,7 @@ async fn main() -> Result<()> {
             render,
             wait_for_selector,
             no_robots,
+            json,
         } => {
             let client = engine::Client::new(proxy)?;
             let parsed_format = extract::Format::from_str(&format);
@@ -244,6 +252,20 @@ async fn main() -> Result<()> {
             )
             .await?;
 
+            if json {
+                // One JSON line; success is judged by the harness from
+                // status_code + bytes. Content is intentionally omitted (the
+                // harness only needs the outcome, not the page).
+                let out = serde_json::json!({
+                    "url": result.url,
+                    "status_code": result.status_code,
+                    "timing_ms": result.timing_ms,
+                    "bytes": result.content.len(),
+                    "title": result.title,
+                });
+                println!("{}", out);
+                return Ok(());
+            }
             if let Some(title) = &result.title {
                 eprintln!("Title: {}", title);
             }

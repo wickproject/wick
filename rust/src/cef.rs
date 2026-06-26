@@ -20,6 +20,10 @@ struct DaemonProcess {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+    /// Whether this daemon was spawned with the residential tunnel
+    /// (LD_PRELOAD bindwg.so). The daemon is a process-wide singleton, so a
+    /// later request in the other mode must respawn it — see `ensure_daemon`.
+    use_residential: bool,
 }
 
 /// Render with default options (no residential tunnel, no selector wait).
@@ -97,11 +101,20 @@ fn render_blocking(url: &str, opts: &RenderOptions) -> Result<String> {
 fn ensure_daemon(use_residential: bool) -> Result<()> {
     let mut daemon = DAEMON.lock().map_err(|e| anyhow::anyhow!("lock: {}", e))?;
 
-    // Check if existing daemon is still alive
+    // Check if existing daemon is still alive AND in the requested
+    // residential mode. The daemon is a process-wide singleton whose
+    // residential tunnel is fixed at spawn (LD_PRELOAD), so reusing one
+    // started in the other mode would silently route through the wrong exit
+    // — e.g. a needs_residential site served over the datacenter IP it was
+    // flagged as blocking. On a mode mismatch, kill and respawn.
     if let Some(ref mut d) = *daemon {
         match d.child.try_wait() {
             Ok(Some(_)) => { *daemon = None; }
-            Ok(None) => return Ok(()),
+            Ok(None) if d.use_residential == use_residential => return Ok(()),
+            Ok(None) => {
+                let _ = d.child.kill();
+                *daemon = None;
+            }
             Err(_) => { *daemon = None; }
         }
     }
@@ -183,7 +196,7 @@ fn ensure_daemon(use_residential: bool) -> Result<()> {
     // Wait for CEF to initialize
     std::thread::sleep(Duration::from_secs(2));
 
-    *daemon = Some(DaemonProcess { child, stdin, stdout });
+    *daemon = Some(DaemonProcess { child, stdin, stdout, use_residential });
     Ok(())
 }
 
