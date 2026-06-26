@@ -35,8 +35,12 @@ const SEED: &str = include_str!("../data/site-rules.json");
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SiteRule {
-    /// What transport is known to work: `"cef"` or `"cronet"`. Unknown
-    /// values are treated as "no opinion" by the consumer (`fetch.rs`).
+    /// What transport is known to work: `"cef"` or `"cronet"`. Defaulted so a
+    /// single overlay entry missing `render` (manual edit, a residential-only
+    /// rule, a partial doc) can't fail the whole-file parse and silently
+    /// disable every overlay rule — an empty/unknown value is "no opinion" to
+    /// the consumer (`fetch.rs::should_use_cef_first`), the same as no rule.
+    #[serde(default)]
     pub render: String,
     /// Datacenter IPs are blocked here — a residential exit is needed for a
     /// reliable fetch. Advisory for clients without a residential transport
@@ -239,5 +243,21 @@ mod tests {
     fn unknown_host_has_no_rule() {
         assert!(get("example.com").is_none());
         assert!(get("news.ycombinator.com").is_none());
+    }
+
+    #[test]
+    fn rule_missing_render_still_parses() {
+        // A partial / residential-only entry must NOT fail the whole-file
+        // parse and silently disable every overlay rule. render defaults to
+        // "" (no opinion), the rest of the entry still applies.
+        let doc = r#"{"version":1,"rules":{
+            "a.com":{"needs_residential":true},
+            "b.com":{"render":"cef"}
+        }}"#;
+        let m = parse(doc);
+        assert_eq!(m.len(), 2, "a malformed entry must not drop the whole file");
+        assert_eq!(m["a.com"].render, "");
+        assert!(m["a.com"].needs_residential);
+        assert_eq!(m["b.com"].render, "cef");
     }
 }
