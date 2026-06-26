@@ -854,6 +854,18 @@ const CONNECTIVITY_PROBE_URL: &str = "https://releases.getwick.dev/install-pro.s
 static CONNECTIVITY_CACHE: std::sync::LazyLock<std::sync::Mutex<Option<(Instant, bool)>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
 
+/// The proxy real fetches use, recorded once by `main` from the resolved
+/// `--proxy` / `WICK_PROXY`. The connectivity probe reads it so it routes
+/// identically. A `OnceLock` rather than process-env mutation, which is
+/// unsound under the multi-thread Tokio runtime (`set_var` can race env reads
+/// on worker threads).
+static EFFECTIVE_PROXY: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// Record the effective proxy at startup. Idempotent — later calls are no-ops.
+pub fn set_proxy(proxy: Option<&str>) {
+    let _ = EFFECTIVE_PROXY.set(proxy.map(|s| s.to_string()));
+}
+
 /// True when the error is *definitively* the user's own network being gone —
 /// the OS told Cronet so. These never need the connectivity probe and must
 /// never be attributed to the site.
@@ -944,11 +956,16 @@ async fn connectivity_ok() -> bool {
             }
         }
     }
-    // Probe through the same proxy real fetches use (WICK_PROXY), so a host
-    // whose only route off-box is a tunnel isn't falsely judged "offline" on
-    // every ambiguous failure.
+    // Probe through the same proxy real fetches use, so a host whose only
+    // route off-box is a tunnel isn't falsely judged "offline" on every
+    // ambiguous failure. Prefer the proxy main recorded; fall back to the env
+    // for entry points that didn't record one (read-only — no env mutation).
     let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(2));
-    if let Ok(proxy) = std::env::var("WICK_PROXY") {
+    let proxy_url = EFFECTIVE_PROXY
+        .get()
+        .and_then(|p| p.clone())
+        .or_else(|| std::env::var("WICK_PROXY").ok());
+    if let Some(proxy) = proxy_url {
         let proxy = proxy.trim();
         if !proxy.is_empty() {
             if let Ok(p) = reqwest::Proxy::all(proxy) {

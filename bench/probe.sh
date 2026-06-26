@@ -76,6 +76,16 @@ if [[ -z "$WICK_BIN" && "$DRY_RUN" -eq 0 ]]; then
 fi
 mkdir -p "$OUT_DIR"
 
+# Resolve a timeout command: GNU coreutils ships `timeout`; macOS only has it
+# as `gtimeout` (after `brew install coreutils`). Without either, run with no
+# per-request timeout (and warn) rather than failing the whole sweep — the
+# README documents macOS/launchd usage, so a hard dependency on `timeout`
+# would break the default Mac.
+TIMEOUT_BIN="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
+if [[ -z "$TIMEOUT_BIN" && "$DRY_RUN" -eq 0 ]]; then
+    echo "WARN: no 'timeout'/'gtimeout' on PATH — running without a per-request timeout (macOS: brew install coreutils)" >&2
+fi
+
 # ── Step 1: candidate selection ─────────────────────────────────────────────
 # Aggregate the per-(host,strategy) rows into per-host totals. A host is a
 # candidate when it has real volume, a low overall success rate, AND its
@@ -148,9 +158,14 @@ probe_cell() {
     local args=(fetch --json --no-robots --render "$render")
     [[ -n "$proxy" ]] && args+=(--proxy "$proxy")
     args+=("$url")
-    local out
-    if ! out="$(WICK_AUTO_INSTALL_CEF=1 timeout "$PER_REQUEST_TIMEOUT" "$WICK_BIN" "${args[@]}" 2>/dev/null)"; then
-        echo "fail $?"
+    local out rc
+    if [[ -n "$TIMEOUT_BIN" ]]; then
+        out="$(WICK_AUTO_INSTALL_CEF=1 "$TIMEOUT_BIN" "$PER_REQUEST_TIMEOUT" "$WICK_BIN" "${args[@]}" 2>/dev/null)"; rc=$?
+    else
+        out="$(WICK_AUTO_INSTALL_CEF=1 "$WICK_BIN" "${args[@]}" 2>/dev/null)"; rc=$?
+    fi
+    if [[ $rc -ne 0 ]]; then
+        echo "fail $rc"
         return
     fi
     local status bytes

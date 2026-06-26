@@ -175,15 +175,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let proxy = cli.proxy.as_deref();
-    // Canonicalize the resolved proxy into WICK_PROXY so the connectivity
-    // probe (fetch::connectivity_ok) routes the same way real fetches do —
-    // clap fills this field from a `--proxy` CLI arg without exporting the
-    // env var, so a proxied-only host would otherwise probe direct and
-    // misclassify a site failure as "offline". Safe here: main start, no
-    // threads spawned yet.
-    if let Some(p) = proxy {
-        std::env::set_var("WICK_PROXY", p);
-    }
+    // Record the resolved proxy so the connectivity probe
+    // (fetch::connectivity_ok) routes the same way real fetches do — clap
+    // fills this from a `--proxy` CLI arg without exporting WICK_PROXY, so a
+    // proxied-only host would otherwise probe direct and misclassify a site
+    // failure as "offline". Recorded in a OnceLock rather than mutated into
+    // process env, which is unsound under the multi-thread Tokio runtime.
+    fetch::set_proxy(proxy);
 
     match cli.command {
         Command::Serve { mcp: true, .. } => {
