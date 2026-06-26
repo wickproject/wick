@@ -135,9 +135,12 @@ country_name_for() {
 
 case "$PROVIDER" in
     oxylabs)
+        # Oxylabs residential is an HTTP CONNECT proxy on :7777 and is
+        # :443-only — SOCKS5 (and non-443 dest ports) return 403/errors. All
+        # Wick fetch targets are https, so CONNECT-to-443 is exactly right.
         require OXY_USER OXY_PASS
         login="customer-${OXY_USER}-cc-${CC}-sessid-$(session_id 10)-sesstime-10"
-        echo "socks5://${login}:${OXY_PASS}@pr.oxylabs.io:7777"
+        echo "http://${login}:${OXY_PASS}@pr.oxylabs.io:7777"
         ;;
     brightdata)
         # BD's SOCKS5 endpoint runs on a different port than HTTP (33335).
