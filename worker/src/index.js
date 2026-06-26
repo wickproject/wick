@@ -265,10 +265,11 @@ export default {
       // this stays empty for them. This is what lets the stats page and the
       // self-improvement harness exclude user-side "offline" failures from
       // "this site is hard" — see analytics::report_transport_error.
-      // Only a transport FAILURE carries a cause — never an OK response. The
-      // endpoint is unauthenticated, so reject error_kind on ok events so a
-      // client can't skew the offline fraction by attaching it to successes.
-      if (body.ok !== true && isErrorKind(body.error_kind)) {
+      // error_kind means "no HTTP response at all" (transport failure), so it
+      // only counts when the event is not ok AND has no status (statusBucket
+      // "0"). The endpoint is unauthenticated; this stops a client from
+      // attaching a cause to an HTTP error (e.g. 403) and skewing the stats.
+      if (body.ok !== true && statusBucket === "0" && isErrorKind(body.error_kind)) {
         existing.error_kind_dist[body.error_kind] =
           (existing.error_kind_dist[body.error_kind] || 0) + 1;
       }
@@ -461,7 +462,10 @@ export default {
       try { doc = await request.json(); } catch {
         return new Response("bad json\n", { status: 400, headers });
       }
-      if (!doc || typeof doc !== "object" || typeof doc.rules !== "object" || doc.rules === null) {
+      if (!doc || typeof doc !== "object" || typeof doc.rules !== "object"
+          || doc.rules === null || Array.isArray(doc.rules)) {
+        // typeof [] === "object", so arrays must be rejected explicitly —
+        // rules must be a host→rule map, not a list.
         return new Response("expected { rules: { host: {...} } }\n", { status: 400, headers });
       }
       const hostCount = Object.keys(doc.rules).length;

@@ -74,9 +74,10 @@ enum Command {
         #[arg(long)]
         no_robots: bool,
         /// Emit one structured JSON line ({url, status_code, timing_ms,
-        /// bytes, title}) instead of page content. Used by the
-        /// self-improvement probe harness to judge per-strategy success
-        /// (forced --render + --proxy) deterministically.
+        /// content_bytes, title}) instead of page content. content_bytes is
+        /// the extracted-content size (a block/challenge shell extracts to
+        /// near nothing). Used by the self-improvement probe harness to judge
+        /// per-strategy success (forced --render + --proxy) deterministically.
         #[arg(long)]
         json: bool,
     },
@@ -269,7 +270,11 @@ async fn main() -> Result<()> {
                     "url": result.url,
                     "status_code": result.status_code,
                     "timing_ms": result.timing_ms,
-                    "bytes": result.content.len(),
+                    // Size of the EXTRACTED content (default markdown), not the
+                    // raw HTML — this is the harness's "did we get usable
+                    // content" signal: a challenge/JS shell extracts to near
+                    // nothing, so a small content_bytes flags a block.
+                    "content_bytes": result.content.len(),
                     "title": result.title,
                 });
                 println!("{}", out);

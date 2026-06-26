@@ -52,7 +52,7 @@ COUNTRY="${WICK_PROBE_COUNTRY:-us}"
 MAX_HOSTS="${WICK_PROBE_MAX_HOSTS:-25}"
 MIN_FETCHES="${WICK_PROBE_MIN_FETCHES:-4}"     # ignore low-volume noise
 MAX_SUCCESS_RATE="${WICK_PROBE_MAX_SR:-0.5}"   # candidate if site-side SR below this
-MIN_OK_BYTES="${WICK_PROBE_MIN_BYTES:-1000}"   # a 200 with < this is treated as a block/shell
+MIN_OK_BYTES="${WICK_PROBE_MIN_BYTES:-1000}"   # a 200 with < this many bytes of extracted content = block/shell
 PER_REQUEST_TIMEOUT="${WICK_PROBE_TIMEOUT:-40}"
 SLEEP_BETWEEN="${WICK_PROBE_SLEEP:-2}"
 DRY_RUN=0
@@ -155,7 +155,9 @@ probe_cell() {
     fi
     local status bytes
     status="$(printf '%s' "$out" | jq -r '.status_code // 0' 2>/dev/null)"
-    bytes="$(printf '%s' "$out" | jq -r '.bytes // 0' 2>/dev/null)"
+    # content_bytes = extracted-content size; a challenge/JS shell extracts to
+    # near nothing, so a small value below means a block (not bytes-on-wire).
+    bytes="$(printf '%s' "$out" | jq -r '.content_bytes // 0' 2>/dev/null)"
     if [[ "$status" == "200" && "${bytes:-0}" -ge "$MIN_OK_BYTES" ]]; then
         echo "ok $status $bytes"
     else
