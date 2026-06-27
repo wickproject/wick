@@ -112,6 +112,10 @@ CANDIDATES="$(printf '%s' "$STATS_JSON" | jq -r --argjson minf "$MIN_FETCHES" --
     | { host, fetches, successes,
         offline: ((.error_kind_dist // {}).offline // 0) }
   ]
+  # group_by already sorts by the key internally in jq, so this sort_by is
+  # belt-and-suspenders: it makes the host-grouping intent explicit and is
+  # robust to any future jq change.
+  | sort_by(.host)
   | group_by(.host)
   | map({
       host: .[0].host,
