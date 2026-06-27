@@ -48,6 +48,8 @@ jq -n \
     generated_at: ($stats.generated_at // null),
     failing: (
       $stats.rows
+      # explicit sort before group_by for clarity (jq group_by sorts internally)
+      | sort_by(.host)
       | group_by(.host)
       | map({
           host: .[0].host,
