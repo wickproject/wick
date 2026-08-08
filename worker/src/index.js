@@ -432,10 +432,15 @@ export default {
     //                             (see rust/src/site_rules.rs). This is how
     //                             the list "constantly evolves" without a
     //                             reinstall.
-    // POST /v1/site-rules/:key  → API-key gated. The self-improvement loop
+    // POST /v1/site-rules/:key  → publisher-gated. The self-improvement loop
     //                             publishes a merged rules doc here (seed ∪
     //                             measured ∪ curated). Body is the full
     //                             { version, rules: { host: {...} } } doc.
+    //                             The key must be an API_KEYS entry with BOTH
+    //                             active:true AND publish:true — publishing
+    //                             rewrites what every client fetches, so it's
+    //                             restricted to designated publisher keys, not
+    //                             any read/proxy customer key.
     if (request.method === "GET" && path === "/v1/site-rules") {
       const stored = await env.SUBSCRIPTIONS.get("site-rules:published");
       const body = stored || JSON.stringify({ version: 1, rules: {} });
@@ -455,8 +460,11 @@ export default {
       try { keys = JSON.parse(env.API_KEYS || "{}"); } catch {
         return new Response("Server error\n", { status: 500, headers });
       }
-      if (!keys[pubKey] || !keys[pubKey].active) {
-        return new Response("Invalid API key\n", { status: 403, headers });
+      // Requires an active key that is ALSO explicitly a publisher
+      // (publish === true). A plain active read/proxy customer key can't
+      // overwrite the global rules every client fetches.
+      if (!keys[pubKey] || !keys[pubKey].active || keys[pubKey].publish !== true) {
+        return new Response("Invalid or non-publisher API key\n", { status: 403, headers });
       }
       let doc;
       try { doc = await request.json(); } catch {

@@ -23,6 +23,11 @@ id = "cc2ea7f5a022431dbb5361c3741786d1"
 # /releases) are a JSON object in a secret:
 # { "key1": { "customer": "Acme Corp", "active": true }, ... }
 # Set with: npx wrangler secret put API_KEYS
+#
+# POST /v1/site-rules/:key additionally requires "publish": true on the key
+# (it rewrites the rules every client fetches), so a publisher entry looks
+# like: { "<token>": { "customer": "self-improvement-loop", "active": true,
+# "publish": true } }. Plain active customer keys cannot publish.
 
 # Per-fetch telemetry is stored in the same SUBSCRIPTIONS KV namespace
 # under the `evt:` prefix. No additional binding required — keeping this
