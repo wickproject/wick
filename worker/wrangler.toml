@@ -24,10 +24,11 @@ id = "cc2ea7f5a022431dbb5361c3741786d1"
 # { "key1": { "customer": "Acme Corp", "active": true }, ... }
 # Set with: npx wrangler secret put API_KEYS
 #
-# POST /v1/site-rules/:key additionally requires "publish": true on the key
-# (it rewrites the rules every client fetches), so a publisher entry looks
-# like: { "<token>": { "customer": "self-improvement-loop", "active": true,
-# "publish": true } }. Plain active customer keys cannot publish.
+# POST /v1/site-rules/:key (the self-improvement loop's rule publish) uses a
+# SEPARATE single-purpose secret, NOT API_KEYS — so publishing never requires
+# touching (or knowing the full contents of) the customer-key secret:
+#   openssl rand -hex 24 | npx wrangler secret put SITE_RULES_PUBLISH_KEY
+# The :key path segment must equal that token. No customer key can publish.
 
 # Per-fetch telemetry is stored in the same SUBSCRIPTIONS KV namespace
 # under the `evt:` prefix. No additional binding required — keeping this

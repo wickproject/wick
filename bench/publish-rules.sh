@@ -10,9 +10,9 @@
 # the seed flagged render:cef actually works on cronet). The seed supplies the
 # long tail the harness hasn't probed yet.
 #
-# Auth: set WICK_PUBLISH_KEY to a Worker API key that has publish:true in the
-# API_KEYS secret (the loop's publisher identity — a plain customer key is
-# rejected). Use --dry-run to print the merged doc without publishing.
+# Auth: set WICK_PUBLISH_KEY to the value of the Worker's SITE_RULES_PUBLISH_KEY
+# secret (a dedicated publisher token, separate from API_KEYS). Use --dry-run to
+# print the merged doc without publishing.
 
 set -u
 
@@ -57,7 +57,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     exit 0
 fi
 
-: "${WICK_PUBLISH_KEY:?set WICK_PUBLISH_KEY to a publisher API key (publish:true in API_KEYS), or pass --dry-run}"
+: "${WICK_PUBLISH_KEY:?set WICK_PUBLISH_KEY to the SITE_RULES_PUBLISH_KEY token, or pass --dry-run}"
 
 resp="$(curl -s -w '\n%{http_code}' -X POST "$URL/$WICK_PUBLISH_KEY" \
     -H 'content-type: application/json' --data-binary "$MERGED")"

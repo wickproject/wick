@@ -436,11 +436,10 @@ export default {
     //                             publishes a merged rules doc here (seed ∪
     //                             measured ∪ curated). Body is the full
     //                             { version, rules: { host: {...} } } doc.
-    //                             The key must be an API_KEYS entry with BOTH
-    //                             active:true AND publish:true — publishing
-    //                             rewrites what every client fetches, so it's
-    //                             restricted to designated publisher keys, not
-    //                             any read/proxy customer key.
+    //                             `:key` must equal the SITE_RULES_PUBLISH_KEY
+    //                             secret — a dedicated single-purpose token,
+    //                             not an API_KEYS customer key — since
+    //                             publishing rewrites what every client fetches.
     if (request.method === "GET" && path === "/v1/site-rules") {
       const stored = await env.SUBSCRIPTIONS.get("site-rules:published");
       const body = stored || JSON.stringify({ version: 1, rules: {} });
@@ -456,15 +455,16 @@ export default {
     const rulesPubMatch = path.match(/^\/v1\/site-rules\/([^/]+)$/);
     if (request.method === "POST" && rulesPubMatch) {
       const pubKey = rulesPubMatch[1];
-      let keys;
-      try { keys = JSON.parse(env.API_KEYS || "{}"); } catch {
-        return new Response("Server error\n", { status: 500, headers });
+      // Publishing rewrites the rules every client fetches, so it's gated on a
+      // dedicated single-purpose secret (SITE_RULES_PUBLISH_KEY) — deliberately
+      // NOT the API_KEYS customer pool. That way no read/proxy customer key can
+      // publish, and rotating/setting the publisher token never risks the
+      // (unreadable, must-be-supplied-whole) API_KEYS secret.
+      if (!env.SITE_RULES_PUBLISH_KEY) {
+        return new Response("Publishing not configured\n", { status: 503, headers });
       }
-      // Requires an active key that is ALSO explicitly a publisher
-      // (publish === true). A plain active read/proxy customer key can't
-      // overwrite the global rules every client fetches.
-      if (!keys[pubKey] || !keys[pubKey].active || keys[pubKey].publish !== true) {
-        return new Response("Invalid or non-publisher API key\n", { status: 403, headers });
+      if (pubKey !== env.SITE_RULES_PUBLISH_KEY) {
+        return new Response("Invalid publisher key\n", { status: 403, headers });
       }
       let doc;
       try { doc = await request.json(); } catch {
@@ -494,7 +494,6 @@ export default {
       await env.SUBSCRIPTIONS.put("site-rules:published", toStore);
       console.log(JSON.stringify({
         event: "site_rules_publish",
-        customer: keys[pubKey].customer,
         hosts: hostCount,
         timestamp: new Date().toISOString(),
       }));
