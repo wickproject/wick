@@ -118,4 +118,8 @@ extern "C" {
 
     // UrlResponseInfo
     pub fn Cronet_UrlResponseInfo_http_status_code_get(info: Cronet_UrlResponseInfoPtr) -> i32;
+
+    // Error inspection — the net-error cause behind a failed request.
+    // Returns a Cronet_Error_ERROR_CODE (see include/cronet.idl_c.h).
+    pub fn Cronet_Error_error_code_get(error: Cronet_ErrorPtr) -> c_int;
 }

@@ -19,6 +19,7 @@ mod search;
 mod session;
 mod setup;
 mod site_cache;
+mod site_rules;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -72,6 +73,13 @@ enum Command {
         /// Ignore robots.txt restrictions
         #[arg(long)]
         no_robots: bool,
+        /// Emit one structured JSON line ({url, status_code, timing_ms,
+        /// content_bytes, title}) instead of page content. content_bytes is
+        /// the extracted-content size (a block/challenge shell extracts to
+        /// near nothing). Used by the self-improvement probe harness to judge
+        /// per-strategy success (forced --render + --proxy) deterministically.
+        #[arg(long)]
+        json: bool,
     },
     /// Search the web and print results
     Search {
@@ -167,6 +175,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let proxy = cli.proxy.as_deref();
+    // Record the resolved proxy so the connectivity probe
+    // (fetch::connectivity_ok) routes the same way real fetches do — clap
+    // fills this from a `--proxy` CLI arg without exporting WICK_PROXY, so a
+    // proxied-only host would otherwise probe direct and misclassify a site
+    // failure as "offline". Recorded in a OnceLock rather than mutated into
+    // process env, which is unsound under the multi-thread Tokio runtime.
+    fetch::set_proxy(proxy);
 
     match cli.command {
         Command::Serve { mcp: true, .. } => {
@@ -208,6 +223,7 @@ async fn main() -> Result<()> {
             render,
             wait_for_selector,
             no_robots,
+            json,
         } => {
             let client = engine::Client::new(proxy)?;
             let parsed_format = extract::Format::from_str(&format);
@@ -244,6 +260,24 @@ async fn main() -> Result<()> {
             )
             .await?;
 
+            if json {
+                // One JSON line; success is judged by the harness from
+                // status_code + bytes. Content is intentionally omitted (the
+                // harness only needs the outcome, not the page).
+                let out = serde_json::json!({
+                    "url": result.url,
+                    "status_code": result.status_code,
+                    "timing_ms": result.timing_ms,
+                    // Size of the EXTRACTED content (default markdown), not the
+                    // raw HTML — this is the harness's "did we get usable
+                    // content" signal: a challenge/JS shell extracts to near
+                    // nothing, so a small content_bytes flags a block.
+                    "content_bytes": result.content.len(),
+                    "title": result.title,
+                });
+                println!("{}", out);
+                return Ok(());
+            }
             if let Some(title) = &result.title {
                 eprintln!("Title: {}", title);
             }

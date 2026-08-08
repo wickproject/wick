@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::analytics::{self, FetchEvent};
 use crate::captcha;
@@ -7,6 +7,7 @@ use crate::engine::Client;
 use crate::extract::{self, Format};
 use crate::robots;
 use crate::site_cache;
+use crate::site_rules;
 
 pub struct FetchResult {
     pub content: String,
@@ -86,6 +87,7 @@ pub async fn fetch(
 ) -> Result<FetchResult> {
     let start = Instant::now();
     analytics::ping("fetch");
+    site_rules::refresh_if_stale();
 
     let parsed = url::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
@@ -130,6 +132,16 @@ pub async fn fetch(
 
     let mut cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
+    // Curated rule for this host (the shared "known behaviors" list).
+    // Consulted above the local cache so a brand-new client can route
+    // correctly on its FIRST visit — pinning CEF-first and/or requesting a
+    // residential exit before this machine has learned anything itself.
+    let rule = site_rules::get(host);
+    let use_residential = rule.as_ref().map(|r| r.needs_residential).unwrap_or(false);
+    // Effective selector: an explicit caller argument wins; otherwise fall
+    // back to the rule's selector (e.g. wait for `article` on x.com).
+    let effective_selector =
+        wait_for_selector.or_else(|| rule.as_ref().and_then(|r| r.wait_for_selector.as_deref()));
     // Forced CEF: attempt auto-install before bailing — the user has
     // explicitly asked for the renderer, so it's the strongest signal
     // they want CEF. Falls back to a clear error if install isn't
@@ -149,10 +161,14 @@ pub async fn fetch(
     }
     let cef_first = render == RenderMode::Cef
         || (render == RenderMode::Auto
-            && should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed));
+            && should_use_cef_first(
+                rule.as_ref().map(|r| r.render.as_str()),
+                cached.as_ref().map(|s| s.strategy.as_str()),
+                cef_installed,
+            ));
 
     if cef_first {
-        match cef_render_with_retry(url, wait_for_selector).await {
+        match cef_render_with_retry(url, effective_selector, use_residential).await {
             Ok(html) => {
                 let extracted = extract::extract(&html, &parsed, format)?;
                 let content = append_media(&extracted.content, &html, &parsed);
@@ -191,10 +207,12 @@ pub async fn fetch(
         Ok(r) => r,
         Err(e) => {
             let timing_ms = start.elapsed().as_millis() as u64;
-            analytics::report_fetch(FetchEvent {
-                host, strategy: "cronet-transport-error", escalated_from,
-                ok: false, status: 0, timing_ms,
-            });
+            if !analytics::is_opted_out() {
+                let kind = classify_transport_error(&e).await;
+                analytics::report_transport_error(
+                    host, "cronet-transport-error", kind, escalated_from, timing_ms,
+                );
+            }
             return Err(e);
         }
     };
@@ -330,7 +348,7 @@ pub async fn fetch(
     // offer to install CEF on the spot in interactive sessions. The
     // captcha branch above falls through here when CEF could help.
     if (status == 403 || status == 503) && escalated_from.is_none() {
-        if let Some(html) = cef_render_or_install(url, wait_for_selector, render).await {
+        if let Some(html) = cef_render_or_install(url, effective_selector, render, use_residential).await {
             let extracted = extract::extract(&html, &parsed, format)?;
             let content = append_media(&extracted.content, &html, &parsed);
             let timing_ms = start.elapsed().as_millis() as u64;
@@ -397,7 +415,7 @@ pub async fn fetch(
     // second auto-escalation trigger alongside 403/503.
     let js_shell = is_js_required_shell(&body);
     if escalated_from.is_none() && js_shell {
-        if let Some(html) = cef_render_or_install(url, wait_for_selector, render).await {
+        if let Some(html) = cef_render_or_install(url, effective_selector, render, use_residential).await {
             let extracted = extract::extract(&html, &parsed, format)?;
             let content = append_media(&extracted.content, &html, &parsed);
             let timing_ms = start.elapsed().as_millis() as u64;
@@ -462,6 +480,7 @@ async fn cef_render_or_install(
     url: &str,
     wait_for_selector: Option<&str>,
     render: RenderMode,
+    use_residential: bool,
 ) -> Option<String> {
     if render == RenderMode::Cronet {
         return None;
@@ -474,7 +493,7 @@ async fn cef_render_or_install(
             return None;
         }
     }
-    cef_render_with_retry(url, wait_for_selector).await.ok()
+    cef_render_with_retry(url, wait_for_selector, use_residential).await.ok()
 }
 
 static USER_DECLINED_INSTALL: std::sync::atomic::AtomicBool =
@@ -553,9 +572,10 @@ fn prompt_user_for_install() -> bool {
 async fn cef_render_with_retry(
     url: &str,
     wait_for_selector: Option<&str>,
+    use_residential: bool,
 ) -> Result<String> {
     let opts = crate::cef::RenderOptions {
-        use_residential: false,
+        use_residential,
         wait_for_selector: wait_for_selector.map(|s| s.to_string()),
     };
     match crate::cef::render_with(url, opts.clone()).await {
@@ -627,6 +647,7 @@ pub async fn fetch_html(
     respect_robots: bool,
 ) -> Result<FetchHtmlResult> {
     let start = Instant::now();
+    site_rules::refresh_if_stale();
     let parsed = url::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
 
@@ -650,10 +671,17 @@ pub async fn fetch_html(
 
     let cef_installed = crate::cef::is_available();
     let cached = site_cache::get(host);
-    let cef_first = should_use_cef_first(cached.as_ref().map(|s| s.strategy.as_str()), cef_installed);
+    let rule = site_rules::get(host);
+    let use_residential = rule.as_ref().map(|r| r.needs_residential).unwrap_or(false);
+    let effective_selector = rule.as_ref().and_then(|r| r.wait_for_selector.as_deref());
+    let cef_first = should_use_cef_first(
+        rule.as_ref().map(|r| r.render.as_str()),
+        cached.as_ref().map(|s| s.strategy.as_str()),
+        cef_installed,
+    );
 
     if cef_first {
-        match cef_render_with_retry(url, None).await {
+        match cef_render_with_retry(url, effective_selector, use_residential).await {
             Ok(html) => {
                 let timing_ms = start.elapsed().as_millis() as u64;
                 site_cache::record(host, "cef", false, timing_ms);
@@ -678,10 +706,12 @@ pub async fn fetch_html(
         Ok(r) => r,
         Err(e) => {
             let timing_ms = start.elapsed().as_millis() as u64;
-            analytics::report_fetch(FetchEvent {
-                host, strategy: "cronet-transport-error", escalated_from,
-                ok: false, status: 0, timing_ms,
-            });
+            if !analytics::is_opted_out() {
+                let kind = classify_transport_error(&e).await;
+                analytics::report_transport_error(
+                    host, "cronet-transport-error", kind, escalated_from, timing_ms,
+                );
+            }
             return Err(e);
         }
     };
@@ -696,7 +726,7 @@ pub async fn fetch_html(
             host, strategy: "cronet-blocked", escalated_from: None,
             ok: false, status: resp.status, timing_ms,
         });
-        match cef_render_with_retry(url, None).await {
+        match cef_render_with_retry(url, effective_selector, use_residential).await {
             Ok(html) => {
                 let timing_ms = start.elapsed().as_millis() as u64;
                 site_cache::record(host, "cef", false, timing_ms);
@@ -758,6 +788,7 @@ pub async fn fetch_raw(
     respect_robots: bool,
 ) -> Result<FetchRawResult> {
     let start = Instant::now();
+    site_rules::refresh_if_stale();
     let parsed = url::Url::parse(url)
         .map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
 
@@ -784,10 +815,12 @@ pub async fn fetch_raw(
         Ok(r) => r,
         Err(e) => {
             let timing_ms = start.elapsed().as_millis() as u64;
-            analytics::report_fetch(FetchEvent {
-                host, strategy: "cronet-raw-transport-error", escalated_from: None,
-                ok: false, status: 0, timing_ms,
-            });
+            if !analytics::is_opted_out() {
+                let kind = classify_transport_error(&e).await;
+                analytics::report_transport_error(
+                    host, "cronet-raw-transport-error", kind, None, timing_ms,
+                );
+            }
             return Err(e);
         }
     };
@@ -808,6 +841,147 @@ pub async fn fetch_raw(
         status_code: resp.status,
         timing_ms,
     })
+}
+
+/// Control endpoint for the connectivity probe. Reaching our own edge is the
+/// relevant signal: if we can't reach it, telemetry can't post anyway, so
+/// attributing the failure to the user rather than the site is correct. The
+/// path is edge-cached (300s), so the probe is cheap.
+const CONNECTIVITY_PROBE_URL: &str = "https://releases.getwick.dev/install-pro.sh";
+
+/// Short-lived cache of the last connectivity verdict, so a site that
+/// hard-blocks many requests in a burst doesn't fan out a probe per failure.
+static CONNECTIVITY_CACHE: std::sync::LazyLock<std::sync::Mutex<Option<(Instant, bool)>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+
+/// The proxy real fetches use, recorded once by `main` from the resolved
+/// `--proxy` / `WICK_PROXY`. The connectivity probe reads it so it routes
+/// identically. A `OnceLock` rather than process-env mutation, which is
+/// unsound under the multi-thread Tokio runtime (`set_var` can race env reads
+/// on worker threads).
+static EFFECTIVE_PROXY: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// Record the effective proxy at startup. Idempotent — later calls are no-ops.
+pub fn set_proxy(proxy: Option<&str>) {
+    let _ = EFFECTIVE_PROXY.set(proxy.map(|s| s.to_string()));
+}
+
+/// True when the error is *definitively* the user's own network being gone —
+/// the OS told Cronet so. These never need the connectivity probe and must
+/// never be attributed to the site.
+fn is_definitely_offline(msg_lower: &str) -> bool {
+    msg_lower.contains("internet_disconnected") || msg_lower.contains("network_changed")
+}
+
+/// True if the message looks like a DNS-resolution failure.
+fn looks_like_dns(msg_lower: &str) -> bool {
+    msg_lower.contains("hostname_not_resolved")
+        || msg_lower.contains("name or service not known")
+        || msg_lower.contains("failed to lookup address")
+        || msg_lower.contains("dns error")
+}
+
+/// Best guess at the *site-side* cause of a transport failure, ASSUMING the
+/// machine is online — the caller applies the connectivity gate. Pure and
+/// unit-testable.
+///
+/// Cronet encodes its net-error name in brackets — see `cronet::on_failed`,
+/// e.g. `ERROR_CONNECTION_RESET`. The reqwest fallback transport is matched on
+/// its typed predicates first, since they're more reliable than the string.
+fn candidate_cause(err: &anyhow::Error, msg_lower: &str) -> &'static str {
+    if let Some(re) = err.downcast_ref::<reqwest::Error>() {
+        if re.is_connect() {
+            return "connect";
+        }
+        if re.is_timeout() {
+            return "timeout";
+        }
+    }
+    if msg_lower.contains("connection_refused") {
+        return "refused";
+    }
+    if msg_lower.contains("connection_reset") || msg_lower.contains("connection_closed") {
+        return "reset";
+    }
+    if msg_lower.contains("address_unreachable") {
+        return "unreachable";
+    }
+    if msg_lower.contains("quic") {
+        return "quic";
+    }
+    if looks_like_dns(msg_lower) {
+        return "dns";
+    }
+    if msg_lower.contains("timed_out") || msg_lower.contains("timeout") || msg_lower.contains("timed out") {
+        return "timeout";
+    }
+    if msg_lower.contains("connect") {
+        return "connect";
+    }
+    "other"
+}
+
+/// Classify a transport failure into a coarse cause for telemetry.
+///
+/// The connectivity probe is the *universal* user-vs-site gate: a dying local
+/// interface can surface as RST / refused / QUIC-failed / unreachable, not
+/// only as `internet_disconnected`. So any non-definitive cause is reported as
+/// `offline` when this machine can't reach our edge at that moment — only an
+/// online machine's failure is attributed to the site. This is what keeps a
+/// user disconnect from poisoning the curated rules with a phantom "this site
+/// is hard" signal. The lone shortcut is the OS-confirmed offline case, which
+/// skips the probe (and its latency) entirely.
+async fn classify_transport_error(err: &anyhow::Error) -> &'static str {
+    let msg = err.to_string().to_ascii_lowercase();
+    if is_definitely_offline(&msg) {
+        return "offline";
+    }
+    let candidate = candidate_cause(err, &msg);
+    if !connectivity_ok().await {
+        return "offline";
+    }
+    candidate
+}
+
+/// Best-effort check that THIS machine has working off-box connectivity, used
+/// to disambiguate a transport failure. Short timeout, cached briefly. On any
+/// inability to even build the probe client we assume online, so we never
+/// *over*-attribute "offline" (which would silently drop a real site signal).
+async fn connectivity_ok() -> bool {
+    const TTL: Duration = Duration::from_secs(10);
+    if let Ok(guard) = CONNECTIVITY_CACHE.lock() {
+        if let Some((when, ok)) = *guard {
+            if when.elapsed() < TTL {
+                return ok;
+            }
+        }
+    }
+    // Probe through the same proxy real fetches use, so a host whose only
+    // route off-box is a tunnel isn't falsely judged "offline" on every
+    // ambiguous failure. Prefer the proxy main recorded; fall back to the env
+    // for entry points that didn't record one (read-only — no env mutation).
+    let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(2));
+    let proxy_url = EFFECTIVE_PROXY
+        .get()
+        .and_then(|p| p.clone())
+        .or_else(|| std::env::var("WICK_PROXY").ok());
+    if let Some(proxy) = proxy_url {
+        let proxy = proxy.trim();
+        if !proxy.is_empty() {
+            if let Ok(p) = reqwest::Proxy::all(proxy) {
+                builder = builder.proxy(p);
+            }
+        }
+    }
+    let ok = match builder.build() {
+        // Any HTTP response (even a 4xx) proves we have a route off the box.
+        Ok(c) => c.get(CONNECTIVITY_PROBE_URL).send().await.is_ok(),
+        Err(_) => true,
+    };
+    if let Ok(mut guard) = CONNECTIVITY_CACHE.lock() {
+        *guard = Some((Instant::now(), ok));
+    }
+    ok
 }
 
 fn is_challenge(body: &str) -> bool {
@@ -854,11 +1028,29 @@ fn is_js_required_shell(body: &str) -> bool {
     SIGNALS.iter().any(|s| lower.contains(s))
 }
 
-/// Decide whether to try CEF first based on the cached strategy and CEF
-/// availability. Pure function so the strategy-selection rule is easy
-/// to unit-test without spinning up a fetch pipeline.
-fn should_use_cef_first(cached_strategy: Option<&str>, cef_installed: bool) -> bool {
-    cef_installed && matches!(cached_strategy, Some("cef"))
+/// Decide whether to try CEF first, consulting the curated rule (highest
+/// authority) then the local cache. Pure function so the precedence rule is
+/// easy to unit-test without spinning up a fetch pipeline.
+///
+/// - curated rule `"cef"`    → CEF-first (when installed), even with no local
+///   cache entry — that head start is the whole point of the shared list.
+/// - curated rule `"cronet"` → not CEF-first; trust the rule and leave the
+///   normal on-block escalation as the only route to CEF.
+/// - no curated opinion (no rule, or an unrecognized `render`) → fall back to
+///   the local cache, preserving the prior behavior (`"cef"` ⇒ CEF-first).
+fn should_use_cef_first(
+    rule_render: Option<&str>,
+    cached_strategy: Option<&str>,
+    cef_installed: bool,
+) -> bool {
+    if !cef_installed {
+        return false;
+    }
+    match rule_render {
+        Some("cef") => true,
+        Some("cronet") => false,
+        _ => matches!(cached_strategy, Some("cef")),
+    }
 }
 
 #[cfg(test)]
@@ -867,25 +1059,29 @@ mod tests {
 
     #[test]
     fn cef_first_only_when_cache_says_cef_and_installed() {
-        assert!(should_use_cef_first(Some("cef"), true));
+        // No curated rule → fall back to the local cache.
+        assert!(should_use_cef_first(None, Some("cef"), true));
     }
 
     #[test]
     fn cef_first_false_when_cef_not_installed() {
-        assert!(!should_use_cef_first(Some("cef"), false));
+        assert!(!should_use_cef_first(None, Some("cef"), false));
+        // Not even a curated "cef" rule force-routes when CEF isn't installed
+        // — Auto mode never auto-installs; escalation prompts instead.
+        assert!(!should_use_cef_first(Some("cef"), None, false));
     }
 
     #[test]
     fn cef_first_false_for_cronet_cache_entry() {
-        assert!(!should_use_cef_first(Some("cronet"), true));
+        assert!(!should_use_cef_first(None, Some("cronet"), true));
     }
 
     #[test]
     fn cef_first_false_for_no_cache_entry() {
         // Default is Cronet-first. CEF is only used when later escalation
         // logic selects it.
-        assert!(!should_use_cef_first(None, true));
-        assert!(!should_use_cef_first(None, false));
+        assert!(!should_use_cef_first(None, None, true));
+        assert!(!should_use_cef_first(None, None, false));
     }
 
     #[test]
@@ -893,9 +1089,37 @@ mod tests {
         // Anything outside the documented set falls through to the default
         // (Cronet-first). Forward-compatible with future cache-value
         // changes — won't accidentally route everything through CEF.
-        assert!(!should_use_cef_first(Some("captcha-auto"), true));
-        assert!(!should_use_cef_first(Some("cef_timeout"), true));
-        assert!(!should_use_cef_first(Some(""), true));
+        assert!(!should_use_cef_first(None, Some("captcha-auto"), true));
+        assert!(!should_use_cef_first(None, Some("cef_timeout"), true));
+        assert!(!should_use_cef_first(None, Some(""), true));
+    }
+
+    #[test]
+    fn curated_cef_rule_wins_with_no_cache_entry() {
+        // The shared list's whole purpose: route a first-time visit to CEF
+        // before this machine has learned anything locally.
+        assert!(should_use_cef_first(Some("cef"), None, true));
+    }
+
+    #[test]
+    fn curated_cef_rule_overrides_stale_cronet_cache() {
+        // Curated authority beats a local cache that only ever saw Cronet
+        // (e.g. it never escalated because CEF wasn't installed at the time).
+        assert!(should_use_cef_first(Some("cef"), Some("cronet"), true));
+    }
+
+    #[test]
+    fn curated_cronet_rule_suppresses_cef_first() {
+        // A rule that says "cronet works here" should stop a stale local
+        // "cef" cache entry from forcing the slower CEF-first path.
+        assert!(!should_use_cef_first(Some("cronet"), Some("cef"), true));
+    }
+
+    #[test]
+    fn unknown_rule_render_falls_back_to_cache() {
+        // Forward-compat: an unrecognized `render` value is "no opinion".
+        assert!(should_use_cef_first(Some("future-mode"), Some("cef"), true));
+        assert!(!should_use_cef_first(Some("future-mode"), None, true));
     }
 
     #[test]
@@ -987,6 +1211,39 @@ mod tests {
         let body = "<title>Wait Just a Moment - News Article</title>\
             <body><p>Real article content goes here for many paragraphs.</p></body>";
         assert!(!looks_like_cloudflare_interstitial(body));
+    }
+
+    #[test]
+    fn offline_is_definite_without_probe() {
+        // OS-confirmed network loss → "offline" with no probe (and no latency).
+        assert!(is_definitely_offline("cronet request failed [error_internet_disconnected]"));
+        assert!(is_definitely_offline("cronet request failed [error_network_changed]"));
+        // A reset is NOT definitively offline — it goes through the gate.
+        assert!(!is_definitely_offline("cronet request failed [error_connection_reset]"));
+        assert!(!is_definitely_offline("cronet request failed [error_timed_out]"));
+    }
+
+    #[test]
+    fn candidate_cause_maps_cronet_names() {
+        // candidate_cause is the online-assumed mapping; the connectivity gate
+        // is applied separately by classify_transport_error.
+        let e = |s: &str| anyhow::anyhow!("{}", s);
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_connection_refused]"), "refused");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_connection_reset]"), "reset");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_connection_closed]"), "reset");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_address_unreachable]"), "unreachable");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_quic_protocol_failed]"), "quic");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_hostname_not_resolved]"), "dns");
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_timed_out]"), "timeout");
+        // Unmapped Cronet codes (e.g. ERROR_CALLBACK) fall through to "other".
+        assert_eq!(candidate_cause(&e("x"), "cronet request failed [error_callback]"), "other");
+    }
+
+    #[test]
+    fn dns_message_recognized() {
+        assert!(looks_like_dns("cronet request failed [error_hostname_not_resolved]"));
+        assert!(looks_like_dns("dns error: failed to lookup address information"));
+        assert!(!looks_like_dns("connection reset by peer"));
     }
 
     #[test]

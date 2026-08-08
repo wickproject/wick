@@ -20,6 +20,12 @@ struct DaemonProcess {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
+    /// Whether this daemon was *effectively* spawned with the residential
+    /// tunnel (LD_PRELOAD bindwg.so actually applied — i.e. requested AND the
+    /// WireGuard interface + bindwg were present). The daemon is a
+    /// process-wide singleton, so a later request whose effective mode differs
+    /// must respawn it — see `ensure_daemon`.
+    use_residential: bool,
 }
 
 /// Render with default options (no residential tunnel, no selector wait).
@@ -95,13 +101,30 @@ fn render_blocking(url: &str, opts: &RenderOptions) -> Result<String> {
 }
 
 fn ensure_daemon(use_residential: bool) -> Result<()> {
+    // EFFECTIVE residential mode: the tunnel only actually applies when a
+    // WireGuard interface is up AND bindwg is present. Track and compare the
+    // effective mode (not the requested one) so we neither (a) keep a
+    // non-residential daemon when residential was requested but the tunnel was
+    // down at spawn and later comes up, nor (b) respawn needlessly when the
+    // effective mode already matches a non-residential request.
+    let want_residential =
+        use_residential && wireguard_active() && std::path::Path::new(BINDWG_PATH).exists();
+
     let mut daemon = DAEMON.lock().map_err(|e| anyhow::anyhow!("lock: {}", e))?;
 
-    // Check if existing daemon is still alive
+    // Reuse the existing daemon only if it's alive AND already in the
+    // effective residential mode we need. The daemon is a process-wide
+    // singleton whose tunnel is fixed at spawn (LD_PRELOAD), so reusing one in
+    // the wrong mode would route through the wrong exit. On a mismatch, kill
+    // and respawn.
     if let Some(ref mut d) = *daemon {
         match d.child.try_wait() {
             Ok(Some(_)) => { *daemon = None; }
-            Ok(None) => return Ok(()),
+            Ok(None) if d.use_residential == want_residential => return Ok(()),
+            Ok(None) => {
+                let _ = d.child.kill();
+                *daemon = None;
+            }
             Err(_) => { *daemon = None; }
         }
     }
@@ -158,7 +181,7 @@ fn ensure_daemon(use_residential: bool) -> Result<()> {
     };
     cmd.env("LD_LIBRARY_PATH", &lib_path);
 
-    if use_residential && wireguard_active() && std::path::Path::new(BINDWG_PATH).exists() {
+    if want_residential {
         // Append rather than clobber any existing LD_PRELOAD.
         let preload = match std::env::var("LD_PRELOAD") {
             Ok(existing) if !existing.trim().is_empty() => {
@@ -183,7 +206,7 @@ fn ensure_daemon(use_residential: bool) -> Result<()> {
     // Wait for CEF to initialize
     std::thread::sleep(Duration::from_secs(2));
 
-    *daemon = Some(DaemonProcess { child, stdin, stdout });
+    *daemon = Some(DaemonProcess { child, stdin, stdout, use_residential: want_residential });
     Ok(())
 }
 

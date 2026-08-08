@@ -286,10 +286,44 @@ unsafe extern "C" fn on_failed(
     callback: ffi::Cronet_UrlRequestCallbackPtr,
     _request: ffi::Cronet_UrlRequestPtr,
     _info: ffi::Cronet_UrlResponseInfoPtr,
-    _error: ffi::Cronet_ErrorPtr,
+    error: ffi::Cronet_ErrorPtr,
 ) {
+    // Capture the net-error cause BEFORE finish_request tears the request
+    // down — the error object is owned by Cronet and valid only for the
+    // duration of this callback. The cause is embedded (in brackets) so
+    // fetch::classify_transport_error can tell a user disconnect apart from
+    // a site actively blocking us instead of lumping both into one opaque
+    // "transport error".
+    let code_name = if error.is_null() {
+        "ERROR_OTHER"
+    } else {
+        net_error_name(ffi::Cronet_Error_error_code_get(error))
+    };
     let boxed = finish_request(callback);
-    complete(&boxed, Err(anyhow::anyhow!("Cronet request failed")));
+    complete(
+        &boxed,
+        Err(anyhow::anyhow!("cronet request failed [{}]", code_name)),
+    );
+}
+
+/// Map a `Cronet_Error_ERROR_CODE` (include/cronet.idl_c.h) to a stable name
+/// embedded in the error message. `fetch::classify_transport_error` (via
+/// `candidate_cause`) matches on these (lowercased) to classify the cause.
+fn net_error_name(code: std::os::raw::c_int) -> &'static str {
+    match code {
+        0 => "ERROR_CALLBACK",
+        1 => "ERROR_HOSTNAME_NOT_RESOLVED",
+        2 => "ERROR_INTERNET_DISCONNECTED",
+        3 => "ERROR_NETWORK_CHANGED",
+        4 => "ERROR_TIMED_OUT",
+        5 => "ERROR_CONNECTION_CLOSED",
+        6 => "ERROR_CONNECTION_TIMED_OUT",
+        7 => "ERROR_CONNECTION_REFUSED",
+        8 => "ERROR_CONNECTION_RESET",
+        9 => "ERROR_ADDRESS_UNREACHABLE",
+        10 => "ERROR_QUIC_PROTOCOL_FAILED",
+        _ => "ERROR_OTHER",
+    }
 }
 
 unsafe extern "C" fn on_canceled(

@@ -7,6 +7,11 @@
 //!   - Command events (`install`, `install_cef`, `fetch` dedup'd daily, etc.)
 //!   - Per-fetch records: hostname, strategy, ok, status, timing_ms,
 //!     wick version, OS.
+//!   - For transport failures (no HTTP response at all): a coarse `error_kind`
+//!     cause — `offline` / `dns` / `timeout` / `reset` / `refused` /
+//!     `unreachable` / `quic` / `connect` / `other`. Lets the stats page tell a
+//!     user disconnect apart from a site actively blocking us. No error
+//!     strings, paths, or IPs — just the bucket.
 //!
 //! What is NOT collected:
 //!   - URL paths or query strings, request headers, page content, titles
@@ -110,6 +115,41 @@ pub fn report_fetch(ev: FetchEvent) {
         "ok": ev.ok,
         "status": ev.status,
         "timing_ms": ev.timing_ms,
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
+    });
+    enqueue(EVENTS_URL, payload.to_string());
+}
+
+/// Report a transport-level failure: the request never produced an HTTP
+/// response at all (DNS failure, connect refused, TLS reset, timeout, or the
+/// user's own network being down). Posts the same `/v1/events` shape as
+/// `report_fetch` plus an `error_kind` cause.
+///
+/// `error_kind` is the load-bearing addition for the self-improvement loop:
+/// it lets the stats page and the probing harness tell a site *actively
+/// blocking us* (`reset`, `refused`, `timeout`-while-online) apart from the
+/// *user's connection dropping* (`offline`). Without it, a user whose wifi
+/// died 25 times reads identically to a genuinely hard site — and would
+/// poison the curated rules with a phantom "this site is hard" signal.
+pub fn report_transport_error(
+    host: &str,
+    strategy: &str,
+    error_kind: &str,
+    escalated_from: Option<&str>,
+    timing_ms: u64,
+) {
+    if is_opted_out() {
+        return;
+    }
+    let payload = json!({
+        "host": host,
+        "strategy": strategy,
+        "escalated_from": escalated_from,
+        "ok": false,
+        "status": 0,
+        "timing_ms": timing_ms,
+        "error_kind": error_kind,
         "version": env!("CARGO_PKG_VERSION"),
         "os": std::env::consts::OS,
     });
