@@ -230,23 +230,25 @@ PLIST
     rm -f "$RENDERER_SRC/$CEF_DIR" 2>/dev/null || true
 
     # Copy CEF framework into bundle (required for code signing)
-    if [[ ! -e "$APP_DIR/Contents/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" ]]; then
+    if [[ -L "$APP_DIR/Contents/Frameworks/Chromium Embedded Framework.framework" || \
+          ! -e "$APP_DIR/Contents/Frameworks/Chromium Embedded Framework.framework/Chromium Embedded Framework" ]]; then
         rm -rf "$APP_DIR/Contents/Frameworks/Chromium Embedded Framework.framework"
         cp -R "$WICK_DIR/$CEF_DIR/Release/Chromium Embedded Framework.framework" "$APP_DIR/Contents/Frameworks/"
     fi
-
-    # Each helper .app needs a Frameworks/ symlink to the CEF framework
-    # (their @executable_path/../Frameworks/ rpath looks in their own bundle)
-    CEF_FW="$APP_DIR/Contents/Frameworks/Chromium Embedded Framework.framework"
-    for helper in "$APP_DIR/Contents/Frameworks"/wick\ Helper*.app; do
-        mkdir -p "$helper/Contents/Frameworks"
-        ln -sf "$CEF_FW" "$helper/Contents/Frameworks/Chromium Embedded Framework.framework" 2>/dev/null
-    done
 
     echo "  Built wick-renderer.app"
 elif [[ "$PREBUILT_INSTALLED" -ne 1 ]]; then
     echo "wick-renderer.app already installed."
 fi
+
+# Each helper .app needs a relative link to the bundled CEF framework.
+# Also repair absolute links in existing installs and older prebuilt archives.
+for helper in "$APP_DIR/Contents/Frameworks"/wick\ Helper*.app; do
+    [[ -d "$helper" ]] || continue
+    mkdir -p "$helper/Contents/Frameworks"
+    ln -sfn "../../../Chromium Embedded Framework.framework" \
+        "$helper/Contents/Frameworks/Chromium Embedded Framework.framework"
+done
 
 # ── Step 4: Save API key ──────────────────────────────────────
 
