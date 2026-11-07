@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test CEF bundle relocation
+        run: python3 scripts/tests/test-cef-mac-relocation.py
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Download libcronet.a (macOS arm64)
