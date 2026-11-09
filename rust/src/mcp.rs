@@ -120,6 +120,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_fetch",
+        annotations(read_only_hint = true, open_world_hint = true),
         description = "Fetch a web page using Chrome's network stack with browser-grade TLS fingerprinting. Returns clean, LLM-friendly content. Succeeds on sites that block standard HTTP clients. Automatically falls back to a full Chromium (CEF) renderer when the page is JavaScript-only or blocked — pass render='cef' to force it, render='cronet' to skip it."
     )]
     async fn wick_fetch(
@@ -159,6 +160,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_search",
+        annotations(read_only_hint = true, open_world_hint = true),
         description = "Search the web via DuckDuckGo. Returns titles, URLs, and snippets. Use wick_fetch to read the full content of any result."
     )]
     async fn wick_search(
@@ -176,6 +178,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_session",
+        annotations(read_only_hint = false, destructive_hint = true, idempotent_hint = true, open_world_hint = false),
         description = "Manage persistent browser sessions. Clear cookies and session data to start fresh."
     )]
     async fn wick_session(
@@ -200,6 +203,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_download",
+        annotations(read_only_hint = false, open_world_hint = true),
         description = "Download video or audio from a URL (Reddit, YouTube, Twitter, and 1000+ sites). Returns the file path of the downloaded media. Requires yt-dlp installed."
     )]
     async fn wick_download(
@@ -230,6 +234,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_crawl",
+        annotations(read_only_hint = true, open_world_hint = true),
         description = "Crawl a website starting from a URL. Follows same-domain links, fetches multiple pages, and returns their content as clean markdown. Useful for reading documentation sites, blogs, or multi-page content."
     )]
     async fn wick_crawl(
@@ -268,6 +273,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_map",
+        annotations(read_only_hint = true, open_world_hint = true),
         description = "Discover all URLs on a website. Checks sitemap.xml first, then follows links to build a URL map. Returns a sorted list of discovered URLs. Useful for understanding site structure before targeted fetching."
     )]
     async fn wick_map(
@@ -300,6 +306,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_fetch_to_file",
+        annotations(read_only_hint = false, open_world_hint = true),
         description = "Fetch a URL and write the raw response body to a local file. Use this for binary content that wick_fetch can't usefully return as text — PDFs, images, archives, audio, etc. Returns the saved path, byte count, status, and timing. The agent can then Read/process the file via the host filesystem (Bash, Read tool, etc.)."
     )]
     async fn wick_fetch_to_file(
