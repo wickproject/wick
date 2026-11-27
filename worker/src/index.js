@@ -165,11 +165,31 @@ function scrubWord(word) {
 function scrubText(v) {
   if (typeof v !== "string") return null;
   const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
-  const masked = words.replace(/\+?\d[\d ().+-]*/g, run => {
-    const core = run.replace(/[^\d]+$/, "");
-    return (core.match(/\d/g) || []).length >= 7 ? "[number]" + run.slice(core.length) : run;
-  });
-  return Array.from(masked).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+  return Array.from(maskDigitRuns(words)).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+}
+
+/**
+ * Runs of 7+ digits (with space, -, (, ), ., + between them) become
+ * `[number]`, widened to whole words so the output survives a second
+ * scrub unchanged. Mirrors `mask_digit_runs` in rust/src/analytics.rs.
+ */
+function maskDigitRuns(text) {
+  const re = /\+?\d[\d ().+-]*/g;
+  let out = "", emitted = 0, m;
+  while ((m = re.exec(text))) {
+    const core = m[0].replace(/[^\d]+$/, "");
+    if ((core.match(/\d/g) || []).length < 7) {
+      re.lastIndex = m.index + Math.max(core.length, 1);
+      continue;
+    }
+    let start = m.index, end = m.index + core.length;
+    while (start > emitted && !/\s/.test(text[start - 1])) start--;
+    while (end < text.length && !/\s/.test(text[end])) end++;
+    out += text.slice(emitted, start) + "[number]";
+    emitted = end;
+    re.lastIndex = end;
+  }
+  return out + text.slice(emitted);
 }
 
 /**

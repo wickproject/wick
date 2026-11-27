@@ -401,16 +401,18 @@ fn looks_like_secret(word: &str) -> bool {
 }
 
 /// Replace any run of digits and separators (space, `-`, `(`, `)`, `.`,
-/// `+`) that holds 7 or more digits with `[number]`.
+/// `+`) that holds 7 or more digits with `[number]`. The replacement
+/// widens to whole words, so `order1234567` becomes `[number]` rather than
+/// `order[number]`, which keeps the output stable under a second scrub.
 fn mask_digit_runs(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
-    let mut out = String::with_capacity(text.len());
+    let mut out: Vec<char> = Vec::with_capacity(chars.len());
+    let mut emitted = 0; // chars[..emitted] have been decided
     let mut i = 0;
     while i < chars.len() {
         let starts_run = chars[i].is_ascii_digit()
             || (chars[i] == '+' && chars.get(i + 1).is_some_and(|c| c.is_ascii_digit()));
         if !starts_run {
-            out.push(chars[i]);
             i += 1;
             continue;
         }
@@ -422,16 +424,26 @@ fn mask_digit_runs(text: &str) -> String {
             }
             j += 1;
         }
-        if digits >= 7 {
-            out.push_str("[number]");
-        } else {
-            out.extend(&chars[i..=last_digit]);
+        if digits < 7 {
+            i = last_digit + 1;
+            continue;
         }
-        i = last_digit + 1;
+        let mut start = i;
+        while start > emitted && !chars[start - 1].is_whitespace() {
+            start -= 1;
+        }
+        let mut end = last_digit + 1;
+        while end < chars.len() && !chars[end].is_whitespace() {
+            end += 1;
+        }
+        out.extend(&chars[emitted..start]);
+        out.extend("[number]".chars());
+        emitted = end;
+        i = end;
     }
-    out
+    out.extend(&chars[emitted..]);
+    out.into_iter().collect()
 }
-
 
 /// Report a fetch failure — legacy endpoint. Still useful for aggregate
 /// error counts on the KV-backed dashboard. `report_fetch` supersedes it

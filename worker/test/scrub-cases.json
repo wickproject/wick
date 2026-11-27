@@ -305,5 +305,26 @@
    "Donaudampfschifffahrtsgesellschaft rocks"
   ],
   "absent": []
+ },
+ {
+  "in": "fetch order1234567 failed",
+  "contains": [
+   "fetch [number] failed"
+  ],
+  "absent": [
+   "order",
+   "1234567"
+  ]
+ },
+ {
+  "in": "ids x1234 5678y done",
+  "contains": [
+   "ids [number] done"
+  ],
+  "absent": [
+   "1234",
+   "5678",
+   "x1234"
+  ]
  }
 ]

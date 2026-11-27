@@ -68,29 +68,22 @@ const feedbackRecords = env => [...env.store].filter(([k]) => k.startsWith("fb:"
   assert.equal(env.store.get(`pingc:${today}:fetch:PT`), "1");
 }
 
-// Feedback: server-side scrub matches the shared cases.
-{
+// Feedback: server-side scrub matches the shared cases. Each case gets a
+// fresh KV so its assertions can only see its own record.
+async function scrubViaWorker(text) {
   const env = makeEnv();
-  for (const c of cases) {
-    const r = await worker.fetch(req("/v1/feedback", { kind: "capability_request", task: c.in, tool: "wick_request_capability" }, "CH"), env);
-    assert.equal(r.status, 204);
-  }
-  const tasks = feedbackRecords(env).map(r => r.task);
-  for (const c of cases) {
-    const got = tasks.find(t => c.contains.every(w => t.includes(w)));
-    assert.ok(got, `no scrubbed record for ${JSON.stringify(c.in)}: ${JSON.stringify(tasks)}`);
-    for (const bad of c.absent) assert.ok(!got.includes(bad), `${JSON.stringify(got)} keeps ${bad}`);
-  }
-  // The worker re-scrubs client output; already-scrubbed text must pass
-  // through unchanged (a second pass is a no-op).
-  const before = feedbackRecords(env).length;
-  for (const t of tasks) {
-    await worker.fetch(req("/v1/feedback", { task: t }, "CH"), env);
-  }
-  const again = feedbackRecords(env).slice(before).map(r => r.task).sort();
-  assert.deepEqual(again, [...tasks].sort(), "scrubbing must be idempotent");
-
-  const rec = feedbackRecords(env)[0];
+  const r = await worker.fetch(req("/v1/feedback", { kind: "capability_request", task: text, tool: "wick_request_capability" }, "CH"), env);
+  assert.equal(r.status, 204);
+  const recs = feedbackRecords(env);
+  assert.equal(recs.length, 1);
+  return recs[0];
+}
+for (const c of cases) {
+  const rec = await scrubViaWorker(c.in);
+  for (const want of c.contains) assert.ok(rec.task.includes(want), `${JSON.stringify(c.in)} -> ${JSON.stringify(rec.task)} lacks ${want}`);
+  for (const bad of c.absent) assert.ok(!rec.task.includes(bad), `${JSON.stringify(c.in)} -> ${JSON.stringify(rec.task)} keeps ${bad}`);
+  // The worker re-scrubs client output, so a second pass must be a no-op.
+  assert.equal((await scrubViaWorker(rec.task)).task, rec.task, `second pass changed ${JSON.stringify(c.in)}`);
   assert.equal(rec.country, "CH");
   assert.equal(rec.tool, "wick_request_capability");
 }
