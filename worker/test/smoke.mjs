@@ -96,9 +96,15 @@ const feedbackRecords = env => [...env.store].filter(([k]) => k.startsWith("fb:"
   assert.equal(feedbackRecords(limited).length, 0);
 
   const full = makeEnv();
-  full.store.set(`fbcount:${today}`, "2000");
+  full.store.set(`fbcount:${today}`, "100");
   assert.equal((await worker.fetch(req("/v1/feedback", { task: "x" }), full)).status, 204);
   assert.equal(feedbackRecords(full).length, 0);
+
+  const failing = makeEnv();
+  const put = failing.SUBSCRIPTIONS.put;
+  failing.SUBSCRIPTIONS.put = async (k, v) => { if (k.startsWith("fbcount:")) throw new Error("KV write limit"); return put(k, v); };
+  assert.equal((await worker.fetch(req("/v1/feedback", { task: "x" }), failing)).status, 204);
+  assert.equal(feedbackRecords(failing).length, 0, "counter write failure must not store an uncounted record");
 }
 
 console.log("worker smoke tests passed");

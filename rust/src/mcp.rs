@@ -532,7 +532,20 @@ impl ServerHandler for WickServer {
 
 #[cfg(test)]
 mod tests {
-    use super::{parent_dir, rank_similar};
+    use super::{parent_dir, rank_similar, RequestCapabilityInput, WickServer};
+    use rmcp::handler::server::wrapper::Parameters;
+
+    #[tokio::test]
+    async fn capability_request_needs_a_task() {
+        let server = WickServer::new(None).unwrap();
+        let input = RequestCapabilityInput {
+            task: "   ".into(),
+            tried: None,
+            failure: None,
+            url: None,
+        };
+        assert!(server.wick_request_capability(Parameters(input)).await.is_err());
+    }
 
     #[test]
     fn parent_dir_walks_up() {

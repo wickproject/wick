@@ -278,37 +278,73 @@ pub fn report_feedback(fb: Feedback) -> bool {
 }
 
 /// Strip likely personal or secret data from free text before it leaves
-/// the machine. URLs keep only their host, including URLs inside a larger
-/// token (`[x](https://...)`, `url=https://...`) and scheme-less
-/// `domain/path` forms. Emails, key-like tokens and runs of 7+ digits
-/// (phone or account numbers, even when split by spaces or dashes) are
-/// replaced. Output is capped at `FEEDBACK_MAX_CHARS`. The worker applies
-/// the same rules (`scrubText` in worker/src/index.js); both are checked
-/// against worker/test/scrub-cases.json.
+/// the machine. Anything from a `scheme://` to the end of its
+/// whitespace-separated token becomes `[url:host]`. The rest of each token
+/// is split at structural characters (quotes, brackets, `:`, `=`, `,`...)
+/// and each piece is checked for scheme-less `domain/path` forms, emails
+/// and key-like tokens. Finally, runs of 7+ digits (phone or account
+/// numbers, even when split by spaces or dashes) become `[number]`, and the
+/// output is capped at `FEEDBACK_MAX_CHARS`. The worker applies the same
+/// rules (`scrubText` in worker/src/index.js); both are checked against
+/// worker/test/scrub-cases.json.
 pub fn scrub(text: &str) -> String {
-    let masked = mask_digit_runs(text);
-    let out: Vec<String> = masked.split_whitespace().map(scrub_word).collect();
-    out.join(" ").chars().take(FEEDBACK_MAX_CHARS).collect()
+    let words: Vec<String> = text.split_whitespace().map(scrub_word).collect();
+    mask_digit_runs(&words.join(" "))
+        .chars()
+        .take(FEEDBACK_MAX_CHARS)
+        .collect()
 }
 
-const URL_STOP: &str = "()<>[]{}\"'`,;";
-const EDGE_PUNCT: &str = ",.;:!?()[]{}<>\"'`";
+/// Characters that split a token into separately checked pieces.
+const SEPARATORS: &str = "\"'`()[]{}<>,;:=|";
 
 fn scrub_word(word: &str) -> String {
-    if let Some(i) = word.find("://") {
-        let start = word[..i]
-            .rfind(|c: char| !(c.is_ascii_alphanumeric() || "+.-".contains(c)))
-            .map(|p| p + 1)
-            .unwrap_or(0);
-        let rest = &word[start..];
-        let end = rest.find(|c: char| URL_STOP.contains(c)).unwrap_or(rest.len());
-        let host = url::Url::parse(&rest[..end])
-            .ok()
-            .and_then(|u| u.host_str().map(|h| h.to_string()));
-        let tag = host.map_or("[url]".to_string(), |h| format!("[url:{}]", h));
-        return format!("{}{}{}", &word[..start], tag, scrub_word(&rest[end..]));
+    let Some(i) = word.find("://") else {
+        return scrub_pieces(word);
+    };
+    let mut start = i;
+    for (idx, c) in word[..i].char_indices().rev() {
+        if c.is_ascii_alphanumeric() || "+.-".contains(c) {
+            start = idx;
+        } else {
+            break;
+        }
     }
-    let trimmed = word.trim_matches(|c: char| EDGE_PUNCT.contains(c));
+    let after = &word[i + 3..];
+    let authority_end = after
+        .find(|c: char| "/?#".contains(c) || (c != ':' && SEPARATORS.contains(c)))
+        .unwrap_or(after.len());
+    let authority = &after[..authority_end];
+    let host = authority.rsplit('@').next().unwrap_or("");
+    let host = host.split(':').next().unwrap_or("");
+    let tag = if !host.is_empty()
+        && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+    {
+        format!("[url:{}]", host)
+    } else {
+        "[url]".to_string()
+    };
+    format!("{}{}", scrub_pieces(&word[..start]), tag)
+}
+
+fn scrub_pieces(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut piece = String::new();
+    for c in s.chars() {
+        if SEPARATORS.contains(c) {
+            out.push_str(&scrub_piece(&piece));
+            piece.clear();
+            out.push(c);
+        } else {
+            piece.push(c);
+        }
+    }
+    out.push_str(&scrub_piece(&piece));
+    out
+}
+
+fn scrub_piece(piece: &str) -> String {
+    let trimmed = piece.trim_matches(|c: char| ".!?".contains(c));
     if let Some(host) = bare_domain_with_path(trimmed) {
         return format!("[url:{}]", host);
     }
@@ -318,13 +354,13 @@ fn scrub_word(word: &str) -> String {
     if looks_like_secret(trimmed) {
         return "[redacted]".to_string();
     }
-    word.to_string()
+    piece.to_string()
 }
 
 /// `example.com/private?x=1` → `Some("example.com")`.
 fn bare_domain_with_path(s: &str) -> Option<&str> {
     let (host, path) = s.split_once('/')?;
-    let tld = host.rsplit('.').nth(0)?;
+    let tld = host.rsplit('.').next()?;
     let valid = host.contains('.')
         && !path.is_empty()
         && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
@@ -369,7 +405,7 @@ fn looks_like_secret(s: &str) -> bool {
     if s.len() < 24 {
         return false;
     }
-    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/=.%".contains(c));
+    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/.%".contains(c));
     let has_digit = s.chars().any(|c| c.is_ascii_digit());
     let has_alpha = s.chars().any(|c| c.is_ascii_alphabetic());
     charset && has_digit && has_alpha

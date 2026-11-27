@@ -1,22 +1,175 @@
 [
-  {"in": "tried https://example.com/user/123/orders?id=9 twice",
-   "contains": ["[url:example.com]", "tried", "twice"], "absent": ["/user", "orders", "id=9"]},
-  {"in": "see [report](https://example.com/private/orders?token=secret) now",
-   "contains": ["[url:example.com]", "now"], "absent": ["private", "token=secret"]},
-  {"in": "failed on url=https://shop.example.de/cart/checkout?session=abc",
-   "contains": ["[url:shop.example.de]"], "absent": ["cart", "session=abc"]},
-  {"in": "fetching example.com/private/orders?token=secret returned 403",
-   "contains": ["[url:example.com]", "403"], "absent": ["private", "token"]},
-  {"in": "mail jane.doe@corp.com about it",
-   "contains": ["[email]"], "absent": ["jane", "corp.com"]},
-  {"in": "call +1 (555) 123-4567 tomorrow",
-   "contains": ["[number]", "tomorrow"], "absent": ["555", "4567"]},
-  {"in": "key key_live_51Habc123DEF456ghi789JKL leaked",
-   "contains": ["[redacted]", "leaked"], "absent": ["key_live"]},
-  {"in": "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123def456",
-   "contains": ["[redacted]"], "absent": ["eyJhbGci"]},
-  {"in": "compare prices for running shoes in Germany and Poland",
-   "contains": ["compare prices for running shoes in Germany and Poland"], "absent": []},
-  {"in": "wick_fetch render=cef on version 0.13.0 got 403",
-   "contains": ["wick_fetch render=cef on version 0.13.0 got 403"], "absent": []}
+ {
+  "in": "tried https://example.com/user/123/orders?id=9 twice",
+  "contains": [
+   "[url:example.com]",
+   "tried",
+   "twice"
+  ],
+  "absent": [
+   "/user",
+   "orders",
+   "id=9"
+  ]
+ },
+ {
+  "in": "see [report](https://example.com/private/orders?token=secret) now",
+  "contains": [
+   "[url:example.com]",
+   "now"
+  ],
+  "absent": [
+   "private",
+   "token=secret"
+  ]
+ },
+ {
+  "in": "failed on url=https://shop.example.de/cart/checkout?session=abc",
+  "contains": [
+   "[url:shop.example.de]"
+  ],
+  "absent": [
+   "cart",
+   "session=abc"
+  ]
+ },
+ {
+  "in": "fetching example.com/private/orders?token=secret returned 403",
+  "contains": [
+   "[url:example.com]",
+   "403"
+  ],
+  "absent": [
+   "private",
+   "token"
+  ]
+ },
+ {
+  "in": "mail jane.doe@corp.com about it",
+  "contains": [
+   "[email]"
+  ],
+  "absent": [
+   "jane",
+   "corp.com"
+  ]
+ },
+ {
+  "in": "call +1 (555) 123-4567 tomorrow",
+  "contains": [
+   "[number]",
+   "tomorrow"
+  ],
+  "absent": [
+   "555",
+   "4567"
+  ]
+ },
+ {
+  "in": "key key_live_51Habc123DEF456ghi789JKL leaked",
+  "contains": [
+   "[redacted]",
+   "leaked"
+  ],
+  "absent": [
+   "key_live"
+  ]
+ },
+ {
+  "in": "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123def456",
+  "contains": [
+   "[redacted]"
+  ],
+  "absent": [
+   "eyJhbGci"
+  ]
+ },
+ {
+  "in": "compare prices for running shoes in Germany and Poland",
+  "contains": [
+   "compare prices for running shoes in Germany and Poland"
+  ],
+  "absent": []
+ },
+ {
+  "in": "wick_fetch render=cef on version 0.13.0 got 403",
+  "contains": [
+   "wick_fetch render=cef on version 0.13.0 got 403"
+  ],
+  "absent": []
+ },
+ {
+  "in": "see https://example.com/user/1234567/orders?token=secret ok",
+  "contains": [
+   "[url:example.com]",
+   "ok"
+  ],
+  "absent": [
+   "orders",
+   "token",
+   "1234567"
+  ]
+ },
+ {
+  "in": "x https://example.com/a;b,c(d)?token=secret y",
+  "contains": [
+   "[url:example.com]",
+   "x",
+   "y"
+  ],
+  "absent": [
+   "token",
+   "b,c",
+   "secret"
+  ]
+ },
+ {
+  "in": "→https://example.com/private/page",
+  "contains": [
+   "[url:example.com]"
+  ],
+  "absent": [
+   "private"
+  ]
+ },
+ {
+  "in": "{\"api_key\":\"key_live_51Habc123DEF456ghi789JKL\"}",
+  "contains": [
+   "api_key"
+  ],
+  "absent": [
+   "key_live"
+  ]
+ },
+ {
+  "in": "contact mailto:jane@corp.com today",
+  "contains": [
+   "[email]",
+   "today"
+  ],
+  "absent": [
+   "jane"
+  ]
+ },
+ {
+  "in": "saw \"example.com/private/x\" here",
+  "contains": [
+   "[url:example.com]",
+   "here"
+  ],
+  "absent": [
+   "private"
+  ]
+ },
+ {
+  "in": "https://user:pw@internal.example.com:8443/admin",
+  "contains": [
+   "[url:internal.example.com]"
+  ],
+  "absent": [
+   "pw",
+   "admin",
+   "user:"
+  ]
+ }
 ]

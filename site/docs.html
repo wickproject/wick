@@ -603,11 +603,16 @@ Options:
   <li><strong>Strategy</strong> — which fetch path succeeded: <code>cronet</code>, <code>cef</code>, <code>cef-after-cronet</code>, <code>captcha-auto</code>, <code>captcha-interactive</code>, or a blocked/error variant.</li>
   <li><strong>Outcome</strong> — ok / not ok, HTTP status code, timing in milliseconds.</li>
   <li><strong>Environment</strong> — Wick version and OS (<code>macos</code> / <code>linux</code>).</li>
+  <li><strong>Tool and retries</strong> (0.13+) — which MCP tool made the fetch (e.g. <code>wick_fetch</code>), or <code>cli</code> / <code>api</code>, and whether it retried a host that failed in the previous five minutes.</li>
+  <li><strong>Country</strong> — the two-letter country Cloudflare derives from your connection, stored as a count beside each event and daily ping. The IP itself is not stored, and per-site country counts are not shown on the public stats.</li>
 </ul>
+
+<h3>Capability requests</h3>
+<p>Wick 0.13 adds an MCP tool, <code>wick_request_capability</code>, which agents are asked to call when Wick can't do what you need. It sends a short description of the task, what was tried and what failed, plus the hostname involved. Before sending, Wick replaces URLs with their hostname and removes emails, long numbers and key-like strings; the server repeats this. Scrubbing is pattern-based and can miss things, so agents are told to leave out personal details. Requests are kept for 30 days, and nothing is sent when telemetry is turned off.</p>
 
 <h3>What's <em>not</em> collected</h3>
 <ul>
-  <li>URL paths, query strings, request headers, request or response bodies.</li>
+  <li>URL paths, query strings, request headers, request or response bodies (capability requests are scrubbed of URL paths; see above).</li>
   <li>Page titles, extracted content, media URLs.</li>
   <li>Your IP address is not stored as a data point. Cloudflare sees it at ingest time, like any HTTP request, but it isn't persisted in the event record.</li>
   <li>No user identifier, no machine ID, no account linkage.</li>

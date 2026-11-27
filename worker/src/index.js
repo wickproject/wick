@@ -113,48 +113,56 @@ const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
 /**
  * Server-side pass of the client's scrub (`scrub` in rust/src/analytics.rs),
  * since old or modified clients may skip it. Same rules, checked against
- * the same cases (worker/test/scrub-cases.json): URLs keep only their host,
- * including URLs inside a token and scheme-less domain/path forms; emails,
- * key-like tokens and runs of 7+ digits are replaced; length is capped.
+ * the same cases (worker/test/scrub-cases.json): anything from a
+ * `scheme://` to the end of its token becomes `[url:host]`; the rest of each
+ * token is split at structural characters and each piece checked for
+ * domain/path forms, emails and key-like tokens; runs of 7+ digits become
+ * `[number]`; length is capped.
  */
 const FEEDBACK_MAX_CHARS = 600;
-const EDGE_PUNCT = /^[,.;:!?()[\]{}<>"'`]+|[,.;:!?()[\]{}<>"'`]+$/g;
+const SEPARATORS = /(["'`()[\]{}<>,;:=|])/;
+function scrubPiece(piece) {
+  const t = piece.replace(/^[.!?]+|[.!?]+$/g, "");
+  const bare = t.match(/^([A-Za-z0-9.-]*\.[A-Za-z]{2,})\/.+/);
+  if (bare) return `[url:${bare[1]}]`;
+  if (t.includes("@") && t.includes(".")) return "[email]";
+  if (t.length >= 24 && /^[A-Za-z0-9_+\/.%-]+$/.test(t) && /\d/.test(t) && /[A-Za-z]/.test(t)) return "[redacted]";
+  return piece;
+}
+function scrubPieces(s) {
+  return s.split(SEPARATORS).map((p, i) => (i % 2 ? p : scrubPiece(p))).join("");
+}
 function scrubWord(word) {
   const i = word.indexOf("://");
-  if (i >= 0) {
-    let start = i;
-    while (start > 0 && /[A-Za-z0-9+.-]/.test(word[start - 1])) start--;
-    const rest = word.slice(start);
-    const m = rest.search(/[()<>[\]{}"'`,;]/);
-    const end = m < 0 ? rest.length : m;
-    let tag = "[url]";
-    try { tag = `[url:${new URL(rest.slice(0, end)).hostname}]`; } catch { /* keep [url] */ }
-    return word.slice(0, start) + tag + scrubWord(rest.slice(end));
-  }
-  const w = word.replace(EDGE_PUNCT, "");
-  const bare = w.match(/^([A-Za-z0-9.-]+\.[A-Za-z]{2,})\/.+/);
-  if (bare) return `[url:${bare[1]}]`;
-  if (w.includes("@") && w.includes(".")) return "[email]";
-  if (w.length >= 24 && /^[A-Za-z0-9_+\/=.%-]+$/.test(w) && /\d/.test(w) && /[A-Za-z]/.test(w)) return "[redacted]";
-  return word;
+  if (i < 0) return scrubPieces(word);
+  let start = i;
+  while (start > 0 && /[A-Za-z0-9+.-]/.test(word[start - 1])) start--;
+  const after = word.slice(i + 3);
+  const m = after.search(/[\/?#"'`()[\]{}<>,;=|]/);
+  const authority = m < 0 ? after : after.slice(0, m);
+  const host = authority.split("@").pop().split(":")[0];
+  const tag = /^[A-Za-z0-9.-]+$/.test(host) ? `[url:${host}]` : "[url]";
+  return scrubPieces(word.slice(0, start)) + tag;
 }
 function scrubText(v) {
   if (typeof v !== "string") return null;
-  const masked = v.replace(/\+?\d[\d ().+-]*/g, run => {
+  const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
+  const masked = words.replace(/\+?\d[\d ().+-]*/g, run => {
     const core = run.replace(/[^\d]+$/, "");
-    const tail = run.slice(core.length);
-    return (core.match(/\d/g) || []).length >= 7 ? "[number]" + tail : run;
+    return (core.match(/\d/g) || []).length >= 7 ? "[number]" + run.slice(core.length) : run;
   });
-  const out = masked.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
-  return Array.from(out).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+  return Array.from(masked).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
 }
 
 /**
- * Approximate ceiling on feedback records per UTC day, across all callers.
- * KV has no atomic increment, so concurrent requests can overshoot it
- * slightly; the per-caller FEEDBACK_LIMITER binding is the main guard.
+ * Ceiling on feedback records per UTC day, across all callers. Each record
+ * costs two KV writes (record + counter), and Workers Free allows about
+ * 1,000 KV writes a day shared with fetch telemetry, so this stays small.
+ * KV has no atomic increment: concurrent requests in the same moment can
+ * overshoot it a little. FEEDBACK_LIMITER bounds that per caller; a strict
+ * global cap would need a Durable Object.
  */
-const FEEDBACK_DAILY_CAP = 2000;
+const FEEDBACK_DAILY_CAP = 100;
 
 export default {
   async fetch(request, env) {
@@ -429,12 +437,14 @@ export default {
       const countKey = `fbcount:${date}`;
       const count = parseInt(await env.SUBSCRIPTIONS.get(countKey) || "0");
       if (count >= FEEDBACK_DAILY_CAP) return new Response("", { status: 204, headers });
-      // KV allows about one write per second to a key, so a burst can make
-      // this counter write fail. Keep the record either way: the counter is
-      // only an approximate ceiling.
+      // Fail closed: if the counter can't be written (KV allows about one
+      // write per second to a key), drop the record rather than store it
+      // uncounted.
       try {
         await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
-      } catch { /* counter write limited; still store the feedback */ }
+      } catch {
+        return new Response("", { status: 204, headers });
+      }
 
       const host = typeof body.host === "string" && /^[a-zA-Z0-9.-]{1,253}$/.test(body.host)
         ? body.host : null;

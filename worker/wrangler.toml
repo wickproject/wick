@@ -41,5 +41,5 @@ name = "FEEDBACK_LIMITER"
 namespace_id = "1001"
 
   [ratelimits.simple]
-  limit = 10
+  limit = 5
   period = 60

@@ -32,7 +32,7 @@ Bindings declared in `wrangler.toml`:
 
 - `RELEASES` — R2 bucket `wick-releases`
 - `SUBSCRIPTIONS` — KV namespace (holds Pro keys, legacy ping counters, per-country ping counters under `pingc:`, per-fetch event counters under `evt:`, agent feedback under `fb:`, and the 5-min stats cache)
-- `FEEDBACK_LIMITER` — rate-limit binding, 10 feedback posts per minute per caller IP (kept in memory by Cloudflare, never stored). Optional: without it the endpoint relies on the daily cap alone.
+- `FEEDBACK_LIMITER` — rate-limit binding, 5 feedback posts per minute per caller IP (kept in memory by Cloudflare, never stored). Optional: without it the endpoint relies on the daily cap alone.
 
 Secrets (set via `wrangler secret put`):
 
@@ -77,7 +77,7 @@ Increments are read-modify-write, same pattern as the legacy `/ping` counters. U
 
 ### Feedback
 
-`POST /v1/feedback` accepts `{"kind": "capability_request", "task", "tried", "failure", "host", "tool", "version", "os"}` and stores one record at `fb:YYYY-MM-DD:{uuid}` with the caller's country, for 30 days. Free text is scrubbed by the client and again here: URLs keep only their host, emails, key-like tokens and runs of 7+ digits are replaced, and each field is capped at 600 characters. Both scrubbers are tested against `test/scrub-cases.json`. About 2000 records per day are kept at most.
+`POST /v1/feedback` accepts `{"kind": "capability_request", "task", "tried", "failure", "host", "tool", "version", "os"}` and stores one record at `fb:YYYY-MM-DD:{uuid}` with the caller's country, for 30 days. Free text is scrubbed by the client and again here: URLs keep only their host, emails, key-like tokens and runs of 7+ digits are replaced, and each field is capped at 600 characters. Both scrubbers are tested against `test/scrub-cases.json`. At most about 100 records are kept per day (KV write budget); if the counter write fails, the record is dropped.
 
 What's **not** stored: URL paths or query strings, request/response bodies, page titles, caller IP (Cloudflare sees it at ingest, but it's never persisted as a data point), user identifier, machine ID.
 
