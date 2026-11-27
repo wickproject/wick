@@ -7,6 +7,7 @@
  *   POST /ping                   → legacy daily usage ping
  *   POST /v1/events              → per-fetch telemetry
  *   GET  /v1/stats/summary       → public 7-day stats aggregate
+ *   POST /v1/feedback            → agent capability requests (wick_request_capability)
  *
  * Protected (API key required, set via API_KEYS secret):
  *   GET  /releases/:key/:file    → pro tarball + CEF runtime downloads
@@ -75,6 +76,65 @@ function isErrorKind(k) {
   return typeof k === "string" && ERROR_KINDS.has(k);
 }
 
+/**
+ * Surfaces a fetch can come from: MCP tool names, plus the process modes
+ * the client falls back to outside a tool call. Bounded for the same
+ * reason as ERROR_KINDS.
+ */
+const TOOLS = new Set([
+  "wick_fetch", "wick_search", "wick_crawl", "wick_map", "wick_download",
+  "wick_fetch_to_file", "wick_session", "wick_request_capability",
+  "wick_fetch_404_suggest", "mcp", "api", "cli",
+]);
+function isTool(t) {
+  return typeof t === "string" && TOOLS.has(t);
+}
+
+/**
+ * Caller country from Cloudflare's own geolocation (request.cf.country):
+ * an ISO 3166 alpha-2 code, "T1" for Tor, or "XX" when unknown. Only this
+ * code is stored, never the IP it came from.
+ */
+function callerCountry(request) {
+  const c = request.cf && request.cf.country;
+  return typeof c === "string" && /^[A-Z][A-Z0-9]$/.test(c) ? c : "XX";
+}
+
+/** Copy `{key: count}` entries from `src` into `dst` where `valid(key)`. */
+function mergeCounts(dst, src, valid) {
+  if (!src || typeof src !== "object") return;
+  for (const [k, count] of Object.entries(src)) {
+    const n = Number(count);
+    if (Number.isFinite(n) && valid(k)) dst[k] = (dst[k] || 0) + n;
+  }
+}
+const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
+
+/**
+ * Server-side pass of the client's scrub (rust/src/analytics.rs `scrub`):
+ * old or modified clients may skip it. Cuts URLs to their host and
+ * replaces emails, key-like tokens and long digit runs, then caps length.
+ */
+const FEEDBACK_MAX_CHARS = 600;
+function scrubText(v) {
+  if (typeof v !== "string") return null;
+  const out = v.split(/\s+/).filter(Boolean).map(word => {
+    const w = word.replace(/^[,.;:!?()\[\]{}<>"'`]+|[,.;:!?()\[\]{}<>"'`]+$/g, "");
+    try {
+      const u = new URL(w);
+      return (u.protocol === "http:" || u.protocol === "https:") ? `[url:${u.hostname}]` : "[url]";
+    } catch { /* not a URL */ }
+    if (w.includes("@") && w.includes(".")) return "[email]";
+    if (w.length >= 24 && /^[A-Za-z0-9_+\/=-]+$/.test(w) && /\d/.test(w) && /[A-Za-z]/.test(w)) return "[redacted]";
+    if ((w.match(/\d/g) || []).length >= 7) return "[number]";
+    return word;
+  }).join(" ");
+  return out.slice(0, FEEDBACK_MAX_CHARS) || null;
+}
+
+/** Most feedback records stored per UTC day, across all callers. */
+const FEEDBACK_DAILY_CAP = 2000;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -131,6 +191,14 @@ export default {
       const current = parseInt(await env.SUBSCRIPTIONS.get(key) || "0");
       await env.SUBSCRIPTIONS.put(key, String(current + 1), { expirationTtl: 90 * 86400 });
 
+      // Daily counter per caller country, so active installs can be split
+      // by where agents run. Separate prefix keeps the ping: key format.
+      if (/^[a-z_]{1,20}$/.test(event)) {
+        const countryKey = `pingc:${date}:${event}:${callerCountry(request)}`;
+        const cCount = parseInt(await env.SUBSCRIPTIONS.get(countryKey) || "0");
+        await env.SUBSCRIPTIONS.put(countryKey, String(cCount + 1), { expirationTtl: 90 * 86400 });
+      }
+
       // Track daily totals
       const totalKey = `ping:${date}:total`;
       const total = parseInt(await env.SUBSCRIPTIONS.get(totalKey) || "0");
@@ -160,7 +228,14 @@ export default {
     // { "host": "nytimes.com", "strategy": "cef", "escalated_from": null|"cronet",
     //   "ok": true, "status": 200, "timing_ms": 1840,
     //   "error_kind": "reset"|"offline"|...,   // only on transport failures
+    //   "tool": "wick_fetch"|"cli"|...,         // 0.13+: surface that fetched
+    //   "retry": true,                          // 0.13+: host failed < 5 min ago
     //   "version": "0.9.2", "os": "macos" }
+    //
+    // The stored value also counts the caller's country (country_dist, from
+    // Cloudflare's request.cf.country), tools (tool_dist), retries and
+    // retries that succeeded. Failures minus successful retries approximates
+    // tasks the agent gave up on.
     //
     // Storage model: one KV key per (date, host, strategy) with a merged
     // JSON value `{ fetches, successes, total_ms }`. Each event is a
@@ -202,7 +277,10 @@ export default {
       // manually edited in the KV dashboard) is treated as "start
       // fresh" so we never throw during increment or write back a
       // poisoned value.
-      const existing = { fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {} };
+      const existing = {
+        fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
+        country_dist: {}, tool_dist: {}, retries: 0, retry_successes: 0,
+      };
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
       if (existingRaw) {
         try {
@@ -237,6 +315,12 @@ export default {
                 }
               }
             }
+            mergeCounts(existing.country_dist, parsed.country_dist, isCountry);
+            mergeCounts(existing.tool_dist, parsed.tool_dist, isTool);
+            const r = Number(parsed.retries);
+            const rs = Number(parsed.retry_successes);
+            if (Number.isFinite(r)) existing.retries = r;
+            if (Number.isFinite(rs)) existing.retry_successes = rs;
           }
         } catch { /* corrupt JSON — start fresh */ }
       }
@@ -274,10 +358,69 @@ export default {
           (existing.error_kind_dist[body.error_kind] || 0) + 1;
       }
 
+      const country = callerCountry(request);
+      existing.country_dist[country] = (existing.country_dist[country] || 0) + 1;
+      if (isTool(body.tool)) {
+        existing.tool_dist[body.tool] = (existing.tool_dist[body.tool] || 0) + 1;
+      }
+      if (body.retry === true) {
+        existing.retries += 1;
+        if (body.ok === true) existing.retry_successes += 1;
+      }
+
       await env.SUBSCRIPTIONS.put(key, JSON.stringify(existing), {
         expirationTtl: 30 * 86400,
       });
 
+      return new Response("", { status: 204, headers });
+    }
+
+    // ── Agent feedback ───────────────────────────────────────────
+    //
+    // POST /v1/feedback with body:
+    // { "kind": "capability_request", "task": "...", "tried": "...",
+    //   "failure": "...", "host": "example.com", "tool": "wick_request_capability",
+    //   "version": "0.13.0", "os": "macos" }
+    //
+    // Sent by the wick_request_capability MCP tool when an agent can't get
+    // what its user needs. Each record is stored once under
+    // `fb:<date>:<uuid>` with the caller's country and a 30-day TTL; read
+    // them with `wrangler kv key list --prefix fb:`. Text is scrubbed again
+    // here in case the client didn't. Unauthenticated, so a global daily
+    // cap bounds how much a misbehaving client can write.
+    if (request.method === "POST" && path === "/v1/feedback") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("bad json\n", { status: 400, headers });
+      }
+      const task = scrubText(body && body.task);
+      if (!task) return new Response("task required\n", { status: 400, headers });
+
+      const date = new Date().toISOString().split("T")[0];
+      const countKey = `fbcount:${date}`;
+      const count = parseInt(await env.SUBSCRIPTIONS.get(countKey) || "0");
+      if (count >= FEEDBACK_DAILY_CAP) return new Response("", { status: 204, headers });
+      await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
+
+      const host = typeof body.host === "string" && /^[a-zA-Z0-9.-]{1,253}$/.test(body.host)
+        ? body.host : null;
+      const record = {
+        kind: body.kind === "capability_request" ? body.kind : "other",
+        task,
+        tried: scrubText(body.tried),
+        failure: scrubText(body.failure),
+        host,
+        tool: isTool(body.tool) ? body.tool : null,
+        country: callerCountry(request),
+        version: typeof body.version === "string" ? body.version.slice(0, 20) : null,
+        os: typeof body.os === "string" ? body.os.slice(0, 20) : null,
+        at: new Date().toISOString(),
+      };
+      await env.SUBSCRIPTIONS.put(`fb:${date}:${crypto.randomUUID()}`, JSON.stringify(record), {
+        expirationTtl: 30 * 86400,
+      });
       return new Response("", { status: 204, headers });
     }
 
@@ -291,7 +434,7 @@ export default {
       // v2 added per-row status_dist; bumping the key ensures the
       // first request after deploy rebuilds the cached payload in the
       // new shape instead of serving stale v1 JSON for up to 5 minutes.
-      const cacheKey = "stats:summary:v3";
+      const cacheKey = "stats:summary:v4";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
       if (cached) {
         return new Response(cached, {
@@ -349,6 +492,7 @@ export default {
             const aggKey = `${host}|${strategy}`;
             const cur = agg.get(aggKey) || {
               host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
+              country_dist: {}, tool_dist: {}, retries: 0, retry_successes: 0,
             };
             // Coerce each field via Number() and ignore non-finite
             // values — a stringly-typed stored value (`"1"`) would
@@ -380,6 +524,12 @@ export default {
                 }
               }
             }
+            mergeCounts(cur.country_dist, v.country_dist, isCountry);
+            mergeCounts(cur.tool_dist, v.tool_dist, isTool);
+            const vr = Number(v.retries);
+            const vrs = Number(v.retry_successes);
+            if (Number.isFinite(vr)) cur.retries += vr;
+            if (Number.isFinite(vrs)) cur.retry_successes += vrs;
             agg.set(aggKey, cur);
           }
           cursor = list.list_complete ? undefined : list.cursor;
@@ -403,6 +553,10 @@ export default {
           // success can be split into "offline×20" (user's network — ignore)
           // vs "reset×20" (the site is actively blocking — a real signal).
           error_kind_dist: r.error_kind_dist || {},
+          country_dist: r.country_dist,
+          tool_dist: r.tool_dist,
+          retries: r.retries,
+          retry_successes: r.retry_successes,
         }))
         .sort((a, b) => b.fetches - a.fetches)
         .slice(0, 500);

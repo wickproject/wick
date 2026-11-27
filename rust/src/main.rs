@@ -194,6 +194,7 @@ async fn main() -> Result<()> {
                 .with_ansi(false)
                 .init();
 
+            analytics::set_mode("mcp");
             let server = mcp::WickServer::new(proxy)?;
             let service = server
                 .serve(stdio())
@@ -211,6 +212,7 @@ async fn main() -> Result<()> {
                 )
                 .init();
 
+            analytics::set_mode("api");
             analytics::ping("api");
             api::serve(port, proxy).await
         }
