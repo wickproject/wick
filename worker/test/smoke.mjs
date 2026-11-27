@@ -88,6 +88,18 @@ for (const c of cases) {
   assert.equal(rec.tool, "wick_request_capability");
 }
 
+// Feedback: metadata is validated, and the length cap never splits a word.
+{
+  const env = makeEnv();
+  const long = Array(200).fill("word").join(" ") + " https://example.com/private";
+  await worker.fetch(req("/v1/feedback", { task: long, version: "0.13.0", os: "<script>" }), env);
+  const [rec] = feedbackRecords(env);
+  assert.equal(rec.version, "0.13.0");
+  assert.equal(rec.os, null);
+  assert.ok(rec.task.length <= 600);
+  assert.ok(rec.task.split(" ").every(w => w === "word" || w === "[url:example.com]"), rec.task.slice(-30));
+}
+
 // Feedback: validation, per-caller limit, daily cap.
 {
   const env = makeEnv();

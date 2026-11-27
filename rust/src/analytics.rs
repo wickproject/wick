@@ -293,10 +293,26 @@ pub fn report_feedback(fb: Feedback) -> bool {
 /// worker/test/scrub-cases.json.
 pub fn scrub(text: &str) -> String {
     let words: Vec<String> = text.split_whitespace().map(scrub_word).collect();
-    mask_digit_runs(&words.join(" "))
-        .chars()
-        .take(FEEDBACK_MAX_CHARS)
-        .collect()
+    cap_words(&mask_digit_runs(&words.join(" ")), FEEDBACK_MAX_CHARS)
+}
+
+/// Keep whole words while the result fits in `max` characters, so the cap
+/// never cuts a placeholder in half.
+fn cap_words(text: &str, max: usize) -> String {
+    let mut out = String::new();
+    let mut len = 0;
+    for word in text.split(' ') {
+        let add = word.chars().count() + usize::from(len > 0);
+        if len + add > max {
+            break;
+        }
+        if len > 0 {
+            out.push(' ');
+        }
+        out.push_str(word);
+        len += add;
+    }
+    out
 }
 
 /// Longest word kept as-is; longer ones are replaced.
@@ -368,6 +384,20 @@ fn is_combining_mark(c: char) -> bool {
         | 0x3099..=0x309A | 0xFE20..=0xFE2F)
 }
 
+/// Decimal digits outside ASCII: the Unicode `Nd` blocks that scripts use
+/// for ordinary numbers (Arabic-Indic, Devanagari, Bengali, Thai,
+/// full-width and others), as opposed to numerals like `Ⅳ` or `½`.
+fn is_decimal_digit(c: char) -> bool {
+    const ZEROS: &[u32] = &[
+        0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66,
+        0x0CE6, 0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810,
+        0x1946, 0x19D0, 0x1A80, 0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0,
+        0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0, 0xFF10,
+    ];
+    let u = c as u32;
+    ZEROS.iter().any(|z| (*z..*z + 10).contains(&u))
+}
+
 /// Letters (any script), digits, `_` and light punctuation; no structural
 /// or URL characters; at most `MAX_PLAIN_WORD` characters; not key-like.
 fn is_plain_word(word: &str) -> bool {
@@ -377,6 +407,11 @@ fn is_plain_word(word: &str) -> bool {
     let core = word.trim_end_matches(|c: char| ".,!?;:)".contains(c));
     let core = core.trim_start_matches('(');
     if core.contains(':') {
+        return false;
+    }
+    // Non-ASCII decimal digits (full-width, Arabic-Indic...) aren't seen by
+    // the ASCII digit-run mask, so a word holding any is not plain.
+    if word.chars().any(is_decimal_digit) {
         return false;
     }
     let charset = word.chars().all(|c| {
@@ -570,7 +605,11 @@ mod tests {
 
     #[test]
     fn scrub_caps_length() {
-        assert_eq!(scrub(&"a ".repeat(1000)).chars().count(), FEEDBACK_MAX_CHARS);
+        let s = scrub(&"a ".repeat(1000));
+        assert!(s.chars().count() <= FEEDBACK_MAX_CHARS && s.chars().count() > FEEDBACK_MAX_CHARS - 3);
+        let long = format!("{}https://example.com/private", "ab ".repeat(296));
+        let capped = scrub(&long);
+        assert!(capped.split(' ').all(|w| w == "ab" || w == "[url:example.com]"), "{}", capped);
     }
 
     #[test]

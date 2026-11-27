@@ -141,6 +141,9 @@ function isPlainWord(word) {
   if (Array.from(word).length > MAX_PLAIN_WORD || word.includes("://")) return false;
   const core = word.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
   if (core.includes(":")) return false;
+  // Non-ASCII decimal digits escape the ASCII digit-run mask, so a word
+  // holding any is not plain.
+  if (/(?![0-9])\p{Nd}/u.test(word)) return false;
   return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(word) && !looksLikeSecret(word);
 }
 function urlTag(authority) {
@@ -165,7 +168,20 @@ function scrubWord(word) {
 function scrubText(v) {
   if (typeof v !== "string") return null;
   const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
-  return Array.from(maskDigitRuns(words)).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+  return capWords(maskDigitRuns(words), FEEDBACK_MAX_CHARS) || null;
+}
+
+/** Keep whole words while they fit in `max` characters (never half a placeholder). */
+function capWords(text, max) {
+  const out = [];
+  let len = 0;
+  for (const word of text.split(" ")) {
+    const add = Array.from(word).length + (out.length ? 1 : 0);
+    if (len + add > max) break;
+    out.push(word);
+    len += add;
+  }
+  return out.join(" ");
 }
 
 /**
@@ -262,8 +278,12 @@ export default {
       // by where agents run. Separate prefix keeps the ping: key format.
       if (/^[a-z_]{1,20}$/.test(event)) {
         const countryKey = `pingc:${date}:${event}:${callerCountry(request)}`;
-        const cCount = parseInt(await env.SUBSCRIPTIONS.get(countryKey) || "0");
-        await env.SUBSCRIPTIONS.put(countryKey, String(cCount + 1), { expirationTtl: 90 * 86400 });
+        // Best effort: a KV write limit on this counter must not break the
+        // legacy ping handling below.
+        try {
+          const cCount = parseInt(await env.SUBSCRIPTIONS.get(countryKey) || "0");
+          await env.SUBSCRIPTIONS.put(countryKey, String(cCount + 1), { expirationTtl: 90 * 86400 });
+        } catch { /* skip this count */ }
       }
 
       // Track daily totals
@@ -474,14 +494,14 @@ export default {
       const date = new Date().toISOString().split("T")[0];
       const countKey = `fbcount:${date}`;
       const count = parseInt(await env.SUBSCRIPTIONS.get(countKey) || "0");
-      if (count >= FEEDBACK_DAILY_CAP) return new Response("", { status: 204, headers });
+      if (count >= FEEDBACK_DAILY_CAP) return new Response(null, { status: 204, headers });
       // Fail closed: if the counter can't be written (KV allows about one
       // write per second to a key), drop the record rather than store it
       // uncounted.
       try {
         await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
       } catch {
-        return new Response("", { status: 204, headers });
+        return new Response(null, { status: 204, headers });
       }
 
       const host = typeof body.host === "string" && /^[a-zA-Z0-9.-]{1,253}$/.test(body.host)
@@ -494,14 +514,14 @@ export default {
         host,
         tool: isTool(body.tool) ? body.tool : null,
         country: callerCountry(request),
-        version: typeof body.version === "string" ? body.version.slice(0, 20) : null,
-        os: typeof body.os === "string" ? body.os.slice(0, 20) : null,
+        version: typeof body.version === "string" && /^[0-9A-Za-z.+-]{1,20}$/.test(body.version) ? body.version : null,
+        os: typeof body.os === "string" && /^[a-z0-9_]{1,20}$/.test(body.os) ? body.os : null,
         at: new Date().toISOString(),
       };
       await env.SUBSCRIPTIONS.put(`fb:${date}:${crypto.randomUUID()}`, JSON.stringify(record), {
         expirationTtl: 30 * 86400,
       });
-      return new Response("", { status: 204, headers });
+      return new Response(null, { status: 204, headers });
     }
 
     // ── Public stats summary ─────────────────────────────────────

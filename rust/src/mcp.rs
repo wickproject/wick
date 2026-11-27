@@ -416,16 +416,21 @@ async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
             let mut dir = parsed.clone();
             for _ in 0..2 {
                 dir = parent_dir(&dir)?;
-                // fetch_raw is network-only: it never launches the CEF
-                // renderer, so the lookup honors render='cronet' and the
-                // timeout above can't leave a render holding the renderer.
-                let Ok(page) = fetch::fetch_raw(client, dir.as_str(), true).await else {
-                    continue;
-                };
-                if page.status_code == 0 || page.status_code >= 400 {
+                // A plain network GET: it never launches the CEF renderer
+                // (so render='cronet' holds and the timeout can't strand a
+                // render) and, unlike fetch_raw, never writes the strategy
+                // cache, so a probe can't overwrite a host's learned CEF-first
+                // routing.
+                if !crate::robots::check(client, dir.as_str()).await {
                     continue;
                 }
-                let html = String::from_utf8_lossy(&page.bytes);
+                let Ok(page) = client.get_bytes(dir.as_str()).await else {
+                    continue;
+                };
+                if page.status >= 400 {
+                    continue;
+                }
+                let html = String::from_utf8_lossy(&page.body);
                 let links: Vec<String> = crate::crawl::extract_links(&html, &dir)
                     .into_iter()
                     .filter(|u| u.host_str() == parsed.host_str())
@@ -467,12 +472,11 @@ fn parent_dir(u: &url::Url) -> Option<url::Url> {
 /// without file extensions or filler like "index".
 fn page_tokens(path: &str) -> Vec<String> {
     const SKIP: &[&str] = &["html", "htm", "php", "aspx", "md", "index", "www"];
-    path.trim_end_matches('/')
-        .rsplit('/')
-        .next()
-        .unwrap_or("")
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .map(|t| t.to_ascii_lowercase())
+    let last = path.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+    let decoded = urlencoding::decode(last).map(|d| d.into_owned()).unwrap_or_else(|_| last.to_string());
+    decoded
+        .split(|c: char| !c.is_alphanumeric())
+        .map(|t| t.to_lowercase())
         .filter(|t| t.len() > 1 && !SKIP.contains(&t.as_str()))
         .collect()
 }
@@ -570,6 +574,16 @@ mod tests {
         let got = rank_similar("/3/library/asyncio-taskgroups.html", &cands, 5);
         assert_eq!(got[0], "https://docs.python.org/3/library/asyncio-task.html");
         assert_eq!(got.len(), 2, "{:?}", got);
+    }
+
+    #[test]
+    fn ranks_decoded_page_names() {
+        let cands = vec![
+            "https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string(),
+            "https://x.io/wiki/%E5%A4%A7%E9%98%AA".to_string(),
+        ];
+        let got = rank_similar("/wiki/%E6%9D%B1%E4%BA%AC%E9%83%BD", &cands, 5);
+        assert_eq!(got, vec!["https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string()]);
     }
 
     #[test]

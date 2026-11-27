@@ -326,5 +326,30 @@
    "5678",
    "x1234"
   ]
+ },
+ {
+  "in": "account １２３４５６７８９０ failed",
+  "contains": [
+   "account [redacted] failed"
+  ],
+  "absent": [
+   "１２３"
+  ]
+ },
+ {
+  "in": "phone ١٢٣٤٥٦٧ now",
+  "contains": [
+   "phone [redacted] now"
+  ],
+  "absent": [
+   "١٢٣"
+  ]
+ },
+ {
+  "in": "Chapter Ⅳ and ½ cup",
+  "contains": [
+   "Chapter Ⅳ and ½ cup"
+  ],
+  "absent": []
  }
 ]

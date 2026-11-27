@@ -32,7 +32,7 @@ Bindings declared in `wrangler.toml`:
 
 - `RELEASES` — R2 bucket `wick-releases`
 - `SUBSCRIPTIONS` — KV namespace (holds Pro keys, legacy ping counters, per-country ping counters under `pingc:`, per-fetch event counters under `evt:`, agent feedback under `fb:`, and the 5-min stats cache)
-- `FEEDBACK_LIMITER` — rate-limit binding, 5 feedback posts per minute per caller IP (kept in memory by Cloudflare, never stored). Optional: without it the endpoint relies on the daily cap alone.
+- `FEEDBACK_LIMITER` — rate-limit binding, 5 feedback posts per minute per caller IP, counted separately at each Cloudflare location and approximate (kept in memory by Cloudflare, never stored). Optional: without it the endpoint relies on the daily cap alone.
 
 Secrets (set via `wrangler secret put`):
 
