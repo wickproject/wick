@@ -384,20 +384,6 @@ fn is_combining_mark(c: char) -> bool {
         | 0x3099..=0x309A | 0xFE20..=0xFE2F)
 }
 
-/// Decimal digits outside ASCII: the Unicode `Nd` blocks that scripts use
-/// for ordinary numbers (Arabic-Indic, Devanagari, Bengali, Thai,
-/// full-width and others), as opposed to numerals like `Ⅳ` or `½`.
-fn is_decimal_digit(c: char) -> bool {
-    const ZEROS: &[u32] = &[
-        0x0660, 0x06F0, 0x07C0, 0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66,
-        0x0CE6, 0x0D66, 0x0DE6, 0x0E50, 0x0ED0, 0x0F20, 0x1040, 0x1090, 0x17E0, 0x1810,
-        0x1946, 0x19D0, 0x1A80, 0x1A90, 0x1B50, 0x1BB0, 0x1C40, 0x1C50, 0xA620, 0xA8D0,
-        0xA900, 0xA9D0, 0xA9F0, 0xAA50, 0xABF0, 0xFF10,
-    ];
-    let u = c as u32;
-    ZEROS.iter().any(|z| (*z..*z + 10).contains(&u))
-}
-
 /// Letters (any script), digits, `_` and light punctuation; no structural
 /// or URL characters; at most `MAX_PLAIN_WORD` characters; not key-like.
 fn is_plain_word(word: &str) -> bool {
@@ -409,9 +395,11 @@ fn is_plain_word(word: &str) -> bool {
     if core.contains(':') {
         return false;
     }
-    // Non-ASCII decimal digits (full-width, Arabic-Indic...) aren't seen by
-    // the ASCII digit-run mask, so a word holding any is not plain.
-    if word.chars().any(is_decimal_digit) {
+    // Non-ASCII numerals (full-width, Arabic-Indic, mathematical digits
+    // above U+FFFF, Roman numerals...) aren't seen by the ASCII digit-run
+    // mask, so a word holding any is not plain. `char::is_numeric` covers
+    // every Unicode number category.
+    if word.chars().any(|c| c.is_numeric() && !c.is_ascii_digit()) {
         return false;
     }
     let charset = word.chars().all(|c| {

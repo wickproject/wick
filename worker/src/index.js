@@ -141,9 +141,10 @@ function isPlainWord(word) {
   if (Array.from(word).length > MAX_PLAIN_WORD || word.includes("://")) return false;
   const core = word.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
   if (core.includes(":")) return false;
-  // Non-ASCII decimal digits escape the ASCII digit-run mask, so a word
-  // holding any is not plain.
-  if (/(?![0-9])\p{Nd}/u.test(word)) return false;
+  // Non-ASCII numerals (any Unicode number category, including digits
+  // above U+FFFF) escape the ASCII digit-run mask, so a word holding any
+  // is not plain. Mirrors char::is_numeric in rust/src/analytics.rs.
+  if (/(?![0-9])\p{N}/u.test(word)) return false;
   return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(word) && !looksLikeSecret(word);
 }
 function urlTag(authority) {

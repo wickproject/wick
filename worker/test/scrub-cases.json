@@ -346,10 +346,22 @@
   ]
  },
  {
+  "in": "account 𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗 failed",
+  "contains": [
+   "account [redacted] failed"
+  ],
+  "absent": [
+   "𝟎𝟏"
+  ]
+ },
+ {
   "in": "Chapter Ⅳ and ½ cup",
   "contains": [
-   "Chapter Ⅳ and ½ cup"
+   "Chapter [redacted] and [redacted] cup"
   ],
-  "absent": []
+  "absent": [
+   "Ⅳ",
+   "½"
+  ]
  }
 ]
