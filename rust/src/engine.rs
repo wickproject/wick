@@ -82,7 +82,10 @@ impl Client {
         {
             let resp = self.inner.get(url).send().await?;
             let status = resp.status().as_u16();
-            let final_url = Some(resp.url().to_string()).filter(|u| u != url);
+            let final_url = url::Url::parse(url)
+                .ok()
+                .filter(|requested| requested != resp.url())
+                .map(|_| resp.url().to_string());
             let body = resp.bytes().await?.to_vec();
             Ok(RawResponse { status, body, final_url })
         }
@@ -97,7 +100,10 @@ pub struct HttpResponse {
 pub struct RawResponse {
     pub status: u16,
     pub body: Vec<u8>,
-    /// The URL after redirects, when it differs from the one requested.
+    /// Where the request ended up after redirects. `None` when it wasn't
+    /// redirected. Cronet sets it after any redirect, even a chain that
+    /// returns to the requested URL; reqwest sets it only when the final URL
+    /// differs from the requested one.
     pub final_url: Option<String>,
 }
 

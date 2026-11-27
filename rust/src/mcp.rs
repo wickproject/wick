@@ -439,9 +439,11 @@ async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
                     .as_deref()
                     .and_then(|u| url::Url::parse(u).ok())
                     .unwrap_or_else(|| dir.clone());
+                // Same-site means the requested host or the one the directory
+                // redirected to (apex to www is the common case).
                 let links: Vec<String> = crate::crawl::extract_links(&html, &base)
                     .into_iter()
-                    .filter(|u| u.host_str() == parsed.host_str())
+                    .filter(|u| u.host_str() == parsed.host_str() || u.host_str() == base.host_str())
                     .map(|u| u.to_string())
                     .collect();
                 let best = rank_similar(parsed.path(), &links, SUGGEST_COUNT);
