@@ -476,18 +476,20 @@ fn parent_dir(u: &url::Url) -> Option<url::Url> {
     Some(d)
 }
 
-/// Whether `u` is on the same site as `requested`: the same host once a
-/// leading `www.` is dropped from each, so an apex-to-www redirect keeps
-/// its links while a redirect to an unrelated host (an SSO page, a parked
-/// domain) contributes none.
+/// A site's identity for suggestions: its host, lowercased, without a
+/// leading `www.`. One rule for the same-site filter, for excluding the
+/// requested page and for de-duplication, so `example.com` and
+/// `www.example.com` are always treated as one site.
+fn site_key(u: &url::Url) -> Option<String> {
+    let h = u.host_str()?.to_ascii_lowercase();
+    Some(h.strip_prefix("www.").map(str::to_string).unwrap_or(h))
+}
+
+/// Whether `u` is on the same site as `requested` (see `site_key`). An
+/// apex-to-www redirect keeps its links; a redirect to an unrelated host
+/// (an SSO page, a parked domain, another subdomain) contributes none.
 fn same_site(u: &url::Url, requested: &url::Url) -> bool {
-    fn bare(h: &str) -> &str {
-        h.strip_prefix("www.").unwrap_or(h)
-    }
-    match (u.host_str(), requested.host_str()) {
-        (Some(a), Some(b)) => bare(&a.to_ascii_lowercase()) == bare(&b.to_ascii_lowercase()),
-        _ => false,
-    }
+    site_key(u).is_some() && site_key(u) == site_key(requested)
 }
 
 /// Tokens of a path's last segment (usually the page name), lowercased,
@@ -518,8 +520,10 @@ fn rank_similar(requested: &url::Url, candidates: &[String], n: usize) -> Vec<St
         .filter_map(|c| {
             let cu = url::Url::parse(c).ok()?;
             let cp = cu.path().to_string();
-            let key = (cu.host_str().map(str::to_string), cp.clone());
-            let is_requested = cu.host_str() == requested.host_str() && cp == requested.path();
+            let key = (site_key(&cu), cp.clone());
+            // The requested page on either host is the page that just 404'd
+            // (after an apex-to-www redirect the 404 came from www).
+            let is_requested = key == (site_key(requested), requested.path().to_string());
             if is_requested || !seen.insert(key) {
                 return None;
             }
@@ -577,13 +581,14 @@ mod tests {
     }
 
     #[test]
-    fn suggests_requested_path_on_other_host() {
+    fn www_twins_are_one_page() {
         let cands = vec![
-            "https://example.com/docs/foo.html".to_string(),
             "https://www.example.com/docs/foo.html".to_string(),
+            "https://www.example.com/docs/foo-bar.html".to_string(),
+            "https://example.com/docs/foo-bar.html".to_string(),
         ];
         let got = rank_similar(&u("https://example.com/docs/foo.html"), &cands, 5);
-        assert_eq!(got, vec!["https://www.example.com/docs/foo.html".to_string()]);
+        assert_eq!(got, vec!["https://www.example.com/docs/foo-bar.html".to_string()]);
     }
     use rmcp::handler::server::wrapper::Parameters;
 

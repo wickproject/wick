@@ -75,7 +75,7 @@ impl Client {
             let final_url = resp.final_url.filter(|f| {
                 match (url::Url::parse(url), url::Url::parse(f)) {
                     (Ok(a), Ok(b)) => a != b,
-                    _ => true,
+                    _ => false,
                 }
             });
             Ok(RawResponse {
