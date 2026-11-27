@@ -374,7 +374,7 @@ fn append_media(content: &str, html: &str, page_url: &Url) -> String {
 
 // ── Link extraction ──────────────────────────────────────────
 
-fn extract_links(html: &str, page_url: &Url) -> Vec<Url> {
+pub(crate) fn extract_links(html: &str, page_url: &Url) -> Vec<Url> {
     let doc = Html::parse_document(html);
     let selector = Selector::parse("a[href]").unwrap();
     let mut links = Vec::new();

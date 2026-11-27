@@ -1,0 +1,367 @@
+[
+ {
+  "in": "tried https://example.com/user/123/orders?id=9 twice",
+  "contains": [
+   "tried [url:example.com] twice"
+  ],
+  "absent": [
+   "/user",
+   "orders",
+   "id=9"
+  ]
+ },
+ {
+  "in": "see [report](https://example.com/private/orders?token=secret) now",
+  "contains": [
+   "[url:example.com]",
+   "now"
+  ],
+  "absent": [
+   "private",
+   "token",
+   "secret"
+  ]
+ },
+ {
+  "in": "failed on url=https://shop.example.de/cart/checkout?session=abc",
+  "contains": [
+   "[url:shop.example.de]"
+  ],
+  "absent": [
+   "cart",
+   "session",
+   "abc"
+  ]
+ },
+ {
+  "in": "fetching example.com/private/orders?token=secret returned 403",
+  "contains": [
+   "[url:example.com]",
+   "returned 403"
+  ],
+  "absent": [
+   "private",
+   "token",
+   "secret"
+  ]
+ },
+ {
+  "in": "saw \"example.com/private/x\" here",
+  "contains": [
+   "[url:example.com]",
+   "here"
+  ],
+  "absent": [
+   "private"
+  ]
+ },
+ {
+  "in": "see https://example.com/user/1234567/orders?token=secret ok",
+  "contains": [
+   "[url:example.com]",
+   "ok"
+  ],
+  "absent": [
+   "orders",
+   "token",
+   "1234567"
+  ]
+ },
+ {
+  "in": "x https://example.com/a;b,c(d)?token=secret y",
+  "contains": [
+   "x [url:example.com] y"
+  ],
+  "absent": [
+   "token",
+   "b,c",
+   "secret"
+  ]
+ },
+ {
+  "in": "→https://example.com/private/page",
+  "contains": [
+   "[url:example.com]"
+  ],
+  "absent": [
+   "private"
+  ]
+ },
+ {
+  "in": "https://user:pw@internal.example.com:8443/admin",
+  "contains": [
+   "[url]"
+  ],
+  "absent": [
+   "pw",
+   "admin",
+   "user",
+   "internal"
+  ]
+ },
+ {
+  "in": "https://alice=extra:pw@example.com/private",
+  "contains": [
+   "[url]"
+  ],
+  "absent": [
+   "alice",
+   "pw",
+   "private"
+  ]
+ },
+ {
+  "in": "mail jane.doe@corp.com about it",
+  "contains": [
+   "[email]",
+   "about it"
+  ],
+  "absent": [
+   "jane",
+   "corp.com"
+  ]
+ },
+ {
+  "in": "contact mailto:jane@corp.com today",
+  "contains": [
+   "[email]",
+   "today"
+  ],
+  "absent": [
+   "jane"
+  ]
+ },
+ {
+  "in": "call +1 (555) 123-4567 tomorrow",
+  "contains": [
+   "[number]",
+   "tomorrow"
+  ],
+  "absent": [
+   "555",
+   "4567"
+  ]
+ },
+ {
+  "in": "key key_live_51Habc123DEF456ghi789JKL leaked",
+  "contains": [
+   "[redacted]",
+   "leaked"
+  ],
+  "absent": [
+   "key_live"
+  ]
+ },
+ {
+  "in": "{\"api_key\":\"key_live_51Habc123DEF456ghi789JKL\"}",
+  "contains": [
+   "[redacted]"
+  ],
+  "absent": [
+   "key_live",
+   "api_key"
+  ]
+ },
+ {
+  "in": "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123def456",
+  "contains": [
+   "[redacted]"
+  ],
+  "absent": [
+   "eyJhbGci"
+  ]
+ },
+ {
+  "in": "auth dGhpc2lzYXNlY3JldHRva2VuMTIzNDU2Nzg5MA== failed",
+  "contains": [
+   "[redacted]",
+   "failed"
+  ],
+  "absent": [
+   "dGhpc2lz"
+  ]
+ },
+ {
+  "in": "compare bike prices in Germany vs. Poland (EUR), e.g. wick_fetch 0.13.0 isn't working!",
+  "contains": [
+   "compare bike prices in Germany vs. Poland (EUR), e.g. wick_fetch 0.13.0 isn't working!"
+  ],
+  "absent": []
+ },
+ {
+  "in": "Preise für Fahrräder in Zürich vergleichen; 東京の価格を比較",
+  "contains": [
+   "Preise für Fahrräder in Zürich vergleichen; 東京の価格を比較"
+  ],
+  "absent": []
+ },
+ {
+  "in": "used render=cef and got 403",
+  "contains": [
+   "used [redacted] and got 403"
+  ],
+  "absent": [
+   "render=cef"
+  ]
+ },
+ {
+  "in": "key key_live_ABCDEFGHIJ1234567KLMNOPQRST here",
+  "contains": [
+   "key [redacted] here"
+  ],
+  "absent": [
+   "key_live",
+   "KLMNOP"
+  ]
+ },
+ {
+  "in": "use tok_1234567890abcdefghij now",
+  "contains": [
+   "use [redacted] now"
+  ],
+  "absent": [
+   "tok_",
+   "abcdefghij"
+  ]
+ },
+ {
+  "in": "account 1234\n5678 closed",
+  "contains": [
+   "account [number] closed"
+  ],
+  "absent": [
+   "1234",
+   "5678"
+  ]
+ },
+ {
+  "in": "tried [url:example.com] twice, mailed [email], got [number] and [redacted].",
+  "contains": [
+   "tried [url:example.com] twice, mailed [email], got [number] and [redacted]."
+  ],
+  "absent": []
+ },
+ {
+  "in": "café für Hindi किताब",
+  "contains": [
+   "café für Hindi किताब"
+  ],
+  "absent": []
+ },
+ {
+  "in": "k abcd1234efgh5678ijkl end",
+  "contains": [
+   "k [redacted] end"
+  ],
+  "absent": [
+   "abcd1234"
+  ]
+ },
+ {
+  "in": "k abcd1234efgh5678ijk end",
+  "contains": [
+   "k abcd1234efgh5678ijk end"
+  ],
+  "absent": []
+ },
+ {
+  "in": "q 'abcd1234efgh5678ijklmnop' and abc&1234efgh5678ijklmnop!",
+  "contains": [
+   "q [redacted] and [redacted]"
+  ],
+  "absent": [
+   "abcd1234",
+   "efgh5678"
+  ]
+ },
+ {
+  "in": "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end",
+  "contains": [
+   "w [redacted] end"
+  ],
+  "absent": [
+   "aaaaaaaaaa"
+  ]
+ },
+ {
+  "in": "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end",
+  "contains": [
+   "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end"
+  ],
+  "absent": []
+ },
+ {
+  "in": "k AbCdEfGhIjKlMnOpQrStUv end",
+  "contains": [
+   "k [redacted] end"
+  ],
+  "absent": [
+   "AbCdEf"
+  ]
+ },
+ {
+  "in": "Donaudampfschifffahrtsgesellschaft rocks",
+  "contains": [
+   "Donaudampfschifffahrtsgesellschaft rocks"
+  ],
+  "absent": []
+ },
+ {
+  "in": "fetch order1234567 failed",
+  "contains": [
+   "fetch [number] failed"
+  ],
+  "absent": [
+   "order",
+   "1234567"
+  ]
+ },
+ {
+  "in": "ids x1234 5678y done",
+  "contains": [
+   "ids [number] done"
+  ],
+  "absent": [
+   "1234",
+   "5678",
+   "x1234"
+  ]
+ },
+ {
+  "in": "account １２３４５６７８９０ failed",
+  "contains": [
+   "account [redacted] failed"
+  ],
+  "absent": [
+   "１２３"
+  ]
+ },
+ {
+  "in": "phone ١٢٣٤٥٦٧ now",
+  "contains": [
+   "phone [redacted] now"
+  ],
+  "absent": [
+   "١٢٣"
+  ]
+ },
+ {
+  "in": "account 𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗 failed",
+  "contains": [
+   "account [redacted] failed"
+  ],
+  "absent": [
+   "𝟎𝟏"
+  ]
+ },
+ {
+  "in": "Chapter Ⅳ and ½ cup",
+  "contains": [
+   "Chapter [redacted] and [redacted] cup"
+  ],
+  "absent": [
+   "Ⅳ",
+   "½"
+  ]
+ }
+]

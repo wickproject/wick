@@ -83,6 +83,7 @@ impl Engine {
             error: Mutex::new(None),
             request: Mutex::new(std::ptr::null_mut()),
             callback: Mutex::new(std::ptr::null_mut()),
+            final_url: Mutex::new(None),
         });
         let state_ptr = Box::into_raw(state) as *mut c_void;
 
@@ -157,6 +158,8 @@ impl Drop for Engine {
 pub struct Response {
     pub status_code: u16,
     pub body: Vec<u8>,
+    /// Where the last redirect pointed, if the request was redirected.
+    pub final_url: Option<String>,
 }
 
 impl Response {
@@ -174,6 +177,7 @@ struct RequestState {
     error: Mutex<Option<String>>,
     request: Mutex<ffi::Cronet_UrlRequestPtr>,
     callback: Mutex<ffi::Cronet_UrlRequestCallbackPtr>,
+    final_url: Mutex<Option<String>>,
 }
 
 fn get_state(callback: ffi::Cronet_UrlRequestCallbackPtr) -> &'static RequestState {
@@ -203,11 +207,17 @@ unsafe extern "C" fn executor_execute(
 // ── Request callbacks ───────────────────────────────────────────
 
 unsafe extern "C" fn on_redirect_received(
-    _callback: ffi::Cronet_UrlRequestCallbackPtr,
+    callback: ffi::Cronet_UrlRequestCallbackPtr,
     request: ffi::Cronet_UrlRequestPtr,
     _info: ffi::Cronet_UrlResponseInfoPtr,
-    _new_location: ffi::Cronet_String,
+    new_location: ffi::Cronet_String,
 ) {
+    // Remember where we were sent (Cronet passes an absolute URL), so
+    // callers can resolve relative links against the final page.
+    if !new_location.is_null() {
+        let loc = std::ffi::CStr::from_ptr(new_location).to_string_lossy().into_owned();
+        *get_state(callback).final_url.lock().unwrap() = Some(loc);
+    }
     // Follow all redirects automatically
     ffi::Cronet_UrlRequest_FollowRedirect(request);
 }
@@ -271,6 +281,7 @@ unsafe extern "C" fn on_succeeded(
     let state = get_state(callback);
     let code = state.status_code.load(std::sync::atomic::Ordering::SeqCst);
     let body = state.body.lock().unwrap().clone();
+    let final_url = state.final_url.lock().unwrap().clone();
 
     let boxed = finish_request(callback);
     complete(
@@ -278,6 +289,7 @@ unsafe extern "C" fn on_succeeded(
         Ok(Response {
             status_code: code as u16,
             body,
+            final_url,
         }),
     );
 }

@@ -72,17 +72,28 @@ impl Client {
         {
             let headers = chrome_header_pairs();
             let resp = self.engine.get(url, &headers).await?;
+            let final_url = resp.final_url.filter(|f| {
+                match (url::Url::parse(url), url::Url::parse(f)) {
+                    (Ok(a), Ok(b)) => a != b,
+                    _ => false,
+                }
+            });
             Ok(RawResponse {
                 status: resp.status_code,
                 body: resp.body,
+                final_url,
             })
         }
         #[cfg(not(feature = "cronet"))]
         {
             let resp = self.inner.get(url).send().await?;
             let status = resp.status().as_u16();
+            let final_url = url::Url::parse(url)
+                .ok()
+                .filter(|requested| requested != resp.url())
+                .map(|_| resp.url().to_string());
             let body = resp.bytes().await?.to_vec();
-            Ok(RawResponse { status, body })
+            Ok(RawResponse { status, body, final_url })
         }
     }
 }
@@ -95,6 +106,10 @@ pub struct HttpResponse {
 pub struct RawResponse {
     pub status: u16,
     pub body: Vec<u8>,
+    /// Where the request ended up after redirects, or `None` when that is
+    /// the URL requested (no redirect, or a chain that returned to it). Both
+    /// backends compare parsed URLs.
+    pub final_url: Option<String>,
 }
 
 fn storage_path() -> Result<PathBuf> {

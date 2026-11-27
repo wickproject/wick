@@ -5,6 +5,7 @@ use rmcp::{
     schemars, tool, tool_handler, tool_router,
 };
 
+use crate::analytics;
 use crate::engine::Client;
 use crate::extract::Format;
 use crate::fetch::{self, RenderMode};
@@ -28,6 +29,18 @@ pub struct FetchInput {
         description = "CSS selector to wait for before capturing the DOM. Only applies when the CEF renderer runs (force render='cef' or it auto-escalates). Use this for SPAs that lazy-load content after initial hydration — e.g. '[data-testid=\"primaryColumn\"]' for X/Twitter timelines, 'article' for blog feeds. The renderer waits up to 20s for the selector to appear. Use simple selectors (data-testid, class, id) — single quotes and backslashes are stripped server-side for safety."
     )]
     pub wait_for_selector: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct RequestCapabilityInput {
+    #[schemars(description = "The user's goal you could not accomplish, in one or two sentences. Describe the task, not the user: leave out names, accounts and other personal details.")]
+    pub task: String,
+    #[schemars(description = "What you tried, e.g. which Wick tools and options")]
+    pub tried: Option<String>,
+    #[schemars(description = "What went wrong: blocked, wrong content, missing feature, too slow, etc.")]
+    pub failure: Option<String>,
+    #[schemars(description = "The URL involved, if any. Only its hostname is sent.")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -120,7 +133,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_fetch",
-        description = "Fetch a web page using Chrome's network stack with browser-grade TLS fingerprinting. Returns clean, LLM-friendly content. Succeeds on sites that block standard HTTP clients. Automatically falls back to a full Chromium (CEF) renderer when the page is JavaScript-only or blocked — pass render='cef' to force it, render='cronet' to skip it."
+        description = "Fetch a web page using Chrome's network stack with browser-grade TLS fingerprinting. Returns clean, LLM-friendly content. Succeeds on sites that block standard HTTP clients. Automatically falls back to a full Chromium (CEF) renderer when the page is JavaScript-only or blocked — pass render='cef' to force it, render='cronet' to skip it. If Wick can't get you what the user needs, call wick_request_capability."
     )]
     async fn wick_fetch(
         &self,
@@ -141,32 +154,39 @@ impl WickServer {
             .unwrap_or_default();
         let wait_for_selector = input.wait_for_selector.as_deref();
 
-        let result = fetch::fetch(
-            client,
-            &input.url,
-            format,
-            respect_robots,
-            render,
-            wait_for_selector,
+        let result = analytics::with_tool(
+            "wick_fetch",
+            fetch::fetch(
+                client,
+                &input.url,
+                format,
+                respect_robots,
+                render,
+                wait_for_selector,
+            ),
         )
         .await
-            .map_err(|e| {
-                McpError::internal_error(format!("fetch failed: {}", e), None)
-            })?;
+        .map_err(|e| McpError::internal_error(format!("fetch failed: {}", e), None))?;
 
-        Ok(CallToolResult::success(vec![Content::text(result.content)]))
+        let mut content = result.content;
+        if result.status_code == 404 {
+            if let Some(hint) = suggest_urls(client, &input.url).await {
+                content.push_str(&hint);
+            }
+        }
+        Ok(CallToolResult::success(vec![Content::text(content)]))
     }
 
     #[tool(
         name = "wick_search",
-        description = "Search the web via DuckDuckGo. Returns titles, URLs, and snippets. Use wick_fetch to read the full content of any result."
+        description = "Search the web via DuckDuckGo. Returns titles, URLs, and snippets. Use wick_fetch to read the full content of any result. If Wick can't get you what the user needs, call wick_request_capability."
     )]
     async fn wick_search(
         &self,
         Parameters(input): Parameters<SearchInput>,
     ) -> Result<CallToolResult, McpError> {
         let num = input.num_results.unwrap_or(5).max(1).min(20) as usize;
-        let results = crate::search::search(&self.client, &input.query, num)
+        let results = analytics::with_tool("wick_search", crate::search::search(&self.client, &input.query, num))
             .await
             .map_err(|e| McpError::internal_error(format!("search failed: {}", e), None))?;
 
@@ -230,7 +250,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_crawl",
-        description = "Crawl a website starting from a URL. Follows same-domain links, fetches multiple pages, and returns their content as clean markdown. Useful for reading documentation sites, blogs, or multi-page content."
+        description = "Crawl a website starting from a URL. Follows same-domain links, fetches multiple pages, and returns their content as clean markdown. Useful for reading documentation sites, blogs, or multi-page content. If Wick can't get you what the user needs, call wick_request_capability."
     )]
     async fn wick_crawl(
         &self,
@@ -253,7 +273,7 @@ impl WickServer {
             path_filter: input.path_filter,
         };
 
-        let result = crate::crawl::crawl(&self.client, &input.url, options)
+        let result = analytics::with_tool("wick_crawl", crate::crawl::crawl(&self.client, &input.url, options))
             .await
             .map_err(|e| McpError::internal_error(format!("crawl failed: {}", e), None))?;
 
@@ -268,7 +288,7 @@ impl WickServer {
 
     #[tool(
         name = "wick_map",
-        description = "Discover all URLs on a website. Checks sitemap.xml first, then follows links to build a URL map. Returns a sorted list of discovered URLs. Useful for understanding site structure before targeted fetching."
+        description = "Discover all URLs on a website. Checks sitemap.xml first, then follows links to build a URL map. Returns a sorted list of discovered URLs. Useful for understanding site structure before targeted fetching. If Wick can't get you what the user needs, call wick_request_capability."
     )]
     async fn wick_map(
         &self,
@@ -285,7 +305,7 @@ impl WickServer {
             path_filter: input.path_filter,
         };
 
-        let result = crate::crawl::map(&self.client, &input.url, options)
+        let result = analytics::with_tool("wick_map", crate::crawl::map(&self.client, &input.url, options))
             .await
             .map_err(|e| McpError::internal_error(format!("map failed: {}", e), None))?;
 
@@ -309,7 +329,7 @@ impl WickServer {
         use std::path::Path;
         let respect_robots = input.respect_robots.unwrap_or(true);
 
-        let result = fetch::fetch_raw(&self.client, &input.url, respect_robots)
+        let result = analytics::with_tool("wick_fetch_to_file", fetch::fetch_raw(&self.client, &input.url, respect_robots))
             .await
             .map_err(|e| McpError::internal_error(format!("fetch_raw failed: {}", e), None))?;
 
@@ -346,6 +366,190 @@ impl WickServer {
         );
         Ok(CallToolResult::success(vec![Content::text(summary)]))
     }
+
+    #[tool(
+        name = "wick_request_capability",
+        description = "Tell the Wick team about a task Wick couldn't help you finish: a site that stayed blocked, content you needed but couldn't get, or a capability Wick lacks (a different country's view of a page, logged-in access, structured data, etc). Call it whenever Wick falls short of the user's goal, then carry on with the task. Text is scrubbed of URL paths, emails and long numbers before sending, and nothing is sent if the user has opted out of Wick telemetry."
+    )]
+    async fn wick_request_capability(
+        &self,
+        Parameters(input): Parameters<RequestCapabilityInput>,
+    ) -> Result<CallToolResult, McpError> {
+        if input.task.trim().is_empty() {
+            return Err(McpError::invalid_params("task is required", None));
+        }
+        let sent = analytics::with_tool("wick_request_capability", async {
+            analytics::report_feedback(analytics::Feedback {
+                task: &input.task,
+                tried: input.tried.as_deref(),
+                failure: input.failure.as_deref(),
+                url: input.url.as_deref(),
+            })
+        })
+        .await;
+        let msg = if sent {
+            "Thanks, this is queued for the Wick team (best effort). Requests like this decide what Wick builds next. Carry on with the user's task."
+        } else if analytics::is_opted_out() {
+            "Not sent: the user has turned off Wick telemetry. Carry on with the user's task."
+        } else {
+            "Not sent: Wick's telemetry queue is unavailable right now. Carry on with the user's task."
+        };
+        Ok(CallToolResult::success(vec![Content::text(msg)]))
+    }
+}
+
+/// How long a 404 may spend looking up alternative URLs.
+const SUGGEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
+const SUGGEST_COUNT: usize = 5;
+
+/// After a 404, look for real pages on the same site whose paths resemble
+/// the one requested. Agents often guess documentation URLs, and the
+/// directory above a guessed page usually links to the real ones, so this
+/// reads the parent directory's page, then the grandparent's, and ranks
+/// their same-site links. Bounded by `SUGGEST_TIMEOUT`. These lookups run
+/// under `SUGGEST_TOOL`, which keeps them out of telemetry.
+async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
+    let parsed = url::Url::parse(requested).ok()?;
+    let best = tokio::time::timeout(
+        SUGGEST_TIMEOUT,
+        analytics::with_tool(analytics::SUGGEST_TOOL, async {
+            let mut dir = parsed.clone();
+            for _ in 0..2 {
+                dir = parent_dir(&dir)?;
+                // A plain network GET: it never launches the CEF renderer
+                // (so render='cronet' holds and the timeout can't strand a
+                // render) and, unlike fetch_raw, never writes the strategy
+                // cache, so a probe can't overwrite a host's learned CEF-first
+                // routing.
+                if !crate::robots::check(client, dir.as_str()).await {
+                    continue;
+                }
+                let Ok(page) = client.get_bytes(dir.as_str()).await else {
+                    continue;
+                };
+                if page.status >= 400 {
+                    continue;
+                }
+                let html = String::from_utf8_lossy(&page.body);
+                // Resolve relative links against where the directory page
+                // actually came from: after a redirect (/docs/ to
+                // /en/latest/), `href="x.html"` means /en/latest/x.html.
+                let base = page
+                    .final_url
+                    .as_deref()
+                    .and_then(|u| url::Url::parse(u).ok())
+                    .unwrap_or_else(|| dir.clone());
+                let links: Vec<String> = crate::crawl::extract_links(&html, &base)
+                    .into_iter()
+                    .filter(|u| same_site(u, &parsed))
+                    .map(|u| u.to_string())
+                    .collect();
+                let best = rank_similar(&parsed, &links, SUGGEST_COUNT);
+                if !best.is_empty() {
+                    return Some(best);
+                }
+            }
+            None
+        }),
+    )
+    .await
+    .ok()??;
+    let mut out = String::from("\n\n---\nThis page doesn't exist. Similar pages on this site:\n");
+    for u in best {
+        out.push_str(&format!("- {}\n", u));
+    }
+    Some(out)
+}
+
+/// The directory containing `u`'s path: `/a/b/c.html` → `/a/b/`,
+/// `/a/b/` → `/a/`. None at the site root.
+fn parent_dir(u: &url::Url) -> Option<url::Url> {
+    let path = u.path().trim_end_matches('/');
+    if path.is_empty() {
+        return None;
+    }
+    let cut = path.rfind('/')?;
+    let mut d = u.clone();
+    d.set_path(&path[..=cut]);
+    d.set_query(None);
+    d.set_fragment(None);
+    Some(d)
+}
+
+/// A site's identity for suggestions: its host, lowercased, without a
+/// leading `www.` or a trailing `.`. One rule for the same-site filter, for excluding the
+/// requested page and for de-duplication, so `example.com` and
+/// `www.example.com` are always treated as one site.
+fn site_key(u: &url::Url) -> Option<String> {
+    let h = u.host_str()?.to_ascii_lowercase();
+    let h = h.strip_suffix('.').unwrap_or(&h);
+    Some(h.strip_prefix("www.").unwrap_or(h).to_string())
+}
+
+/// Whether `u` is on the same site as `requested` (see `site_key`). An
+/// apex-to-www redirect keeps its links; a redirect to an unrelated host
+/// (an SSO page, a parked domain, another subdomain) contributes none.
+fn same_site(u: &url::Url, requested: &url::Url) -> bool {
+    matches!((site_key(u), site_key(requested)), (Some(a), Some(b)) if a == b)
+}
+
+/// Tokens of a path's last segment (usually the page name), lowercased,
+/// without file extensions or filler like "index".
+fn page_tokens(path: &str) -> Vec<String> {
+    const SKIP: &[&str] = &["html", "htm", "php", "aspx", "md", "index", "www"];
+    let last = path.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+    let decoded = urlencoding::decode(last).map(|d| d.into_owned()).unwrap_or_else(|_| last.to_string());
+    decoded
+        .split(|c: char| !c.is_alphanumeric())
+        .map(|t| t.to_lowercase())
+        .filter(|t| t.len() > 1 && !SKIP.contains(&t.as_str()))
+        .collect()
+}
+
+/// Rank `candidates` by how well their page name matches the requested
+/// one: 2 per identical token, 1 when one token starts with the other
+/// (`task` and `taskgroups`). Candidates with no match are dropped, so an
+/// unrelated site gets no suggestions rather than noise.
+fn rank_similar(requested: &url::Url, candidates: &[String], n: usize) -> Vec<String> {
+    let want = page_tokens(requested.path());
+    if want.is_empty() {
+        return Vec::new();
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut scored: Vec<(usize, &String)> = candidates
+        .iter()
+        .filter_map(|c| {
+            let cu = url::Url::parse(c).ok()?;
+            let cp = cu.path().to_string();
+            let key = (site_key(&cu), cp.clone());
+            // The requested page on either host counts as the page that just
+            // 404'd. After an apex-to-www redirect the 404 came from www; when
+            // there was no redirect a live www twin is lost, a deliberate
+            // trade: suggesting a dead page is worse than missing a twin.
+            let is_requested = key == (site_key(requested), requested.path().to_string());
+            if is_requested || !seen.insert(key) {
+                return None;
+            }
+            let have = page_tokens(&cp);
+            let score: usize = want
+                .iter()
+                .map(|w| {
+                    if have.contains(w) {
+                        2
+                    } else if have.iter().any(|h| {
+                        h.len() >= 3 && w.len() >= 3 && (h.starts_with(w.as_str()) || w.starts_with(h.as_str()))
+                    }) {
+                        1
+                    } else {
+                        0
+                    }
+                })
+                .sum();
+            (score > 0).then_some((score, c))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.len().cmp(&b.1.len())));
+    scored.into_iter().take(n).map(|(_, c)| c.clone()).collect()
 }
 
 #[tool_handler]
@@ -354,8 +558,94 @@ impl ServerHandler for WickServer {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
                 "Wick provides browser-grade web access for AI agents. \
-                 Use wick_fetch to read any webpage with clean markdown output."
+                 Use wick_fetch to read any webpage with clean markdown output. \
+                 When Wick can't accomplish what the user needs, call \
+                 wick_request_capability to tell the Wick team, then continue."
                     .to_string(),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parent_dir, rank_similar, same_site, RequestCapabilityInput, WickServer};
+
+    fn u(s: &str) -> url::Url {
+        url::Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn same_site_allows_www_only() {
+        let req = u("https://example.com/docs/x.html");
+        assert!(same_site(&u("https://www.example.com/docs/a.html"), &req));
+        assert!(same_site(&u("https://EXAMPLE.com/b"), &req));
+        assert!(!same_site(&u("https://login.okta.com/help"), &req));
+        assert!(!same_site(&u("https://docs.example.com/c"), &req));
+        assert!(same_site(&u("https://example.com./d"), &req));
+    }
+
+    #[test]
+    fn www_twins_are_one_page() {
+        let cands = vec![
+            "https://www.example.com/docs/foo.html".to_string(),
+            "https://www.example.com/docs/foo-bar.html".to_string(),
+            "https://example.com/docs/foo-bar.html".to_string(),
+        ];
+        let got = rank_similar(&u("https://example.com/docs/foo.html"), &cands, 5);
+        assert_eq!(got, vec!["https://www.example.com/docs/foo-bar.html".to_string()]);
+    }
+    use rmcp::handler::server::wrapper::Parameters;
+
+    #[tokio::test]
+    async fn capability_request_needs_a_task() {
+        let server = WickServer::new(None).unwrap();
+        let input = RequestCapabilityInput {
+            task: "   ".into(),
+            tried: None,
+            failure: None,
+            url: None,
+        };
+        assert!(server.wick_request_capability(Parameters(input)).await.is_err());
+    }
+
+    #[test]
+    fn parent_dir_walks_up() {
+        let u = url::Url::parse("https://x.io/a/b/c.html?q=1").unwrap();
+        let p = parent_dir(&u).unwrap();
+        assert_eq!(p.as_str(), "https://x.io/a/b/");
+        assert_eq!(parent_dir(&p).unwrap().as_str(), "https://x.io/a/");
+        assert!(parent_dir(&url::Url::parse("https://x.io/").unwrap()).is_none());
+    }
+
+    #[test]
+    fn ranks_by_page_name() {
+        let cands: Vec<String> = [
+            "https://docs.python.org/3/library/re.html",
+            "https://docs.python.org/3/library/asyncio-task.html",
+            "https://docs.python.org/3/library/asyncio.html",
+            "https://docs.python.org/3/library/os.html",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let got = rank_similar(&u("https://docs.python.org/3/library/asyncio-taskgroups.html"), &cands, 5);
+        assert_eq!(got[0], "https://docs.python.org/3/library/asyncio-task.html");
+        assert_eq!(got.len(), 2, "{:?}", got);
+    }
+
+    #[test]
+    fn ranks_decoded_page_names() {
+        let cands = vec![
+            "https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string(),
+            "https://x.io/wiki/%E5%A4%A7%E9%98%AA".to_string(),
+        ];
+        let got = rank_similar(&u("https://x.io/wiki/%E6%9D%B1%E4%BA%AC%E9%83%BD"), &cands, 5);
+        assert_eq!(got, vec!["https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string()]);
+    }
+
+    #[test]
+    fn no_match_means_no_suggestions() {
+        let cands = vec!["https://x.io/runtime-apis/".to_string(), "https://x.io/cache/".to_string()];
+        assert!(rank_similar(&u("https://x.io/runtime-apis/kv-namespace/"), &cands, 5).is_empty());
     }
 }

@@ -7,6 +7,7 @@
  *   POST /ping                   → legacy daily usage ping
  *   POST /v1/events              → per-fetch telemetry
  *   GET  /v1/stats/summary       → public 7-day stats aggregate
+ *   POST /v1/feedback            → agent capability requests (wick_request_capability)
  *
  * Protected (API key required, set via API_KEYS secret):
  *   GET  /releases/:key/:file    → pro tarball + CEF runtime downloads
@@ -75,6 +76,149 @@ function isErrorKind(k) {
   return typeof k === "string" && ERROR_KINDS.has(k);
 }
 
+/**
+ * Surfaces a fetch can come from: MCP tool names, plus the process modes
+ * the client falls back to outside a tool call. Bounded for the same
+ * reason as ERROR_KINDS.
+ */
+const TOOLS = new Set([
+  "wick_fetch", "wick_search", "wick_crawl", "wick_map", "wick_download",
+  "wick_fetch_to_file", "wick_session", "wick_request_capability",
+  "mcp", "api", "cli",
+]);
+function isTool(t) {
+  return typeof t === "string" && TOOLS.has(t);
+}
+
+/**
+ * Caller country from Cloudflare's own geolocation (request.cf.country):
+ * an ISO 3166 alpha-2 code, "T1" for Tor, or "XX" when unknown. Only this
+ * code is stored, never the IP it came from.
+ */
+function callerCountry(request) {
+  const c = request.cf && request.cf.country;
+  return typeof c === "string" && /^[A-Z][A-Z0-9]$/.test(c) ? c : "XX";
+}
+
+/** Copy `{key: count}` entries from `src` into `dst` where `valid(key)`. */
+function mergeCounts(dst, src, valid) {
+  if (!src || typeof src !== "object") return;
+  for (const [k, count] of Object.entries(src)) {
+    const n = Number(count);
+    if (Number.isFinite(n) && valid(k)) dst[k] = (dst[k] || 0) + n;
+  }
+}
+const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
+
+/**
+ * Server-side pass of the client's scrub (`scrub` in rust/src/analytics.rs),
+ * since old or modified clients may skip it. Same allowlist rules, checked
+ * against the same cases (worker/test/scrub-cases.json): a word is kept
+ * only if it is a scrub placeholder or looks like plain language; any other
+ * word is replaced whole with `[url:host]`, `[email]` or `[redacted]`; then
+ * runs of 7+ digits become `[number]`; length is capped. Scrubbing twice
+ * gives the same result, so client output passes through unchanged.
+ */
+const FEEDBACK_MAX_CHARS = 600;
+const MAX_PLAIN_WORD = 40;
+function looksLikeSecret(word) {
+  const alnum = word.replace(/[^A-Za-z0-9]/g, "");
+  if (alnum.length < 20) return false;
+  const mixed = /\d/.test(alnum) && /[A-Za-z]/.test(alnum);
+  const innerUpper = (alnum.slice(1).match(/[A-Z]/g) || []).length;
+  return mixed || (innerUpper >= 3 && /[a-z]/.test(alnum));
+}
+function isDomain(h) {
+  return h.includes(".") && /^[A-Za-z0-9.-]+$/.test(h) && /\.[A-Za-z]{2,}$/.test(h);
+}
+function isPlaceholder(word) {
+  const w = word.replace(/^\(+/, "").replace(/[.,;:!?)]+$/, "");
+  if (["[number]", "[email]", "[redacted]", "[url]"].includes(w)) return true;
+  const m = w.match(/^\[url:(.+)\]$/);
+  return !!m && isDomain(m[1]);
+}
+function isPlainWord(word) {
+  if (Array.from(word).length > MAX_PLAIN_WORD || word.includes("://")) return false;
+  const core = word.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
+  if (core.includes(":")) return false;
+  // Non-ASCII numerals (any Unicode number category, including digits
+  // above U+FFFF) escape the ASCII digit-run mask, so a word holding any
+  // is not plain. Mirrors char::is_numeric in rust/src/analytics.rs.
+  if (/(?![0-9])\p{N}/u.test(word)) return false;
+  return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(word) && !looksLikeSecret(word);
+}
+function urlTag(authority) {
+  if (authority.includes("@")) return "[url]";
+  const host = authority.split(":")[0];
+  return isDomain(host) ? `[url:${host}]` : "[url]";
+}
+function scrubWord(word) {
+  if (isPlaceholder(word) || isPlainWord(word)) return word;
+  const i = word.indexOf("://");
+  if (i >= 0) {
+    const after = word.slice(i + 3);
+    const m = after.search(/[\/?#]/);
+    return urlTag(m < 0 ? after : after.slice(0, m));
+  }
+  const core = word.replace(/^["'`()[\]{}<>,.;:!?]+|["'`()[\]{}<>,.;:!?]+$/g, "");
+  const slash = core.indexOf("/");
+  if (slash > 0 && slash < core.length - 1 && isDomain(core.slice(0, slash))) return `[url:${core.slice(0, slash)}]`;
+  if (word.includes("@")) return "[email]";
+  return "[redacted]";
+}
+function scrubText(v) {
+  if (typeof v !== "string") return null;
+  const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
+  return capWords(maskDigitRuns(words), FEEDBACK_MAX_CHARS) || null;
+}
+
+/** Keep whole words while they fit in `max` characters (never half a placeholder). */
+function capWords(text, max) {
+  const out = [];
+  let len = 0;
+  for (const word of text.split(" ")) {
+    const add = Array.from(word).length + (out.length ? 1 : 0);
+    if (len + add > max) break;
+    out.push(word);
+    len += add;
+  }
+  return out.join(" ");
+}
+
+/**
+ * Runs of 7+ digits (with space, -, (, ), ., + between them) become
+ * `[number]`, widened to whole words so the output survives a second
+ * scrub unchanged. Mirrors `mask_digit_runs` in rust/src/analytics.rs.
+ */
+function maskDigitRuns(text) {
+  const re = /\+?\d[\d ().+-]*/g;
+  let out = "", emitted = 0, m;
+  while ((m = re.exec(text))) {
+    const core = m[0].replace(/[^\d]+$/, "");
+    if ((core.match(/\d/g) || []).length < 7) {
+      re.lastIndex = m.index + Math.max(core.length, 1);
+      continue;
+    }
+    let start = m.index, end = m.index + core.length;
+    while (start > emitted && !/\s/.test(text[start - 1])) start--;
+    while (end < text.length && !/\s/.test(text[end])) end++;
+    out += text.slice(emitted, start) + "[number]";
+    emitted = end;
+    re.lastIndex = end;
+  }
+  return out + text.slice(emitted);
+}
+
+/**
+ * Ceiling on feedback records per UTC day, across all callers. Each record
+ * costs two KV writes (record + counter), and Workers Free allows about
+ * 1,000 KV writes a day shared with fetch telemetry, so this stays small.
+ * KV has no atomic increment: concurrent requests in the same moment can
+ * overshoot it a little. FEEDBACK_LIMITER bounds that per caller; a strict
+ * global cap would need a Durable Object.
+ */
+const FEEDBACK_DAILY_CAP = 100;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -131,6 +275,18 @@ export default {
       const current = parseInt(await env.SUBSCRIPTIONS.get(key) || "0");
       await env.SUBSCRIPTIONS.put(key, String(current + 1), { expirationTtl: 90 * 86400 });
 
+      // Daily counter per caller country, so active installs can be split
+      // by where agents run. Separate prefix keeps the ping: key format.
+      if (/^[a-z_]{1,20}$/.test(event)) {
+        const countryKey = `pingc:${date}:${event}:${callerCountry(request)}`;
+        // Best effort: a KV write limit on this counter must not break the
+        // legacy ping handling below.
+        try {
+          const cCount = parseInt(await env.SUBSCRIPTIONS.get(countryKey) || "0");
+          await env.SUBSCRIPTIONS.put(countryKey, String(cCount + 1), { expirationTtl: 90 * 86400 });
+        } catch { /* skip this count */ }
+      }
+
       // Track daily totals
       const totalKey = `ping:${date}:total`;
       const total = parseInt(await env.SUBSCRIPTIONS.get(totalKey) || "0");
@@ -160,7 +316,14 @@ export default {
     // { "host": "nytimes.com", "strategy": "cef", "escalated_from": null|"cronet",
     //   "ok": true, "status": 200, "timing_ms": 1840,
     //   "error_kind": "reset"|"offline"|...,   // only on transport failures
+    //   "tool": "wick_fetch"|"cli"|...,         // 0.13+: surface that fetched
+    //   "retry": true,                          // 0.13+: host failed < 5 min ago
     //   "version": "0.9.2", "os": "macos" }
+    //
+    // The stored value also counts the caller's country (country_dist, from
+    // Cloudflare's request.cf.country), tools (tool_dist), retries and
+    // retries that succeeded. Failures minus successful retries approximates
+    // tasks the agent gave up on.
     //
     // Storage model: one KV key per (date, host, strategy) with a merged
     // JSON value `{ fetches, successes, total_ms }`. Each event is a
@@ -202,7 +365,10 @@ export default {
       // manually edited in the KV dashboard) is treated as "start
       // fresh" so we never throw during increment or write back a
       // poisoned value.
-      const existing = { fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {} };
+      const existing = {
+        fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
+        country_dist: {}, tool_dist: {}, retries: 0, retry_successes: 0,
+      };
       const existingRaw = await env.SUBSCRIPTIONS.get(key);
       if (existingRaw) {
         try {
@@ -237,6 +403,12 @@ export default {
                 }
               }
             }
+            mergeCounts(existing.country_dist, parsed.country_dist, isCountry);
+            mergeCounts(existing.tool_dist, parsed.tool_dist, isTool);
+            const r = Number(parsed.retries);
+            const rs = Number(parsed.retry_successes);
+            if (Number.isFinite(r)) existing.retries = r;
+            if (Number.isFinite(rs)) existing.retry_successes = rs;
           }
         } catch { /* corrupt JSON — start fresh */ }
       }
@@ -274,11 +446,83 @@ export default {
           (existing.error_kind_dist[body.error_kind] || 0) + 1;
       }
 
+      const country = callerCountry(request);
+      existing.country_dist[country] = (existing.country_dist[country] || 0) + 1;
+      if (isTool(body.tool)) {
+        existing.tool_dist[body.tool] = (existing.tool_dist[body.tool] || 0) + 1;
+      }
+      if (body.retry === true) {
+        existing.retries += 1;
+        if (body.ok === true) existing.retry_successes += 1;
+      }
+
       await env.SUBSCRIPTIONS.put(key, JSON.stringify(existing), {
         expirationTtl: 30 * 86400,
       });
 
       return new Response("", { status: 204, headers });
+    }
+
+    // ── Agent feedback ───────────────────────────────────────────
+    //
+    // POST /v1/feedback with body:
+    // { "kind": "capability_request", "task": "...", "tried": "...",
+    //   "failure": "...", "host": "example.com", "tool": "wick_request_capability",
+    //   "version": "0.13.0", "os": "macos" }
+    //
+    // Sent by the wick_request_capability MCP tool when an agent can't get
+    // what its user needs. Each record is stored once under
+    // `fb:<date>:<uuid>` with the caller's country and a 30-day TTL; read
+    // them with `wrangler kv key list --prefix fb:`. Text is scrubbed again
+    // here in case the client didn't. The endpoint is unauthenticated, so
+    // each caller IP is rate limited (FEEDBACK_LIMITER, in memory, never
+    // stored) and a global daily cap bounds total writes.
+    if (request.method === "POST" && path === "/v1/feedback") {
+      if (env.FEEDBACK_LIMITER) {
+        const ip = request.headers.get("cf-connecting-ip") || "unknown";
+        const { success } = await env.FEEDBACK_LIMITER.limit({ key: ip });
+        if (!success) return new Response("rate limited\n", { status: 429, headers });
+      }
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response("bad json\n", { status: 400, headers });
+      }
+      const task = scrubText(body && body.task);
+      if (!task) return new Response("task required\n", { status: 400, headers });
+
+      const date = new Date().toISOString().split("T")[0];
+      const countKey = `fbcount:${date}`;
+      const count = parseInt(await env.SUBSCRIPTIONS.get(countKey) || "0");
+      if (count >= FEEDBACK_DAILY_CAP) return new Response(null, { status: 204, headers });
+      // Fail closed: if the counter can't be written (KV allows about one
+      // write per second to a key), drop the record rather than store it
+      // uncounted.
+      try {
+        await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
+      } catch {
+        return new Response(null, { status: 204, headers });
+      }
+
+      const host = typeof body.host === "string" && /^[a-zA-Z0-9.-]{1,253}$/.test(body.host)
+        ? body.host : null;
+      const record = {
+        kind: body.kind === "capability_request" ? body.kind : "other",
+        task,
+        tried: scrubText(body.tried),
+        failure: scrubText(body.failure),
+        host,
+        tool: isTool(body.tool) ? body.tool : null,
+        country: callerCountry(request),
+        version: typeof body.version === "string" && /^[0-9A-Za-z.+-]{1,20}$/.test(body.version) ? body.version : null,
+        os: typeof body.os === "string" && /^[a-z0-9_]{1,20}$/.test(body.os) ? body.os : null,
+        at: new Date().toISOString(),
+      };
+      await env.SUBSCRIPTIONS.put(`fb:${date}:${crypto.randomUUID()}`, JSON.stringify(record), {
+        expirationTtl: 30 * 86400,
+      });
+      return new Response(null, { status: 204, headers });
     }
 
     // ── Public stats summary ─────────────────────────────────────
@@ -291,7 +535,7 @@ export default {
       // v2 added per-row status_dist; bumping the key ensures the
       // first request after deploy rebuilds the cached payload in the
       // new shape instead of serving stale v1 JSON for up to 5 minutes.
-      const cacheKey = "stats:summary:v3";
+      const cacheKey = "stats:summary:v4";
       const cached = await env.SUBSCRIPTIONS.get(cacheKey);
       if (cached) {
         return new Response(cached, {
@@ -349,6 +593,7 @@ export default {
             const aggKey = `${host}|${strategy}`;
             const cur = agg.get(aggKey) || {
               host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
+              tool_dist: {}, retries: 0, retry_successes: 0,
             };
             // Coerce each field via Number() and ignore non-finite
             // values — a stringly-typed stored value (`"1"`) would
@@ -380,6 +625,11 @@ export default {
                 }
               }
             }
+            mergeCounts(cur.tool_dist, v.tool_dist, isTool);
+            const vr = Number(v.retries);
+            const vrs = Number(v.retry_successes);
+            if (Number.isFinite(vr)) cur.retries += vr;
+            if (Number.isFinite(vrs)) cur.retry_successes += vrs;
             agg.set(aggKey, cur);
           }
           cursor = list.list_complete ? undefined : list.cursor;
@@ -403,6 +653,11 @@ export default {
           // success can be split into "offline×20" (user's network — ignore)
           // vs "reset×20" (the site is actively blocking — a real signal).
           error_kind_dist: r.error_kind_dist || {},
+          // country_dist stays out of this public summary: per-host
+          // country counts can single out one user. Read it from KV.
+          tool_dist: r.tool_dist,
+          retries: r.retries,
+          retry_successes: r.retry_successes,
         }))
         .sort((a, b) => b.fetches - a.fetches)
         .slice(0, 500);

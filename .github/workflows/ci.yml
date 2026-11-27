@@ -65,3 +65,16 @@ jobs:
       - name: Test (without Cronet)
         run: cargo test
         working-directory: rust
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Worker smoke tests
+        run: node test/smoke.mjs
+        working-directory: worker
