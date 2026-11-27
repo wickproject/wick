@@ -439,14 +439,12 @@ async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
                     .as_deref()
                     .and_then(|u| url::Url::parse(u).ok())
                     .unwrap_or_else(|| dir.clone());
-                // Same-site means the requested host or the one the directory
-                // redirected to (apex to www is the common case).
                 let links: Vec<String> = crate::crawl::extract_links(&html, &base)
                     .into_iter()
-                    .filter(|u| u.host_str() == parsed.host_str() || u.host_str() == base.host_str())
+                    .filter(|u| same_site(u, &parsed))
                     .map(|u| u.to_string())
                     .collect();
-                let best = rank_similar(parsed.path(), &links, SUGGEST_COUNT);
+                let best = rank_similar(&parsed, &links, SUGGEST_COUNT);
                 if !best.is_empty() {
                     return Some(best);
                 }
@@ -478,6 +476,20 @@ fn parent_dir(u: &url::Url) -> Option<url::Url> {
     Some(d)
 }
 
+/// Whether `u` is on the same site as `requested`: the same host once a
+/// leading `www.` is dropped from each, so an apex-to-www redirect keeps
+/// its links while a redirect to an unrelated host (an SSO page, a parked
+/// domain) contributes none.
+fn same_site(u: &url::Url, requested: &url::Url) -> bool {
+    fn bare(h: &str) -> &str {
+        h.strip_prefix("www.").unwrap_or(h)
+    }
+    match (u.host_str(), requested.host_str()) {
+        (Some(a), Some(b)) => bare(&a.to_ascii_lowercase()) == bare(&b.to_ascii_lowercase()),
+        _ => false,
+    }
+}
+
 /// Tokens of a path's last segment (usually the page name), lowercased,
 /// without file extensions or filler like "index".
 fn page_tokens(path: &str) -> Vec<String> {
@@ -495,8 +507,8 @@ fn page_tokens(path: &str) -> Vec<String> {
 /// one: 2 per identical token, 1 when one token starts with the other
 /// (`task` and `taskgroups`). Candidates with no match are dropped, so an
 /// unrelated site gets no suggestions rather than noise.
-fn rank_similar(path: &str, candidates: &[String], n: usize) -> Vec<String> {
-    let want = page_tokens(path);
+fn rank_similar(requested: &url::Url, candidates: &[String], n: usize) -> Vec<String> {
+    let want = page_tokens(requested.path());
     if want.is_empty() {
         return Vec::new();
     }
@@ -504,8 +516,11 @@ fn rank_similar(path: &str, candidates: &[String], n: usize) -> Vec<String> {
     let mut scored: Vec<(usize, &String)> = candidates
         .iter()
         .filter_map(|c| {
-            let cp = url::Url::parse(c).ok()?.path().to_string();
-            if cp == path || !seen.insert(cp.clone()) {
+            let cu = url::Url::parse(c).ok()?;
+            let cp = cu.path().to_string();
+            let key = (cu.host_str().map(str::to_string), cp.clone());
+            let is_requested = cu.host_str() == requested.host_str() && cp == requested.path();
+            if is_requested || !seen.insert(key) {
                 return None;
             }
             let have = page_tokens(&cp);
@@ -546,7 +561,30 @@ impl ServerHandler for WickServer {
 
 #[cfg(test)]
 mod tests {
-    use super::{parent_dir, rank_similar, RequestCapabilityInput, WickServer};
+    use super::{parent_dir, rank_similar, same_site, RequestCapabilityInput, WickServer};
+
+    fn u(s: &str) -> url::Url {
+        url::Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn same_site_allows_www_only() {
+        let req = u("https://example.com/docs/x.html");
+        assert!(same_site(&u("https://www.example.com/docs/a.html"), &req));
+        assert!(same_site(&u("https://EXAMPLE.com/b"), &req));
+        assert!(!same_site(&u("https://login.okta.com/help"), &req));
+        assert!(!same_site(&u("https://docs.example.com/c"), &req));
+    }
+
+    #[test]
+    fn suggests_requested_path_on_other_host() {
+        let cands = vec![
+            "https://example.com/docs/foo.html".to_string(),
+            "https://www.example.com/docs/foo.html".to_string(),
+        ];
+        let got = rank_similar(&u("https://example.com/docs/foo.html"), &cands, 5);
+        assert_eq!(got, vec!["https://www.example.com/docs/foo.html".to_string()]);
+    }
     use rmcp::handler::server::wrapper::Parameters;
 
     #[tokio::test]
@@ -581,7 +619,7 @@ mod tests {
         .iter()
         .map(|s| s.to_string())
         .collect();
-        let got = rank_similar("/3/library/asyncio-taskgroups.html", &cands, 5);
+        let got = rank_similar(&u("https://docs.python.org/3/library/asyncio-taskgroups.html"), &cands, 5);
         assert_eq!(got[0], "https://docs.python.org/3/library/asyncio-task.html");
         assert_eq!(got.len(), 2, "{:?}", got);
     }
@@ -592,13 +630,13 @@ mod tests {
             "https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string(),
             "https://x.io/wiki/%E5%A4%A7%E9%98%AA".to_string(),
         ];
-        let got = rank_similar("/wiki/%E6%9D%B1%E4%BA%AC%E9%83%BD", &cands, 5);
+        let got = rank_similar(&u("https://x.io/wiki/%E6%9D%B1%E4%BA%AC%E9%83%BD"), &cands, 5);
         assert_eq!(got, vec!["https://x.io/wiki/%E6%9D%B1%E4%BA%AC".to_string()]);
     }
 
     #[test]
     fn no_match_means_no_suggestions() {
         let cands = vec!["https://x.io/runtime-apis/".to_string(), "https://x.io/cache/".to_string()];
-        assert!(rank_similar("/runtime-apis/kv-namespace/", &cands, 5).is_empty());
+        assert!(rank_similar(&u("https://x.io/runtime-apis/kv-namespace/"), &cands, 5).is_empty());
     }
 }

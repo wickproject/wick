@@ -72,10 +72,16 @@ impl Client {
         {
             let headers = chrome_header_pairs();
             let resp = self.engine.get(url, &headers).await?;
+            let final_url = resp.final_url.filter(|f| {
+                match (url::Url::parse(url), url::Url::parse(f)) {
+                    (Ok(a), Ok(b)) => a != b,
+                    _ => true,
+                }
+            });
             Ok(RawResponse {
                 status: resp.status_code,
                 body: resp.body,
-                final_url: resp.final_url,
+                final_url,
             })
         }
         #[cfg(not(feature = "cronet"))]
@@ -100,10 +106,9 @@ pub struct HttpResponse {
 pub struct RawResponse {
     pub status: u16,
     pub body: Vec<u8>,
-    /// Where the request ended up after redirects. `None` when it wasn't
-    /// redirected. Cronet sets it after any redirect, even a chain that
-    /// returns to the requested URL; reqwest sets it only when the final URL
-    /// differs from the requested one.
+    /// Where the request ended up after redirects, or `None` when that is
+    /// the URL requested (no redirect, or a chain that returned to it). Both
+    /// backends compare parsed URLs.
     pub final_url: Option<String>,
 }
 
