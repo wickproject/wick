@@ -75,14 +75,16 @@ impl Client {
             Ok(RawResponse {
                 status: resp.status_code,
                 body: resp.body,
+                final_url: resp.final_url,
             })
         }
         #[cfg(not(feature = "cronet"))]
         {
             let resp = self.inner.get(url).send().await?;
             let status = resp.status().as_u16();
+            let final_url = Some(resp.url().to_string()).filter(|u| u != url);
             let body = resp.bytes().await?.to_vec();
-            Ok(RawResponse { status, body })
+            Ok(RawResponse { status, body, final_url })
         }
     }
 }
@@ -95,6 +97,8 @@ pub struct HttpResponse {
 pub struct RawResponse {
     pub status: u16,
     pub body: Vec<u8>,
+    /// The URL after redirects, when it differs from the one requested.
+    pub final_url: Option<String>,
 }
 
 fn storage_path() -> Result<PathBuf> {

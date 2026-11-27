@@ -431,7 +431,15 @@ async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
                     continue;
                 }
                 let html = String::from_utf8_lossy(&page.body);
-                let links: Vec<String> = crate::crawl::extract_links(&html, &dir)
+                // Resolve relative links against where the directory page
+                // actually came from: after a redirect (/docs/ to
+                // /en/latest/), `href="x.html"` means /en/latest/x.html.
+                let base = page
+                    .final_url
+                    .as_deref()
+                    .and_then(|u| url::Url::parse(u).ok())
+                    .unwrap_or_else(|| dir.clone());
+                let links: Vec<String> = crate::crawl::extract_links(&html, &base)
                     .into_iter()
                     .filter(|u| u.host_str() == parsed.host_str())
                     .map(|u| u.to_string())
