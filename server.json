@@ -7,12 +7,12 @@
     "url": "https://github.com/wickproject/wick",
     "source": "github"
   },
-  "version": "0.5.0",
+  "version": "0.13.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "wick-mcp",
-      "version": "0.5.0",
+      "version": "0.13.0",
       "transport": {
         "type": "stdio"
       }
