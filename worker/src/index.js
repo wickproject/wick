@@ -84,7 +84,7 @@ function isErrorKind(k) {
 const TOOLS = new Set([
   "wick_fetch", "wick_search", "wick_crawl", "wick_map", "wick_download",
   "wick_fetch_to_file", "wick_session", "wick_request_capability",
-  "wick_fetch_404_suggest", "mcp", "api", "cli",
+  "mcp", "api", "cli",
 ]);
 function isTool(t) {
   return typeof t === "string" && TOOLS.has(t);
@@ -111,28 +111,49 @@ function mergeCounts(dst, src, valid) {
 const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
 
 /**
- * Server-side pass of the client's scrub (rust/src/analytics.rs `scrub`):
- * old or modified clients may skip it. Cuts URLs to their host and
- * replaces emails, key-like tokens and long digit runs, then caps length.
+ * Server-side pass of the client's scrub (`scrub` in rust/src/analytics.rs),
+ * since old or modified clients may skip it. Same rules, checked against
+ * the same cases (worker/test/scrub-cases.json): URLs keep only their host,
+ * including URLs inside a token and scheme-less domain/path forms; emails,
+ * key-like tokens and runs of 7+ digits are replaced; length is capped.
  */
 const FEEDBACK_MAX_CHARS = 600;
+const EDGE_PUNCT = /^[,.;:!?()[\]{}<>"'`]+|[,.;:!?()[\]{}<>"'`]+$/g;
+function scrubWord(word) {
+  const i = word.indexOf("://");
+  if (i >= 0) {
+    let start = i;
+    while (start > 0 && /[A-Za-z0-9+.-]/.test(word[start - 1])) start--;
+    const rest = word.slice(start);
+    const m = rest.search(/[()<>[\]{}"'`,;]/);
+    const end = m < 0 ? rest.length : m;
+    let tag = "[url]";
+    try { tag = `[url:${new URL(rest.slice(0, end)).hostname}]`; } catch { /* keep [url] */ }
+    return word.slice(0, start) + tag + scrubWord(rest.slice(end));
+  }
+  const w = word.replace(EDGE_PUNCT, "");
+  const bare = w.match(/^([A-Za-z0-9.-]+\.[A-Za-z]{2,})\/.+/);
+  if (bare) return `[url:${bare[1]}]`;
+  if (w.includes("@") && w.includes(".")) return "[email]";
+  if (w.length >= 24 && /^[A-Za-z0-9_+\/=.%-]+$/.test(w) && /\d/.test(w) && /[A-Za-z]/.test(w)) return "[redacted]";
+  return word;
+}
 function scrubText(v) {
   if (typeof v !== "string") return null;
-  const out = v.split(/\s+/).filter(Boolean).map(word => {
-    const w = word.replace(/^[,.;:!?()\[\]{}<>"'`]+|[,.;:!?()\[\]{}<>"'`]+$/g, "");
-    try {
-      const u = new URL(w);
-      return (u.protocol === "http:" || u.protocol === "https:") ? `[url:${u.hostname}]` : "[url]";
-    } catch { /* not a URL */ }
-    if (w.includes("@") && w.includes(".")) return "[email]";
-    if (w.length >= 24 && /^[A-Za-z0-9_+\/=-]+$/.test(w) && /\d/.test(w) && /[A-Za-z]/.test(w)) return "[redacted]";
-    if ((w.match(/\d/g) || []).length >= 7) return "[number]";
-    return word;
-  }).join(" ");
-  return out.slice(0, FEEDBACK_MAX_CHARS) || null;
+  const masked = v.replace(/\+?\d[\d ().+-]*/g, run => {
+    const core = run.replace(/[^\d]+$/, "");
+    const tail = run.slice(core.length);
+    return (core.match(/\d/g) || []).length >= 7 ? "[number]" + tail : run;
+  });
+  const out = masked.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
+  return Array.from(out).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
 }
 
-/** Most feedback records stored per UTC day, across all callers. */
+/**
+ * Approximate ceiling on feedback records per UTC day, across all callers.
+ * KV has no atomic increment, so concurrent requests can overshoot it
+ * slightly; the per-caller FEEDBACK_LIMITER binding is the main guard.
+ */
 const FEEDBACK_DAILY_CAP = 2000;
 
 export default {
@@ -386,9 +407,15 @@ export default {
     // what its user needs. Each record is stored once under
     // `fb:<date>:<uuid>` with the caller's country and a 30-day TTL; read
     // them with `wrangler kv key list --prefix fb:`. Text is scrubbed again
-    // here in case the client didn't. Unauthenticated, so a global daily
-    // cap bounds how much a misbehaving client can write.
+    // here in case the client didn't. The endpoint is unauthenticated, so
+    // each caller IP is rate limited (FEEDBACK_LIMITER, in memory, never
+    // stored) and a global daily cap bounds total writes.
     if (request.method === "POST" && path === "/v1/feedback") {
+      if (env.FEEDBACK_LIMITER) {
+        const ip = request.headers.get("cf-connecting-ip") || "unknown";
+        const { success } = await env.FEEDBACK_LIMITER.limit({ key: ip });
+        if (!success) return new Response("rate limited\n", { status: 429, headers });
+      }
       let body;
       try {
         body = await request.json();
@@ -402,7 +429,12 @@ export default {
       const countKey = `fbcount:${date}`;
       const count = parseInt(await env.SUBSCRIPTIONS.get(countKey) || "0");
       if (count >= FEEDBACK_DAILY_CAP) return new Response("", { status: 204, headers });
-      await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
+      // KV allows about one write per second to a key, so a burst can make
+      // this counter write fail. Keep the record either way: the counter is
+      // only an approximate ceiling.
+      try {
+        await env.SUBSCRIPTIONS.put(countKey, String(count + 1), { expirationTtl: 2 * 86400 });
+      } catch { /* counter write limited; still store the feedback */ }
 
       const host = typeof body.host === "string" && /^[a-zA-Z0-9.-]{1,253}$/.test(body.host)
         ? body.host : null;
@@ -492,7 +524,7 @@ export default {
             const aggKey = `${host}|${strategy}`;
             const cur = agg.get(aggKey) || {
               host, strategy, fetches: 0, successes: 0, total_ms: 0, status_dist: {}, error_kind_dist: {},
-              country_dist: {}, tool_dist: {}, retries: 0, retry_successes: 0,
+              tool_dist: {}, retries: 0, retry_successes: 0,
             };
             // Coerce each field via Number() and ignore non-finite
             // values — a stringly-typed stored value (`"1"`) would
@@ -524,7 +556,6 @@ export default {
                 }
               }
             }
-            mergeCounts(cur.country_dist, v.country_dist, isCountry);
             mergeCounts(cur.tool_dist, v.tool_dist, isTool);
             const vr = Number(v.retries);
             const vrs = Number(v.retry_successes);
@@ -553,7 +584,8 @@ export default {
           // success can be split into "offline×20" (user's network — ignore)
           // vs "reset×20" (the site is actively blocking — a real signal).
           error_kind_dist: r.error_kind_dist || {},
-          country_dist: r.country_dist,
+          // country_dist stays out of this public summary: per-host
+          // country counts can single out one user. Read it from KV.
           tool_dist: r.tool_dist,
           retries: r.retries,
           retry_successes: r.retry_successes,

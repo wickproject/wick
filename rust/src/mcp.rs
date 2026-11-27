@@ -388,9 +388,11 @@ impl WickServer {
         })
         .await;
         let msg = if sent {
-            "Thanks, this was sent to the Wick team. Requests like this decide what Wick builds next. Carry on with the user's task."
-        } else {
+            "Thanks, this is queued for the Wick team (best effort). Requests like this decide what Wick builds next. Carry on with the user's task."
+        } else if analytics::is_opted_out() {
             "Not sent: the user has turned off Wick telemetry. Carry on with the user's task."
+        } else {
+            "Not sent: Wick's telemetry queue is unavailable right now. Carry on with the user's task."
         };
         Ok(CallToolResult::success(vec![Content::text(msg)]))
     }
@@ -404,7 +406,8 @@ const SUGGEST_COUNT: usize = 5;
 /// the one requested. Agents often guess documentation URLs, and the
 /// directory above a guessed page usually links to the real ones, so this
 /// reads the parent directory's page, then the grandparent's, and ranks
-/// their same-site links. Bounded by `SUGGEST_TIMEOUT`.
+/// their same-site links. Bounded by `SUGGEST_TIMEOUT`. These lookups run
+/// under `SUGGEST_TOOL`, which keeps them out of telemetry.
 async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
     let parsed = url::Url::parse(requested).ok()?;
     let best = tokio::time::timeout(
@@ -413,13 +416,17 @@ async fn suggest_urls(client: &Client, requested: &str) -> Option<String> {
             let mut dir = parsed.clone();
             for _ in 0..2 {
                 dir = parent_dir(&dir)?;
-                let Ok(page) = fetch::fetch_html(client, dir.as_str(), true).await else {
+                // fetch_raw is network-only: it never launches the CEF
+                // renderer, so the lookup honors render='cronet' and the
+                // timeout above can't leave a render holding the renderer.
+                let Ok(page) = fetch::fetch_raw(client, dir.as_str(), true).await else {
                     continue;
                 };
-                if page.status_code >= 400 {
+                if page.status_code == 0 || page.status_code >= 400 {
                     continue;
                 }
-                let links: Vec<String> = crate::crawl::extract_links(&page.html, &dir)
+                let html = String::from_utf8_lossy(&page.bytes);
+                let links: Vec<String> = crate::crawl::extract_links(&html, &dir)
                     .into_iter()
                     .filter(|u| u.host_str() == parsed.host_str())
                     .map(|u| u.to_string())

@@ -33,3 +33,13 @@ id = "cc2ea7f5a022431dbb5361c3741786d1"
 # Per-fetch telemetry is stored in the same SUBSCRIPTIONS KV namespace
 # under the `evt:` prefix. No additional binding required — keeping this
 # on Workers Free avoids pulling in the Analytics Engine paid tier.
+
+# Per-caller limit on POST /v1/feedback, keyed by caller IP in memory only.
+# Approximate and per Cloudflare location (see the Workers rate-limit docs).
+[[ratelimits]]
+name = "FEEDBACK_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

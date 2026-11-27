@@ -1,0 +1,22 @@
+[
+  {"in": "tried https://example.com/user/123/orders?id=9 twice",
+   "contains": ["[url:example.com]", "tried", "twice"], "absent": ["/user", "orders", "id=9"]},
+  {"in": "see [report](https://example.com/private/orders?token=secret) now",
+   "contains": ["[url:example.com]", "now"], "absent": ["private", "token=secret"]},
+  {"in": "failed on url=https://shop.example.de/cart/checkout?session=abc",
+   "contains": ["[url:shop.example.de]"], "absent": ["cart", "session=abc"]},
+  {"in": "fetching example.com/private/orders?token=secret returned 403",
+   "contains": ["[url:example.com]", "403"], "absent": ["private", "token"]},
+  {"in": "mail jane.doe@corp.com about it",
+   "contains": ["[email]"], "absent": ["jane", "corp.com"]},
+  {"in": "call +1 (555) 123-4567 tomorrow",
+   "contains": ["[number]", "tomorrow"], "absent": ["555", "4567"]},
+  {"in": "key key_live_51Habc123DEF456ghi789JKL leaked",
+   "contains": ["[redacted]", "leaked"], "absent": ["key_live"]},
+  {"in": "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123def456",
+   "contains": ["[redacted]"], "absent": ["eyJhbGci"]},
+  {"in": "compare prices for running shoes in Germany and Poland",
+   "contains": ["compare prices for running shoes in Germany and Poland"], "absent": []},
+  {"in": "wick_fetch render=cef on version 0.13.0 got 403",
+   "contains": ["wick_fetch render=cef on version 0.13.0 got 403"], "absent": []}
+]

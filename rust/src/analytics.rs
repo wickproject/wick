@@ -9,12 +9,13 @@
 //!     wick version, OS.
 //!   - Which surface issued the fetch (`tool`: an MCP tool name such as
 //!     `wick_fetch`, or `cli` / `api`) and whether it retried a host that
-//!     failed in the last few minutes (`retry`). A failure with no later
-//!     successful retry is how the stats page spots abandoned tasks.
+//!     failed in the last few minutes (`retry`). The worker counts retries
+//!     and successful retries per host, as input for spotting tasks agents
+//!     gave up on; nothing reads those counts yet.
 //!   - Explicit agent feedback sent through the `wick_request_capability`
 //!     MCP tool: free text describing a task Wick couldn't do. It is scrubbed
-//!     on this machine before sending (URLs cut to their host, emails, long
-//!     numbers and key-like tokens replaced) and capped in length.
+//!     on this machine before sending (see `scrub`) and capped in length.
+//!     Delivery is best effort, like everything here.
 //!   - For transport failures (no HTTP response at all): a coarse `error_kind`
 //!     cause — `offline` / `dns` / `timeout` / `reset` / `refused` /
 //!     `unreachable` / `quic` / `connect` / `other`. Lets the stats page tell a
@@ -172,34 +173,39 @@ fn worker_sender() -> Option<&'static SyncSender<Job>> {
 /// Enqueue a JSON post. Returns immediately; on a full queue or if the
 /// worker thread couldn't be spawned, the event is dropped silently
 /// (telemetry never applies backpressure or fails loudly).
-fn enqueue(url: &'static str, body: String) {
-    if let Some(s) = worker_sender() {
-        let _ = s.try_send(Job::PostJson(url, body));
-    }
+fn enqueue(url: &'static str, body: String) -> bool {
+    worker_sender().is_some_and(|s| s.try_send(Job::PostJson(url, body)).is_ok())
+}
+
+/// Telemetry is skipped for opted-out users and for lookups Wick runs on
+/// its own behalf (404 suggestions), which must not count as the agent's
+/// fetches or touch its retry tracking.
+fn should_report() -> bool {
+    !is_opted_out() && current_tool() != SUGGEST_TOOL
 }
 
 /// Report a per-fetch outcome. Fire-and-forget.
 pub fn report_fetch(ev: FetchEvent) {
-    if is_opted_out() {
+    if !should_report() {
         return;
     }
-    let tool = current_tool();
-    // Lookups Wick makes on its own behalf (404 suggestions) must not clear
-    // or set the retry marker for the agent's own requests.
-    let retry = tool != SUGGEST_TOOL && note_outcome(ev.host, ev.ok);
-    let payload = json!({
+    let retry = note_outcome(ev.host, ev.ok);
+    enqueue(EVENTS_URL, fetch_payload(&ev, retry).to_string());
+}
+
+fn fetch_payload(ev: &FetchEvent, retry: bool) -> serde_json::Value {
+    json!({
         "host": ev.host,
         "strategy": ev.strategy,
         "escalated_from": ev.escalated_from,
         "ok": ev.ok,
         "status": ev.status,
         "timing_ms": ev.timing_ms,
-        "tool": tool,
+        "tool": current_tool(),
         "retry": retry,
         "version": env!("CARGO_PKG_VERSION"),
         "os": std::env::consts::OS,
-    });
-    enqueue(EVENTS_URL, payload.to_string());
+    })
 }
 
 /// Report a transport-level failure: the request never produced an HTTP
@@ -220,7 +226,7 @@ pub fn report_transport_error(
     escalated_from: Option<&str>,
     timing_ms: u64,
 ) {
-    if is_opted_out() {
+    if !should_report() {
         return;
     }
     let retry = note_outcome(host, false);
@@ -251,8 +257,9 @@ pub struct Feedback<'a> {
 /// Per-field cap on feedback text, in characters.
 pub const FEEDBACK_MAX_CHARS: usize = 600;
 
-/// Send agent feedback. Returns false when telemetry is opted out, in which
-/// case nothing is sent.
+/// Queue agent feedback for sending. Returns false when nothing was queued:
+/// telemetry is opted out, or the send queue is full or unavailable.
+/// Delivery is best effort, like all telemetry.
 pub fn report_feedback(fb: Feedback) -> bool {
     if is_opted_out() {
         return false;
@@ -267,52 +274,112 @@ pub fn report_feedback(fb: Feedback) -> bool {
         "version": env!("CARGO_PKG_VERSION"),
         "os": std::env::consts::OS,
     });
-    enqueue(FEEDBACK_URL, payload.to_string());
-    true
+    enqueue(FEEDBACK_URL, payload.to_string())
 }
 
 /// Strip likely personal or secret data from free text before it leaves
-/// the machine: URLs keep only their host, and emails, long digit runs and
-/// long key-like tokens are replaced. Output is capped at
-/// `FEEDBACK_MAX_CHARS`.
+/// the machine. URLs keep only their host, including URLs inside a larger
+/// token (`[x](https://...)`, `url=https://...`) and scheme-less
+/// `domain/path` forms. Emails, key-like tokens and runs of 7+ digits
+/// (phone or account numbers, even when split by spaces or dashes) are
+/// replaced. Output is capped at `FEEDBACK_MAX_CHARS`. The worker applies
+/// the same rules (`scrubText` in worker/src/index.js); both are checked
+/// against worker/test/scrub-cases.json.
 pub fn scrub(text: &str) -> String {
-    let mut out = Vec::new();
-    for word in text.split_whitespace() {
-        let trimmed = word.trim_matches(|c: char| ",.;:!?()[]{}<>\"'`".contains(c));
-        let replacement = if let Ok(u) = url::Url::parse(trimmed) {
-            match u.host_str() {
-                Some(h) if matches!(u.scheme(), "http" | "https") => Some(format!("[url:{}]", h)),
-                _ => Some("[url]".to_string()),
-            }
-        } else if trimmed.contains('@') && trimmed.contains('.') {
-            Some("[email]".to_string())
-        } else if looks_like_secret(trimmed) {
-            Some("[redacted]".to_string())
-        } else if trimmed.chars().filter(|c| c.is_ascii_digit()).count() >= 7 {
-            Some("[number]".to_string())
-        } else {
-            None
-        };
-        out.push(replacement.unwrap_or_else(|| word.to_string()));
-    }
+    let masked = mask_digit_runs(text);
+    let out: Vec<String> = masked.split_whitespace().map(scrub_word).collect();
     out.join(" ").chars().take(FEEDBACK_MAX_CHARS).collect()
+}
+
+const URL_STOP: &str = "()<>[]{}\"'`,;";
+const EDGE_PUNCT: &str = ",.;:!?()[]{}<>\"'`";
+
+fn scrub_word(word: &str) -> String {
+    if let Some(i) = word.find("://") {
+        let start = word[..i]
+            .rfind(|c: char| !(c.is_ascii_alphanumeric() || "+.-".contains(c)))
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let rest = &word[start..];
+        let end = rest.find(|c: char| URL_STOP.contains(c)).unwrap_or(rest.len());
+        let host = url::Url::parse(&rest[..end])
+            .ok()
+            .and_then(|u| u.host_str().map(|h| h.to_string()));
+        let tag = host.map_or("[url]".to_string(), |h| format!("[url:{}]", h));
+        return format!("{}{}{}", &word[..start], tag, scrub_word(&rest[end..]));
+    }
+    let trimmed = word.trim_matches(|c: char| EDGE_PUNCT.contains(c));
+    if let Some(host) = bare_domain_with_path(trimmed) {
+        return format!("[url:{}]", host);
+    }
+    if trimmed.contains('@') && trimmed.contains('.') {
+        return "[email]".to_string();
+    }
+    if looks_like_secret(trimmed) {
+        return "[redacted]".to_string();
+    }
+    word.to_string()
+}
+
+/// `example.com/private?x=1` → `Some("example.com")`.
+fn bare_domain_with_path(s: &str) -> Option<&str> {
+    let (host, path) = s.split_once('/')?;
+    let tld = host.rsplit('.').nth(0)?;
+    let valid = host.contains('.')
+        && !path.is_empty()
+        && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && tld.len() >= 2
+        && tld.chars().all(|c| c.is_ascii_alphabetic());
+    valid.then_some(host)
+}
+
+/// Replace any run of digits and separators (space, `-`, `(`, `)`, `.`,
+/// `+`) that holds 7 or more digits with `[number]`.
+fn mask_digit_runs(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let starts_run = chars[i].is_ascii_digit()
+            || (chars[i] == '+' && chars.get(i + 1).is_some_and(|c| c.is_ascii_digit()));
+        if !starts_run {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        let (mut j, mut digits, mut last_digit) = (i, 0, i);
+        while j < chars.len() && (chars[j].is_ascii_digit() || " -().+".contains(chars[j])) {
+            if chars[j].is_ascii_digit() {
+                digits += 1;
+                last_digit = j;
+            }
+            j += 1;
+        }
+        if digits >= 7 {
+            out.push_str("[number]");
+        } else {
+            out.extend(&chars[i..=last_digit]);
+        }
+        i = last_digit + 1;
+    }
+    out
 }
 
 fn looks_like_secret(s: &str) -> bool {
     if s.len() < 24 {
         return false;
     }
-    let alnum = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/=".contains(c));
+    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/=.%".contains(c));
     let has_digit = s.chars().any(|c| c.is_ascii_digit());
     let has_alpha = s.chars().any(|c| c.is_ascii_alphabetic());
-    alnum && has_digit && has_alpha
+    charset && has_digit && has_alpha
 }
 
 /// Report a fetch failure — legacy endpoint. Still useful for aggregate
 /// error counts on the KV-backed dashboard. `report_fetch` supersedes it
 /// for per-host/per-strategy analysis.
 pub fn report_failure(domain: &str, status: u16, error_type: &str) {
-    if is_opted_out() {
+    if !should_report() {
         return;
     }
     let payload = json!({
@@ -398,26 +465,31 @@ fn epoch_day() -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn scrub_cuts_urls_to_host() {
-        assert_eq!(
-            scrub("tried https://example.com/user/123/orders?id=9 twice"),
-            "tried [url:example.com] twice"
-        );
+    #[derive(serde::Deserialize)]
+    struct ScrubCase {
+        #[serde(rename = "in")]
+        input: String,
+        contains: Vec<String>,
+        absent: Vec<String>,
     }
 
     #[test]
-    fn scrub_removes_emails_numbers_and_keys() {
-        let s = scrub("mail jane.doe@corp.com call +1 (555) 123-4567 key key_live_51Habc123DEF456ghi789JKL");
-        assert!(!s.contains("jane"), "{}", s);
-        assert!(!s.contains("key_live"), "{}", s);
-        assert!(s.contains("[email]"), "{}", s);
-        assert!(s.contains("[redacted]"), "{}", s);
+    fn scrub_matches_shared_cases() {
+        let cases: Vec<ScrubCase> =
+            serde_json::from_str(include_str!("../../worker/test/scrub-cases.json")).unwrap();
+        for c in cases {
+            let got = scrub(&c.input);
+            for want in &c.contains {
+                assert!(got.contains(want.as_str()), "{:?} -> {:?} lacks {:?}", c.input, got, want);
+            }
+            for bad in &c.absent {
+                assert!(!got.contains(bad.as_str()), "{:?} -> {:?} keeps {:?}", c.input, got, bad);
+            }
+        }
     }
 
     #[test]
-    fn scrub_keeps_plain_text_and_caps_length() {
-        assert_eq!(scrub("compare prices in Germany"), "compare prices in Germany");
+    fn scrub_caps_length() {
         assert_eq!(scrub(&"a ".repeat(1000)).chars().count(), FEEDBACK_MAX_CHARS);
     }
 
@@ -431,8 +503,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tool_scope_attribution() {
-        assert_eq!(with_tool("wick_fetch", async { current_tool() }).await, "wick_fetch");
-        assert_ne!(current_tool(), "wick_fetch");
+    async fn payload_carries_tool_and_retry() {
+        let ev = FetchEvent {
+            host: "h.example",
+            strategy: "cronet",
+            escalated_from: None,
+            ok: true,
+            status: 200,
+            timing_ms: 5,
+        };
+        let p = with_tool("wick_crawl", async { fetch_payload(&ev, true) }).await;
+        assert_eq!(p["tool"], "wick_crawl");
+        assert_eq!(p["retry"], true);
+        assert_eq!(fetch_payload(&ev, false)["retry"], false);
+    }
+
+    #[tokio::test]
+    async fn suggestion_lookups_are_not_reported() {
+        let in_suggest = with_tool(SUGGEST_TOOL, async { should_report() }).await;
+        assert!(!in_suggest);
+        let in_fetch = with_tool("wick_fetch", async { should_report() }).await;
+        assert_eq!(in_fetch, !is_opted_out());
     }
 }
