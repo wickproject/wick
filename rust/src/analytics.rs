@@ -278,95 +278,88 @@ pub fn report_feedback(fb: Feedback) -> bool {
 }
 
 /// Strip likely personal or secret data from free text before it leaves
-/// the machine. Anything from a `scheme://` to the end of its
-/// whitespace-separated token becomes `[url:host]`. The rest of each token
-/// is split at structural characters (quotes, brackets, `:`, `=`, `,`...)
-/// and each piece is checked for scheme-less `domain/path` forms, emails
-/// and key-like tokens. Finally, runs of 7+ digits (phone or account
-/// numbers, even when split by spaces or dashes) become `[number]`, and the
-/// output is capped at `FEEDBACK_MAX_CHARS`. The worker applies the same
+/// the machine, by allowlist rather than by spotting known secrets:
+///
+/// 1. Runs of 7+ digits, even split by spaces or dashes, become `[number]`.
+/// 2. A whitespace-separated word is kept only if it looks like plain
+///    language (see `is_plain_word`).
+/// 3. Any other word is replaced whole: `[url:host]` when it is a URL or
+///    `domain/path` with an unambiguous host, `[email]` when it holds an
+///    `@`, else `[redacted]`. Nothing from a replaced word survives.
+///
+/// Output is capped at `FEEDBACK_MAX_CHARS`. The worker applies the same
 /// rules (`scrubText` in worker/src/index.js); both are checked against
 /// worker/test/scrub-cases.json.
 pub fn scrub(text: &str) -> String {
-    let words: Vec<String> = text.split_whitespace().map(scrub_word).collect();
-    mask_digit_runs(&words.join(" "))
-        .chars()
-        .take(FEEDBACK_MAX_CHARS)
-        .collect()
+    let masked = mask_digit_runs(text);
+    let words: Vec<String> = masked.split_whitespace().map(scrub_word).collect();
+    words.join(" ").chars().take(FEEDBACK_MAX_CHARS).collect()
 }
 
-/// Characters that split a token into separately checked pieces.
-const SEPARATORS: &str = "\"'`()[]{}<>,;:=|";
+const NUMBER_TAG: &str = "[number]";
+/// Longest word kept as-is; longer ones are replaced.
+const MAX_PLAIN_WORD: usize = 40;
 
 fn scrub_word(word: &str) -> String {
-    let Some(i) = word.find("://") else {
-        return scrub_pieces(word);
-    };
-    let mut start = i;
-    for (idx, c) in word[..i].char_indices().rev() {
-        if c.is_ascii_alphanumeric() || "+.-".contains(c) {
-            start = idx;
-        } else {
-            break;
+    if is_plain_word(word) {
+        return word.to_string();
+    }
+    if let Some(i) = word.find("://") {
+        let after = &word[i + 3..];
+        let authority = &after[..after.find(|c: char| "/?#".contains(c)).unwrap_or(after.len())];
+        return url_tag(authority);
+    }
+    let core = word.trim_matches(|c: char| "\"'`()[]{}<>,.;:!?".contains(c));
+    if let Some((host, path)) = core.split_once('/') {
+        if !path.is_empty() && is_domain(host) {
+            return format!("[url:{}]", host);
         }
     }
-    let after = &word[i + 3..];
-    let authority_end = after
-        .find(|c: char| "/?#".contains(c) || (c != ':' && SEPARATORS.contains(c)))
-        .unwrap_or(after.len());
-    let authority = &after[..authority_end];
-    let host = authority.rsplit('@').next().unwrap_or("");
-    let host = host.split(':').next().unwrap_or("");
-    let tag = if !host.is_empty()
-        && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
-    {
+    if word.contains('@') {
+        return "[email]".to_string();
+    }
+    "[redacted]".to_string()
+}
+
+/// `[url:host]` for an authority with no userinfo and a valid domain
+/// (port dropped), else a bare `[url]`.
+fn url_tag(authority: &str) -> String {
+    if authority.contains('@') {
+        return "[url]".to_string();
+    }
+    let host = authority.split(':').next().unwrap_or("");
+    if is_domain(host) {
         format!("[url:{}]", host)
     } else {
         "[url]".to_string()
-    };
-    format!("{}{}", scrub_pieces(&word[..start]), tag)
+    }
 }
 
-fn scrub_pieces(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut piece = String::new();
-    for c in s.chars() {
-        if SEPARATORS.contains(c) {
-            out.push_str(&scrub_piece(&piece));
-            piece.clear();
-            out.push(c);
-        } else {
-            piece.push(c);
-        }
-    }
-    out.push_str(&scrub_piece(&piece));
-    out
-}
-
-fn scrub_piece(piece: &str) -> String {
-    let trimmed = piece.trim_matches(|c: char| ".!?".contains(c));
-    if let Some(host) = bare_domain_with_path(trimmed) {
-        return format!("[url:{}]", host);
-    }
-    if trimmed.contains('@') && trimmed.contains('.') {
-        return "[email]".to_string();
-    }
-    if looks_like_secret(trimmed) {
-        return "[redacted]".to_string();
-    }
-    piece.to_string()
-}
-
-/// `example.com/private?x=1` → `Some("example.com")`.
-fn bare_domain_with_path(s: &str) -> Option<&str> {
-    let (host, path) = s.split_once('/')?;
-    let tld = host.rsplit('.').next()?;
-    let valid = host.contains('.')
-        && !path.is_empty()
+fn is_domain(host: &str) -> bool {
+    let tld = host.rsplit('.').next().unwrap_or("");
+    host.contains('.')
         && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         && tld.len() >= 2
-        && tld.chars().all(|c| c.is_ascii_alphabetic());
-    valid.then_some(host)
+        && tld.chars().all(|c| c.is_ascii_alphabetic())
+}
+
+/// Letters, digits, `_` and light punctuation, no structural or URL
+/// characters, at most `MAX_PLAIN_WORD` characters, and not key-like.
+/// `[number]` placeholders from step 1 are allowed inside a word.
+fn is_plain_word(word: &str) -> bool {
+    let w = word.replace(NUMBER_TAG, "");
+    if w.chars().count() > MAX_PLAIN_WORD || w.contains("://") {
+        return false;
+    }
+    let core = w.trim_end_matches(|c: char| ".,!?;:)".contains(c));
+    let core = core.trim_start_matches('(');
+    if core.contains(':') {
+        return false;
+    }
+    let charset = w
+        .chars()
+        .all(|c| c.is_alphanumeric() || "_'\u{2019}.,!?;:()-&+%".contains(c));
+    charset && !looks_like_secret(core)
 }
 
 /// Replace any run of digits and separators (space, `-`, `(`, `)`, `.`,
@@ -401,11 +394,12 @@ fn mask_digit_runs(text: &str) -> String {
     out
 }
 
+/// Long mixed letter-and-digit tokens: API keys, JWTs, base64 blobs.
 fn looks_like_secret(s: &str) -> bool {
-    if s.len() < 24 {
+    if s.len() < 20 {
         return false;
     }
-    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/.%".contains(c));
+    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/.%=".contains(c));
     let has_digit = s.chars().any(|c| c.is_ascii_digit());
     let has_alpha = s.chars().any(|c| c.is_ascii_alphabetic());
     charset && has_digit && has_alpha

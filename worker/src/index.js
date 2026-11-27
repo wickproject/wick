@@ -112,46 +112,54 @@ const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
 
 /**
  * Server-side pass of the client's scrub (`scrub` in rust/src/analytics.rs),
- * since old or modified clients may skip it. Same rules, checked against
- * the same cases (worker/test/scrub-cases.json): anything from a
- * `scheme://` to the end of its token becomes `[url:host]`; the rest of each
- * token is split at structural characters and each piece checked for
- * domain/path forms, emails and key-like tokens; runs of 7+ digits become
- * `[number]`; length is capped.
+ * since old or modified clients may skip it. Same allowlist rules, checked
+ * against the same cases (worker/test/scrub-cases.json): digit runs of 7+
+ * become `[number]`; a word is kept only if it looks like plain language;
+ * any other word is replaced whole with `[url:host]`, `[email]` or
+ * `[redacted]`; length is capped.
  */
 const FEEDBACK_MAX_CHARS = 600;
-const SEPARATORS = /(["'`()[\]{}<>,;:=|])/;
-function scrubPiece(piece) {
-  const t = piece.replace(/^[.!?]+|[.!?]+$/g, "");
-  const bare = t.match(/^([A-Za-z0-9.-]*\.[A-Za-z]{2,})\/.+/);
-  if (bare) return `[url:${bare[1]}]`;
-  if (t.includes("@") && t.includes(".")) return "[email]";
-  if (t.length >= 24 && /^[A-Za-z0-9_+\/.%-]+$/.test(t) && /\d/.test(t) && /[A-Za-z]/.test(t)) return "[redacted]";
-  return piece;
+const MAX_PLAIN_WORD = 40;
+function looksLikeSecret(s) {
+  return s.length >= 20 && /^[A-Za-z0-9_+\/.%=-]+$/.test(s) && /\d/.test(s) && /[A-Za-z]/.test(s);
 }
-function scrubPieces(s) {
-  return s.split(SEPARATORS).map((p, i) => (i % 2 ? p : scrubPiece(p))).join("");
+function isDomain(h) {
+  return /^[A-Za-z0-9.-]*\.[A-Za-z]{2,}$/.test(h);
+}
+function isPlainWord(word) {
+  const w = word.split("[number]").join("");
+  if (Array.from(w).length > MAX_PLAIN_WORD || w.includes("://")) return false;
+  const core = w.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
+  if (core.includes(":")) return false;
+  return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(w) && !looksLikeSecret(core);
+}
+function urlTag(authority) {
+  if (authority.includes("@")) return "[url]";
+  const host = authority.split(":")[0];
+  return isDomain(host) ? `[url:${host}]` : "[url]";
 }
 function scrubWord(word) {
+  if (isPlainWord(word)) return word;
   const i = word.indexOf("://");
-  if (i < 0) return scrubPieces(word);
-  let start = i;
-  while (start > 0 && /[A-Za-z0-9+.-]/.test(word[start - 1])) start--;
-  const after = word.slice(i + 3);
-  const m = after.search(/[\/?#"'`()[\]{}<>,;=|]/);
-  const authority = m < 0 ? after : after.slice(0, m);
-  const host = authority.split("@").pop().split(":")[0];
-  const tag = /^[A-Za-z0-9.-]+$/.test(host) ? `[url:${host}]` : "[url]";
-  return scrubPieces(word.slice(0, start)) + tag;
+  if (i >= 0) {
+    const after = word.slice(i + 3);
+    const m = after.search(/[\/?#]/);
+    return urlTag(m < 0 ? after : after.slice(0, m));
+  }
+  const core = word.replace(/^["'`()[\]{}<>,.;:!?]+|["'`()[\]{}<>,.;:!?]+$/g, "");
+  const slash = core.indexOf("/");
+  if (slash > 0 && slash < core.length - 1 && isDomain(core.slice(0, slash))) return `[url:${core.slice(0, slash)}]`;
+  if (word.includes("@")) return "[email]";
+  return "[redacted]";
 }
 function scrubText(v) {
   if (typeof v !== "string") return null;
-  const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
-  const masked = words.replace(/\+?\d[\d ().+-]*/g, run => {
+  const masked = v.replace(/\+?\d[\d ().+-]*/g, run => {
     const core = run.replace(/[^\d]+$/, "");
     return (core.match(/\d/g) || []).length >= 7 ? "[number]" + run.slice(core.length) : run;
   });
-  return Array.from(masked).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+  const out = masked.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
+  return Array.from(out).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
 }
 
 /**
