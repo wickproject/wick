@@ -477,19 +477,20 @@ fn parent_dir(u: &url::Url) -> Option<url::Url> {
 }
 
 /// A site's identity for suggestions: its host, lowercased, without a
-/// leading `www.`. One rule for the same-site filter, for excluding the
+/// leading `www.` or a trailing `.`. One rule for the same-site filter, for excluding the
 /// requested page and for de-duplication, so `example.com` and
 /// `www.example.com` are always treated as one site.
 fn site_key(u: &url::Url) -> Option<String> {
     let h = u.host_str()?.to_ascii_lowercase();
-    Some(h.strip_prefix("www.").map(str::to_string).unwrap_or(h))
+    let h = h.strip_suffix('.').unwrap_or(&h);
+    Some(h.strip_prefix("www.").unwrap_or(h).to_string())
 }
 
 /// Whether `u` is on the same site as `requested` (see `site_key`). An
 /// apex-to-www redirect keeps its links; a redirect to an unrelated host
 /// (an SSO page, a parked domain, another subdomain) contributes none.
 fn same_site(u: &url::Url, requested: &url::Url) -> bool {
-    site_key(u).is_some() && site_key(u) == site_key(requested)
+    matches!((site_key(u), site_key(requested)), (Some(a), Some(b)) if a == b)
 }
 
 /// Tokens of a path's last segment (usually the page name), lowercased,
@@ -521,8 +522,10 @@ fn rank_similar(requested: &url::Url, candidates: &[String], n: usize) -> Vec<St
             let cu = url::Url::parse(c).ok()?;
             let cp = cu.path().to_string();
             let key = (site_key(&cu), cp.clone());
-            // The requested page on either host is the page that just 404'd
-            // (after an apex-to-www redirect the 404 came from www).
+            // The requested page on either host counts as the page that just
+            // 404'd. After an apex-to-www redirect the 404 came from www; when
+            // there was no redirect a live www twin is lost, a deliberate
+            // trade: suggesting a dead page is worse than missing a twin.
             let is_requested = key == (site_key(requested), requested.path().to_string());
             if is_requested || !seen.insert(key) {
                 return None;
@@ -578,6 +581,7 @@ mod tests {
         assert!(same_site(&u("https://EXAMPLE.com/b"), &req));
         assert!(!same_site(&u("https://login.okta.com/help"), &req));
         assert!(!same_site(&u("https://docs.example.com/c"), &req));
+        assert!(same_site(&u("https://example.com./d"), &req));
     }
 
     #[test]
