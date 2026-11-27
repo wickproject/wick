@@ -113,25 +113,35 @@ const isCountry = k => /^[A-Z][A-Z0-9]$/.test(k);
 /**
  * Server-side pass of the client's scrub (`scrub` in rust/src/analytics.rs),
  * since old or modified clients may skip it. Same allowlist rules, checked
- * against the same cases (worker/test/scrub-cases.json): digit runs of 7+
- * become `[number]`; a word is kept only if it looks like plain language;
- * any other word is replaced whole with `[url:host]`, `[email]` or
- * `[redacted]`; length is capped.
+ * against the same cases (worker/test/scrub-cases.json): a word is kept
+ * only if it is a scrub placeholder or looks like plain language; any other
+ * word is replaced whole with `[url:host]`, `[email]` or `[redacted]`; then
+ * runs of 7+ digits become `[number]`; length is capped. Scrubbing twice
+ * gives the same result, so client output passes through unchanged.
  */
 const FEEDBACK_MAX_CHARS = 600;
 const MAX_PLAIN_WORD = 40;
-function looksLikeSecret(s) {
-  return s.length >= 20 && /^[A-Za-z0-9_+\/.%=-]+$/.test(s) && /\d/.test(s) && /[A-Za-z]/.test(s);
+function looksLikeSecret(word) {
+  const alnum = word.replace(/[^A-Za-z0-9]/g, "");
+  if (alnum.length < 20) return false;
+  const mixed = /\d/.test(alnum) && /[A-Za-z]/.test(alnum);
+  const innerUpper = (alnum.slice(1).match(/[A-Z]/g) || []).length;
+  return mixed || (innerUpper >= 3 && /[a-z]/.test(alnum));
 }
 function isDomain(h) {
-  return /^[A-Za-z0-9.-]*\.[A-Za-z]{2,}$/.test(h);
+  return h.includes(".") && /^[A-Za-z0-9.-]+$/.test(h) && /\.[A-Za-z]{2,}$/.test(h);
+}
+function isPlaceholder(word) {
+  const w = word.replace(/^\(+/, "").replace(/[.,;:!?)]+$/, "");
+  if (["[number]", "[email]", "[redacted]", "[url]"].includes(w)) return true;
+  const m = w.match(/^\[url:(.+)\]$/);
+  return !!m && isDomain(m[1]);
 }
 function isPlainWord(word) {
-  const w = word.split("[number]").join("");
-  if (Array.from(w).length > MAX_PLAIN_WORD || w.includes("://")) return false;
-  const core = w.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
+  if (Array.from(word).length > MAX_PLAIN_WORD || word.includes("://")) return false;
+  const core = word.replace(/[.,!?;:)]+$/, "").replace(/^\(+/, "");
   if (core.includes(":")) return false;
-  return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(w) && !looksLikeSecret(core);
+  return /^[\p{L}\p{M}\p{N}_'’.,!?;:()\-&+%]*$/u.test(word) && !looksLikeSecret(word);
 }
 function urlTag(authority) {
   if (authority.includes("@")) return "[url]";
@@ -139,7 +149,7 @@ function urlTag(authority) {
   return isDomain(host) ? `[url:${host}]` : "[url]";
 }
 function scrubWord(word) {
-  if (isPlainWord(word)) return word;
+  if (isPlaceholder(word) || isPlainWord(word)) return word;
   const i = word.indexOf("://");
   if (i >= 0) {
     const after = word.slice(i + 3);
@@ -154,12 +164,12 @@ function scrubWord(word) {
 }
 function scrubText(v) {
   if (typeof v !== "string") return null;
-  const masked = v.replace(/\+?\d[\d ().+-]*/g, run => {
+  const words = v.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
+  const masked = words.replace(/\+?\d[\d ().+-]*/g, run => {
     const core = run.replace(/[^\d]+$/, "");
     return (core.match(/\d/g) || []).length >= 7 ? "[number]" + run.slice(core.length) : run;
   });
-  const out = masked.split(/\s+/).filter(Boolean).map(scrubWord).join(" ");
-  return Array.from(out).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
+  return Array.from(masked).slice(0, FEEDBACK_MAX_CHARS).join("") || null;
 }
 
 /**

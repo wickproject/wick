@@ -203,5 +203,107 @@
   "absent": [
    "render=cef"
   ]
+ },
+ {
+  "in": "key key_live_ABCDEFGHIJ1234567KLMNOPQRST here",
+  "contains": [
+   "key [redacted] here"
+  ],
+  "absent": [
+   "key_live",
+   "KLMNOP"
+  ]
+ },
+ {
+  "in": "use tok_1234567890abcdefghij now",
+  "contains": [
+   "use [redacted] now"
+  ],
+  "absent": [
+   "tok_",
+   "abcdefghij"
+  ]
+ },
+ {
+  "in": "account 1234\n5678 closed",
+  "contains": [
+   "account [number] closed"
+  ],
+  "absent": [
+   "1234",
+   "5678"
+  ]
+ },
+ {
+  "in": "tried [url:example.com] twice, mailed [email], got [number] and [redacted].",
+  "contains": [
+   "tried [url:example.com] twice, mailed [email], got [number] and [redacted]."
+  ],
+  "absent": []
+ },
+ {
+  "in": "café für Hindi किताब",
+  "contains": [
+   "café für Hindi किताब"
+  ],
+  "absent": []
+ },
+ {
+  "in": "k abcd1234efgh5678ijkl end",
+  "contains": [
+   "k [redacted] end"
+  ],
+  "absent": [
+   "abcd1234"
+  ]
+ },
+ {
+  "in": "k abcd1234efgh5678ijk end",
+  "contains": [
+   "k abcd1234efgh5678ijk end"
+  ],
+  "absent": []
+ },
+ {
+  "in": "q 'abcd1234efgh5678ijklmnop' and abc&1234efgh5678ijklmnop!",
+  "contains": [
+   "q [redacted] and [redacted]"
+  ],
+  "absent": [
+   "abcd1234",
+   "efgh5678"
+  ]
+ },
+ {
+  "in": "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end",
+  "contains": [
+   "w [redacted] end"
+  ],
+  "absent": [
+   "aaaaaaaaaa"
+  ]
+ },
+ {
+  "in": "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end",
+  "contains": [
+   "w aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end"
+  ],
+  "absent": []
+ },
+ {
+  "in": "k AbCdEfGhIjKlMnOpQrStUv end",
+  "contains": [
+   "k [redacted] end"
+  ],
+  "absent": [
+   "AbCdEf"
+  ]
+ },
+ {
+  "in": "Donaudampfschifffahrtsgesellschaft rocks",
+  "contains": [
+   "Donaudampfschifffahrtsgesellschaft rocks"
+  ],
+  "absent": []
  }
 ]

@@ -280,28 +280,30 @@ pub fn report_feedback(fb: Feedback) -> bool {
 /// Strip likely personal or secret data from free text before it leaves
 /// the machine, by allowlist rather than by spotting known secrets:
 ///
-/// 1. Runs of 7+ digits, even split by spaces or dashes, become `[number]`.
-/// 2. A whitespace-separated word is kept only if it looks like plain
-///    language (see `is_plain_word`).
-/// 3. Any other word is replaced whole: `[url:host]` when it is a URL or
+/// 1. A whitespace-separated word is kept only if it is one of our own
+///    placeholders or looks like plain language (see `is_plain_word`).
+/// 2. Any other word is replaced whole: `[url:host]` when it is a URL or
 ///    `domain/path` with an unambiguous host, `[email]` when it holds an
 ///    `@`, else `[redacted]`. Nothing from a replaced word survives.
+/// 3. Then runs of 7+ digits, even split across words, become `[number]`.
 ///
-/// Output is capped at `FEEDBACK_MAX_CHARS`. The worker applies the same
-/// rules (`scrubText` in worker/src/index.js); both are checked against
+/// Output is capped at `FEEDBACK_MAX_CHARS`. Scrubbing twice gives the
+/// same result, so the worker can safely re-apply the same rules
+/// (`scrubText` in worker/src/index.js); both are checked against
 /// worker/test/scrub-cases.json.
 pub fn scrub(text: &str) -> String {
-    let masked = mask_digit_runs(text);
-    let words: Vec<String> = masked.split_whitespace().map(scrub_word).collect();
-    words.join(" ").chars().take(FEEDBACK_MAX_CHARS).collect()
+    let words: Vec<String> = text.split_whitespace().map(scrub_word).collect();
+    mask_digit_runs(&words.join(" "))
+        .chars()
+        .take(FEEDBACK_MAX_CHARS)
+        .collect()
 }
 
-const NUMBER_TAG: &str = "[number]";
 /// Longest word kept as-is; longer ones are replaced.
 const MAX_PLAIN_WORD: usize = 40;
 
 fn scrub_word(word: &str) -> String {
-    if is_plain_word(word) {
+    if is_placeholder(word) || is_plain_word(word) {
         return word.to_string();
     }
     if let Some(i) = word.find("://") {
@@ -343,23 +345,59 @@ fn is_domain(host: &str) -> bool {
         && tld.chars().all(|c| c.is_ascii_alphabetic())
 }
 
-/// Letters, digits, `_` and light punctuation, no structural or URL
-/// characters, at most `MAX_PLAIN_WORD` characters, and not key-like.
-/// `[number]` placeholders from step 1 are allowed inside a word.
+/// A placeholder this scrubber emits (`[number]`, `[email]`, `[redacted]`,
+/// `[url]`, `[url:host]`), optionally wrapped in `(` and trailing
+/// punctuation, so a second pass leaves it alone.
+fn is_placeholder(word: &str) -> bool {
+    let w = word.trim_start_matches('(');
+    let w = w.trim_end_matches(|c: char| ".,;:!?)".contains(c));
+    if matches!(w, "[number]" | "[email]" | "[redacted]" | "[url]") {
+        return true;
+    }
+    w.strip_prefix("[url:")
+        .and_then(|r| r.strip_suffix(']'))
+        .is_some_and(is_domain)
+}
+
+/// Combining marks (accents written as a separate code point), which
+/// `char::is_alphanumeric` doesn't count as letters.
+fn is_combining_mark(c: char) -> bool {
+    matches!(c as u32,
+        0x0300..=0x036F | 0x0483..=0x0489 | 0x0591..=0x05C7 | 0x0610..=0x061A
+        | 0x064B..=0x065F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF
+        | 0x3099..=0x309A | 0xFE20..=0xFE2F)
+}
+
+/// Letters (any script), digits, `_` and light punctuation; no structural
+/// or URL characters; at most `MAX_PLAIN_WORD` characters; not key-like.
 fn is_plain_word(word: &str) -> bool {
-    let w = word.replace(NUMBER_TAG, "");
-    if w.chars().count() > MAX_PLAIN_WORD || w.contains("://") {
+    if word.chars().count() > MAX_PLAIN_WORD || word.contains("://") {
         return false;
     }
-    let core = w.trim_end_matches(|c: char| ".,!?;:)".contains(c));
+    let core = word.trim_end_matches(|c: char| ".,!?;:)".contains(c));
     let core = core.trim_start_matches('(');
     if core.contains(':') {
         return false;
     }
-    let charset = w
-        .chars()
-        .all(|c| c.is_alphanumeric() || "_'\u{2019}.,!?;:()-&+%".contains(c));
-    charset && !looks_like_secret(core)
+    let charset = word.chars().all(|c| {
+        c.is_alphanumeric() || is_combining_mark(c) || "_'\u{2019}.,!?;:()-&+%".contains(c)
+    });
+    charset && !looks_like_secret(word)
+}
+
+/// Key-like: 20+ ASCII letters and digits in total that mix letters with
+/// digits, or mix case the way random tokens do. Punctuation around or
+/// inside the word doesn't matter.
+fn looks_like_secret(word: &str) -> bool {
+    let alnum: Vec<char> = word.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    if alnum.len() < 20 {
+        return false;
+    }
+    let digits = alnum.iter().any(|c| c.is_ascii_digit());
+    let letters = alnum.iter().any(|c| c.is_ascii_alphabetic());
+    let inner_upper = alnum.iter().skip(1).filter(|c| c.is_ascii_uppercase()).count();
+    let lower = alnum.iter().any(|c| c.is_ascii_lowercase());
+    (digits && letters) || (inner_upper >= 3 && lower)
 }
 
 /// Replace any run of digits and separators (space, `-`, `(`, `)`, `.`,
@@ -394,16 +432,6 @@ fn mask_digit_runs(text: &str) -> String {
     out
 }
 
-/// Long mixed letter-and-digit tokens: API keys, JWTs, base64 blobs.
-fn looks_like_secret(s: &str) -> bool {
-    if s.len() < 20 {
-        return false;
-    }
-    let charset = s.chars().all(|c| c.is_ascii_alphanumeric() || "-_+/.%=".contains(c));
-    let has_digit = s.chars().any(|c| c.is_ascii_digit());
-    let has_alpha = s.chars().any(|c| c.is_ascii_alphabetic());
-    charset && has_digit && has_alpha
-}
 
 /// Report a fetch failure — legacy endpoint. Still useful for aggregate
 /// error counts on the KV-backed dashboard. `report_fetch` supersedes it
@@ -515,6 +543,16 @@ mod tests {
             for bad in &c.absent {
                 assert!(!got.contains(bad.as_str()), "{:?} -> {:?} keeps {:?}", c.input, got, bad);
             }
+        }
+    }
+
+    #[test]
+    fn scrub_is_idempotent() {
+        let cases: Vec<ScrubCase> =
+            serde_json::from_str(include_str!("../../worker/test/scrub-cases.json")).unwrap();
+        for c in cases {
+            let once = scrub(&c.input);
+            assert_eq!(scrub(&once), once, "second pass changed {:?}", c.input);
         }
     }
 
